@@ -41,6 +41,7 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "pagada",
   "anulada",
 ]);
+export const reminderStatusEnum = pgEnum("reminder_status", ["enviado", "error"]);
 export const itemUnitEnum = pgEnum("item_unit", ["horas", "unidades"]);
 export const paymentMethodEnum = pgEnum("payment_method", [
   "transferencia",
@@ -63,6 +64,8 @@ export const users = pgTable(
     /** Tarifa horaria por defecto, en céntimos. */
     hourlyRateCents: integer("hourly_rate_cents").notNull().default(0),
     active: boolean().notNull().default(true),
+    /** Recibe por correo los recordatorios de plazos y eventos que tiene asignados. */
+    emailReminders: boolean("email_reminders").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
@@ -257,6 +260,36 @@ export const payments = pgTable(
   (t) => [index("payments_invoice_idx").on(t.invoiceId)],
 );
 
+/**
+ * Registro de recordatorios enviados. La clave única (evento, fecha del evento, antelación)
+ * garantiza que cada aviso se envía una sola vez; si el evento se reprograma, cambia la fecha
+ * y los avisos vuelven a aplicarse.
+ */
+export const reminderLog = pgTable(
+  "reminder_log",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** Día del evento (YYYY-MM-DD, zona horaria del despacho) cuando se envió el aviso. */
+    eventDate: date("event_date").notNull(),
+    /** Días de antelación del aviso: 7, 3, 1, 0 (el mismo día) o negativo (vencido). */
+    offsetDays: integer("offset_days").notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    email: text().notNull(),
+    status: reminderStatusEnum().notNull(),
+    attempts: integer().notNull().default(1),
+    error: text(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("reminder_log_unique_idx").on(t.eventId, t.eventDate, t.offsetDays),
+    index("reminder_log_created_idx").on(t.createdAt),
+  ],
+);
+
 /* ---------- Relaciones ---------- */
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -323,3 +356,4 @@ export type Invoice = typeof invoices.$inferSelect;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
+export type ReminderLog = typeof reminderLog.$inferSelect;

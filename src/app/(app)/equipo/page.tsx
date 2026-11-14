@@ -33,7 +33,10 @@ export default async function TeamPage() {
                     <p className="text-xs text-ink-500">{u.email}</p>
                   </div>
                   <div className="text-right text-sm text-ink-600">
-                    <p>{roleLabels[u.role]}</p>
+                    <p>
+                      {roleLabels[u.role]}
+                      {!u.emailReminders && <span className="badge-gray ml-2">Sin avisos</span>}
+                    </p>
                     <p className="text-xs">{formatMoney(u.hourlyRateCents)}/h</p>
                   </div>
                 </summary>
@@ -90,12 +93,18 @@ function UserForm({
         <Field label={user ? "Nueva contraseña (opcional)" : "Contraseña"} hint="Mínimo 10 caracteres">
           <input className="input" type="password" name="password" autoComplete="new-password" required={!user} />
         </Field>
-        {user && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-700">
-            <input type="checkbox" name="active" defaultChecked={user.active} />
-            Usuario activo
+        <div className="space-y-2 self-end pb-2 text-sm text-ink-700">
+          {user && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="active" defaultChecked={user.active} />
+              Usuario activo
+            </label>
+          )}
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="emailReminders" defaultChecked={user?.emailReminders ?? true} />
+            Recibe recordatorios por correo
           </label>
-        )}
+        </div>
       </div>
       <div className="mt-3">
         <SubmitButton>{user ? "Guardar cambios" : "Crear usuario"}</SubmitButton>

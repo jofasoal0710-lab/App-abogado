@@ -47,7 +47,11 @@ export async function createUserAction(_prev: ActionState, formData: FormData): 
   if (!password.success) return { error: firstZodError(password.error) };
   if (await emailTaken(parsed.data.email)) return { error: "Ya existe un usuario con ese correo." };
 
-  await db.insert(users).values({ ...parsed.data, passwordHash: await bcrypt.hash(password.data, 12) });
+  await db.insert(users).values({
+    ...parsed.data,
+    emailReminders: formData.get("emailReminders") === "on",
+    passwordHash: await bcrypt.hash(password.data, 12),
+  });
   revalidatePath("/equipo");
   return { ok: `Usuario ${parsed.data.name} creado.` };
 }
@@ -75,7 +79,11 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
   }
 
   const newPassword = String(formData.get("password") ?? "");
-  const set: Partial<typeof users.$inferInsert> = { ...parsed.data, active };
+  const set: Partial<typeof users.$inferInsert> = {
+    ...parsed.data,
+    active,
+    emailReminders: formData.get("emailReminders") === "on",
+  };
   if (newPassword) {
     const pw = passwordSchema.safeParse(newPassword);
     if (!pw.success) return { error: firstZodError(pw.error) };

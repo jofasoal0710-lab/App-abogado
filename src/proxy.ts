@@ -7,6 +7,9 @@ export async function proxy(request: NextRequest) {
   const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
   const { pathname } = request.nextUrl;
 
+  // Los cron externos no tienen cookie de sesión: se autentican con CRON_SECRET en la propia ruta.
+  if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+
   if (!session && pathname !== "/login") {
     const url = new URL("/login", request.url);
     if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);

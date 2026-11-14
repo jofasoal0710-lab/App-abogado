@@ -15,7 +15,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/documentos", label: "Documentos" },
     { href: "/horas", label: "Horas" },
     { href: "/facturas", label: "Facturas" },
-    ...(user.role === "admin" ? [{ href: "/equipo", label: "Equipo" }] : []),
+    ...(user.role === "admin"
+      ? [
+          { href: "/recordatorios", label: "Recordatorios" },
+          { href: "/equipo", label: "Equipo" },
+        ]
+      : []),
   ];
 
   return (
