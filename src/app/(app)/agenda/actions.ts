@@ -7,6 +7,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
+import { canAccessEvent, canAccessMatterOrNone, canUserIdAccessMatter } from "@/lib/access";
+import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-redirect";
 
@@ -46,6 +48,19 @@ function parseEvent(formData: FormData) {
   });
 }
 
+/** El evento solo puede vincularse a un expediente que veas, y asignarse a alguien que también lo vea. */
+async function checkEventAccess(
+  user: Parameters<typeof canAccessMatterOrNone>[0],
+  matterId: number | null,
+  assignedId: number | null,
+): Promise<string | null> {
+  if (!(await canAccessMatterOrNone(user, matterId))) return ACCESS_DENIED;
+  if (matterId !== null && assignedId !== null && assignedId !== user.id && !(await canUserIdAccessMatter(assignedId, matterId))) {
+    return "La persona asignada no tiene acceso a ese expediente.";
+  }
+  return null;
+}
+
 function revalidateAgenda(matterId?: number | null) {
   revalidatePath("/agenda");
   revalidatePath("/");
@@ -53,9 +68,11 @@ function revalidateAgenda(matterId?: number | null) {
 }
 
 export async function createEventAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
   const parsed = parseEvent(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
+  const denied = await checkEventAccess(user, parsed.data.matterId, parsed.data.assignedId);
+  if (denied) return { error: denied };
 
   await db.insert(events).values(parsed.data);
   revalidateAgenda(parsed.data.matterId);
@@ -67,9 +84,12 @@ export async function updateEventAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await canAccessEvent(user, id))) return { error: ACCESS_DENIED };
   const parsed = parseEvent(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
+  const denied = await checkEventAccess(user, parsed.data.matterId, parsed.data.assignedId);
+  if (denied) return { error: denied };
 
   await db.update(events).set(parsed.data).where(eq(events.id, id));
   revalidateAgenda(parsed.data.matterId);
@@ -77,7 +97,8 @@ export async function updateEventAction(
 }
 
 export async function toggleEventAction(id: number) {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await canAccessEvent(user, id))) return;
   const [ev] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!ev) return;
   await db.update(events).set({ completed: !ev.completed }).where(eq(events.id, id));
@@ -85,7 +106,8 @@ export async function toggleEventAction(id: number) {
 }
 
 export async function deleteEventAction(id: number) {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await canAccessEvent(user, id))) return;
   const [ev] = await db.delete(events).where(eq(events.id, id)).returning({ matterId: events.matterId });
   revalidateAgenda(ev?.matterId);
 }

@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/form";
 import { EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters, timeEntries, users } from "@/db/schema";
+import { getAccessibleMatter, matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, formatDate, todayISO } from "@/lib/dates";
@@ -18,7 +19,7 @@ export default async function NewInvoicePage({
 }: {
   searchParams: Promise<{ expediente?: string; cliente?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
   const matterId = Number(sp.expediente) || null;
   const clientParam = Number(sp.cliente) || null;
@@ -30,7 +31,7 @@ export default async function NewInvoicePage({
         .select({ id: matters.id, number: matters.number, title: matters.title, client: clients.name })
         .from(matters)
         .innerJoin(clients, eq(clients.id, matters.clientId))
-        .where(inArray(matters.status, ["abierto", "en_curso", "en_espera", "cerrado"]))
+        .where(and(inArray(matters.status, ["abierto", "en_curso", "en_espera", "cerrado"]), matterAccessSql(user, matters.id)))
         .orderBy(asc(clients.name), desc(matters.number)),
       db.select({ id: clients.id, name: clients.name }).from(clients).orderBy(asc(clients.name)),
     ]);
@@ -77,7 +78,7 @@ export default async function NewInvoicePage({
   let clientId = clientParam;
   let matter: typeof matters.$inferSelect | undefined;
   if (matterId) {
-    [matter] = await db.select().from(matters).where(eq(matters.id, matterId)).limit(1);
+    matter = (await getAccessibleMatter(user, matterId)) ?? undefined;
     if (!matter) notFound();
     clientId = matter.clientId;
   }

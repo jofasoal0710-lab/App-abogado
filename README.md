@@ -40,6 +40,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 - **Documentos**: subida por expediente (máx. 25 MB, lista de extensiones permitida), descarga autenticada.
 - **Horas**: registro con tarifa congelada por entrada; las facturadas quedan bloqueadas.
 - **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada / anulada; cobros parciales, IVA configurable, vista imprimible (Imprimir / PDF).
+- **Permisos por expediente**: cada expediente es *abierto* (lo ve todo el equipo) o *restringido* (ver abajo).
 - **Recordatorios** (solo administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
 - **Equipo** (solo administradores): altas, roles, tarifa horaria, desactivación y si recibe avisos por correo.
 
@@ -50,7 +51,26 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Clientes, expedientes, horas, agenda, documentos (subir) | ✓ | ✓ | ✓ |
 | Eliminar clientes / documentos | ✓ | ✓ | – |
 | Eliminar expedientes, gestionar equipo | ✓ | – | – |
+| Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
+| Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
 | Emitir/anular facturas, borrar cobros | ✓ | ✓ | – |
+
+## Permisos por expediente
+
+Cada expediente tiene una **visibilidad**:
+- **Abierto** (por defecto): lo ve todo el equipo, como antes.
+- **Restringido**: solo lo ven su **responsable**, los **miembros** que se añadan en la pestaña *Acceso* y los **administradores**.
+
+Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo administradores y el responsable). Esa pestaña lista quién tiene acceso y guarda un **historial** de cambios (visibilidad, altas y bajas de miembros, cambios de responsable).
+
+**Qué cubre.** Todo lo que cuelga del expediente: notas, documentos (incluida la descarga), horas, eventos de agenda, facturas y cobros. Quien no tiene acceso no ve el expediente en listas, búsquedas, ficha de cliente, panel ni cifras, y las direcciones directas devuelven **404** (no revelan que existe). Los avisos por correo tampoco se envían a quien no pueda ver el expediente, y no se puede asignar un evento a alguien sin acceso.
+
+**Qué no cubre** (limitaciones conocidas):
+- Los **administradores lo ven todo**; no hay "muralla china" frente a ellos.
+- Los **clientes** son visibles para todo el equipo, y las facturas sin expediente también.
+- Borrar un cliente con expedientes ocultos responde "tiene expedientes o facturas asociados": revela que hay algo, no qué.
+- Se registran los cambios de acceso, **no las lecturas** (quién abrió qué).
+- Un evento ya asignado a alguien que luego pierde el acceso sigue asignado, aunque deje de verlo y de recibir avisos.
 
 ## Recordatorios por correo
 
@@ -92,6 +112,5 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - Define `AUTH_SECRET` y `DATABASE_URL` reales, sirve la app tras HTTPS y haz copias de seguridad de la base de datos **y** de `UPLOAD_DIR`.
 - Los documentos se guardan en disco local; con varias réplicas hay que pasar a almacenamiento compartido (S3 o similar).
 - El limitador de intentos de login es en memoria (una sola instancia).
-- Todos los usuarios ven todos los expedientes (sin confidencialidad por expediente / "muralla china").
 - Sin retención IRPF, facturas rectificativas ni facturación electrónica oficial (Verifactu/FacturaE).
 - Sin firma electrónica ni portal de clientes.

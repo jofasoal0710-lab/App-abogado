@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Readable } from "node:stream";
 import { db } from "@/db";
 import { documents } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
 import { openFile } from "@/lib/storage";
 
@@ -15,7 +16,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return new Response("No encontrado", { status: 404 });
 
-  const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
+  // 404 tanto si no existe como si pertenece a un expediente al que no tienes acceso.
+  const [doc] = await db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.id, id), matterAccessSql(user, documents.matterId)))
+    .limit(1);
   if (!doc) return new Response("No encontrado", { status: 404 });
 
   let stream: Readable;

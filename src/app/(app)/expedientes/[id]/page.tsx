@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { notFound } from "next/navigation";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form";
-import { Badge, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { Badge, EmptyState, Field, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/db";
-import { documents, events, invoices, matterNotes, matters, clients, timeEntries, users } from "@/db/schema";
+import { documents, events, invoices, matterAccessLog, matterMembers, matterNotes, matters, clients, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
+import { listAddableUsers, matterAccessSql } from "@/lib/access";
+import { canManageMatterAccess } from "@/lib/access-rules";
 import { canManageInvoices, requireUser } from "@/lib/auth";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { areaLabels, billingTypeLabels, entries, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
@@ -17,6 +20,8 @@ import { EventsList } from "../../agenda/events-list";
 import { TimeEntriesTable } from "../../horas/time-entries-table";
 import { TimeEntryForm } from "../../horas/time-entry-form";
 import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction } from "../actions";
+import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
+import { roleLabels } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Expediente" };
 
@@ -27,6 +32,7 @@ const TABS = [
   ["horas", "Horas"],
   ["agenda", "Agenda"],
   ["facturas", "Facturas"],
+  ["acceso", "Acceso"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -48,10 +54,11 @@ export default async function MatterPage({
     .from(matters)
     .innerJoin(clients, eq(clients.id, matters.clientId))
     .leftJoin(users, eq(users.id, matters.responsibleId))
-    .where(eq(matters.id, id))
+    .where(and(eq(matters.id, id), matterAccessSql(user, matters.id)))
     .limit(1);
-  if (!row) notFound();
+  if (!row) notFound(); // 404 también si existe pero no tienes acceso
   const { matter, client } = row;
+  const canManage = canManageMatterAccess(user, matter);
 
   // Estadísticas económicas (siempre visibles en la cabecera).
   const [pending] = await db
@@ -82,6 +89,7 @@ export default async function MatterPage({
         subtitle={
           <>
             {matter.number} · <Link className="link" href={`/clientes/${client.id}`}>{client.name}</Link> · {areaLabels[matter.area]}
+            {matter.visibility === "restringido" && <span className="badge-amber ml-2">Restringido</span>}
           </>
         }
         actions={
@@ -183,6 +191,8 @@ export default async function MatterPage({
       {tab === "horas" && <HoursTab matterId={id} user={user} />}
 
       {tab === "agenda" && <AgendaTab matterId={id} base={base} />}
+
+      {tab === "acceso" && <AccessTab matter={matter} responsibleName={row.responsible} canManage={canManage} />}
 
       {tab === "facturas" && (
         <section className="card overflow-x-auto">
@@ -360,5 +370,138 @@ async function AgendaTab({ matterId, base }: { matterId: number; base: string })
       </div>
       <EventsList rows={rows} returnTo={`${base}?tab=agenda`} showMatter={false} empty="Este expediente no tiene eventos ni plazos" />
     </section>
+  );
+}
+
+async function AccessTab({
+  matter,
+  responsibleName,
+  canManage,
+}: {
+  matter: typeof matters.$inferSelect;
+  responsibleName: string | null;
+  canManage: boolean;
+}) {
+  const addedBy = alias(users, "added_by");
+  const [members, addable, log] = await Promise.all([
+    db
+      .select({ userId: matterMembers.userId, name: users.name, role: users.role, createdAt: matterMembers.createdAt, addedBy: addedBy.name })
+      .from(matterMembers)
+      .innerJoin(users, eq(users.id, matterMembers.userId))
+      .leftJoin(addedBy, eq(addedBy.id, matterMembers.addedById))
+      .where(eq(matterMembers.matterId, matter.id))
+      .orderBy(asc(users.name)),
+    canManage ? listAddableUsers(matter.id, matter.responsibleId) : Promise.resolve([]),
+    canManage
+      ? db
+          .select({ id: matterAccessLog.id, detail: matterAccessLog.detail, createdAt: matterAccessLog.createdAt, actor: users.name })
+          .from(matterAccessLog)
+          .leftJoin(users, eq(users.id, matterAccessLog.actorId))
+          .where(eq(matterAccessLog.matterId, matter.id))
+          .orderBy(desc(matterAccessLog.createdAt), desc(matterAccessLog.id))
+          .limit(30)
+      : Promise.resolve([]),
+  ]);
+  const restricted = matter.visibility === "restringido";
+
+  return (
+    <div className="space-y-6">
+      <section className="card card-pad">
+        <h2 className="mb-1 font-serif text-lg font-semibold">Visibilidad</h2>
+        <p className="mb-4 text-sm text-ink-600">
+          {restricted
+            ? "Restringido: solo lo ven el responsable, los miembros de la lista y los administradores. El resto del equipo ni siquiera sabe que existe."
+            : "Abierto: lo ve todo el equipo. Los miembros de la lista solo se tienen en cuenta si lo restringes."}
+        </p>
+        {canManage ? (
+          <ActionForm action={setVisibilityAction.bind(null, matter.id)}>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Visibilidad" className="w-64">
+                <select className="input" name="visibility" defaultValue={matter.visibility}>
+                  <option value="abierto">Abierto (todo el equipo)</option>
+                  <option value="restringido">Restringido (confidencial)</option>
+                </select>
+              </Field>
+              <SubmitButton>Guardar</SubmitButton>
+            </div>
+            <p className="hint mt-2">Al restringirlo, quien no sea miembro dejará de verlo, incluidos los eventos que tenga asignados en este expediente.</p>
+          </ActionForm>
+        ) : (
+          <p className="text-sm text-ink-500">Solo los administradores y el responsable pueden cambiarla.</p>
+        )}
+      </section>
+
+      <section className="card">
+        <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Quién tiene acceso</h2>
+        <ul className="divide-y divide-ink-100 text-sm">
+          <li className="flex items-center justify-between px-5 py-3">
+            <span>
+              <strong className="text-ink-900">{responsibleName ?? "Sin responsable"}</strong>
+              <span className="ml-2 text-ink-500">Responsable</span>
+            </span>
+          </li>
+          <li className="px-5 py-3 text-ink-600">Los administradores siempre tienen acceso.</li>
+          {members.map((m) => (
+            <li key={m.userId} className="flex items-center justify-between gap-3 px-5 py-3">
+              <span>
+                <strong className="text-ink-900">{m.name}</strong>
+                <span className="ml-2 text-ink-500">
+                  {roleLabels[m.role]} · miembro desde {formatDate(m.createdAt)}
+                  {m.addedBy && ` · añadido/a por ${m.addedBy}`}
+                </span>
+              </span>
+              {canManage && (
+                <form action={removeMemberAction.bind(null, matter.id, m.userId)}>
+                  <ConfirmButton message={`¿Quitar a ${m.name} del expediente?`} className="btn-ghost btn-sm text-red-700">
+                    Quitar
+                  </ConfirmButton>
+                </form>
+              )}
+            </li>
+          ))}
+          {members.length === 0 && <li className="px-5 py-3 text-ink-500">No hay miembros añadidos.</li>}
+        </ul>
+        {canManage && (
+          <ActionForm action={addMemberAction.bind(null, matter.id)} resetOnSuccess>
+            <div className="flex flex-wrap items-end gap-3 border-t border-ink-100 px-5 py-4">
+              <Field label="Añadir miembro" className="w-72">
+                <select className="input" name="userId" defaultValue="" required>
+                  <option value="" disabled>
+                    Selecciona una persona…
+                  </option>
+                  {addable.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({roleLabels[u.role]})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <SubmitButton>Añadir</SubmitButton>
+            </div>
+          </ActionForm>
+        )}
+      </section>
+
+      {canManage && (
+        <section className="card overflow-x-auto">
+          <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Historial de cambios de acceso</h2>
+          {log.length === 0 ? (
+            <EmptyState title="Sin cambios registrados" />
+          ) : (
+            <table className="table">
+              <tbody>
+                {log.map((l) => (
+                  <tr key={l.id}>
+                    <td className="whitespace-nowrap">{formatDateTime(l.createdAt)}</td>
+                    <td>{l.detail}</td>
+                    <td className="text-ink-500">{l.actor ?? "Usuario eliminado"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
+    </div>
   );
 }

@@ -15,6 +15,7 @@ export function MatterForm({
   lawyers,
   defaultClientId,
   defaultResponsibleId,
+  canChangeResponsible = true,
   cancelHref,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
@@ -23,6 +24,8 @@ export function MatterForm({
   lawyers: Option[];
   defaultClientId?: number;
   defaultResponsibleId?: number;
+  /** Falso si no puedes cambiar el responsable (no eres administrador ni el responsable actual). */
+  canChangeResponsible?: boolean;
   cancelHref: string;
 }) {
   const fee = matter?.fixedFeeCents != null ? (matter.fixedFeeCents / 100).toFixed(2).replace(".", ",") : "";
@@ -45,7 +48,7 @@ export function MatterForm({
           </select>
         </Field>
         <Field label="Abogado responsable">
-          <select className="input" name="responsibleId" defaultValue={matter?.responsibleId ?? defaultResponsibleId ?? ""}>
+          <select className="input" name="responsibleId" defaultValue={matter?.responsibleId ?? defaultResponsibleId ?? ""} disabled={!canChangeResponsible}>
             <option value="">Sin asignar</option>
             {lawyers.map((u) => (
               <option key={u.id} value={u.id}>
@@ -54,6 +57,14 @@ export function MatterForm({
             ))}
           </select>
         </Field>
+        {!matter && (
+          <Field label="Visibilidad" hint="Restringido: solo el responsable, los miembros que añadas y los administradores. Podrás cambiarlo en la pestaña Acceso.">
+            <select className="input" name="visibility" defaultValue="abierto">
+              <option value="abierto">Abierto (todo el equipo)</option>
+              <option value="restringido">Restringido (confidencial)</option>
+            </select>
+          </Field>
+        )}
         <Field label="Área">
           <select className="input" name="area" defaultValue={matter?.area ?? "otros"}>
             {entries(areaLabels).map(([value, label]) => (

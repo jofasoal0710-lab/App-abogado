@@ -5,6 +5,7 @@ import { Badge, EmptyState, Stat } from "@/components/ui";
 import { db } from "@/db";
 import { clients, events, invoices, matters, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
 import { summarizeInvoice } from "@/lib/invoices";
@@ -21,10 +22,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
   const in14Days = new Date(startOfToday.getTime() + 14 * 86_400_000);
   const in7Days = new Date(startOfToday.getTime() + 7 * 86_400_000);
-  const mineEvents = (extra?: ReturnType<typeof and>) => and(eq(events.assignedId, user.id), eq(events.completed, false), extra);
+  const mineEvents = (extra?: ReturnType<typeof and>) => and(eq(events.assignedId, user.id), eq(events.completed, false), matterAccessSql(user, events.matterId, { orNone: true }), extra);
 
   const [[activeCount], [unbilled], [overdueEvents], [week], upcoming, recentMatters, emitted] = await Promise.all([
-    db.select({ n: count() }).from(matters).where(inArray(matters.status, ["abierto", "en_curso", "en_espera"])),
+    db
+      .select({ n: count() })
+      .from(matters)
+      .where(and(inArray(matters.status, ["abierto", "en_curso", "en_espera"]), matterAccessSql(user, matters.id))),
     db
       .select({
         minutes: sql<number>`coalesce(sum(${timeEntries.minutes}), 0)::int`,
@@ -32,7 +36,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       })
       .from(timeEntries)
       .innerJoin(matters, eq(matters.id, timeEntries.matterId))
-      .where(and(eq(timeEntries.billable, true), isNull(timeEntries.invoiceId), eq(matters.billingType, "por_horas"))),
+      .where(and(eq(timeEntries.billable, true), isNull(timeEntries.invoiceId), eq(matters.billingType, "por_horas"), matterAccessSql(user, matters.id))),
     db
       .select({ n: count() })
       .from(events)
@@ -58,11 +62,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       })
       .from(matters)
       .innerJoin(clients, eq(clients.id, matters.clientId))
-      .where(and(eq(matters.responsibleId, user.id), inArray(matters.status, ["abierto", "en_curso", "en_espera"])))
+      .where(and(eq(matters.responsibleId, user.id), inArray(matters.status, ["abierto", "en_curso", "en_espera"]), matterAccessSql(user, matters.id)))
       .orderBy(desc(matters.openedAt), desc(matters.id))
       .limit(6),
     db.query.invoices.findMany({
-      where: eq(invoices.status, "emitida"),
+      where: and(eq(invoices.status, "emitida"), matterAccessSql(user, invoices.matterId, { orNone: true })),
       with: { items: true, payments: true, client: true },
       orderBy: asc(invoices.dueDate),
     }),

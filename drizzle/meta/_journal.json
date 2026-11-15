@@ -15,6 +15,13 @@
       "when": 1794691150679,
       "tag": "0001_true_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794707295786,
+      "tag": "0002_gigantic_greymalkin",
+      "breakpoints": true
     }
   ]
 }

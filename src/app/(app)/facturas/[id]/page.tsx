@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ActionForm, ConfirmButton, PrintButton, SubmitButton } from "@/components/form";
 import { Badge, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { canManageInvoices, requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { formatDate, todayISO } from "@/lib/dates";
@@ -39,7 +40,7 @@ export default async function InvoicePage({
   const { error } = await searchParams;
 
   const inv = await db.query.invoices.findFirst({
-    where: eq(invoices.id, id),
+    where: and(eq(invoices.id, id), matterAccessSql(user, invoices.matterId, { orNone: true })),
     with: { client: true, matter: true, items: { orderBy: (i) => asc(i.id) }, payments: { orderBy: (p) => asc(p.paidAt) } },
   });
   if (!inv) notFound();

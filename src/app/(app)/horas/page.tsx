@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters, timeEntries, users } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { currentMonth, monthLabel, shiftMonth, todayISO } from "@/lib/dates";
 import { qs } from "@/lib/search";
@@ -48,6 +49,7 @@ export default async function HoursPage({
           gte(timeEntries.workedOn, start),
           lt(timeEntries.workedOn, end),
           all ? undefined : eq(timeEntries.userId, user.id),
+          matterAccessSql(user, timeEntries.matterId),
         ),
       )
       .orderBy(desc(timeEntries.workedOn), desc(timeEntries.id)),
@@ -55,7 +57,7 @@ export default async function HoursPage({
       .select({ id: matters.id, number: matters.number, title: matters.title, client: clients.name })
       .from(matters)
       .innerJoin(clients, eq(clients.id, matters.clientId))
-      .where(inArray(matters.status, ["abierto", "en_curso", "en_espera"]))
+      .where(and(inArray(matters.status, ["abierto", "en_curso", "en_espera"]), matterAccessSql(user, matters.id)))
       .orderBy(asc(clients.name), asc(matters.number)),
   ]);
 

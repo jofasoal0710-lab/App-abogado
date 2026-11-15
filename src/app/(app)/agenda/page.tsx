@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { events, matters, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { buildMonthGrid, currentMonth, dayKey, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { qs } from "@/lib/search";
@@ -31,6 +32,7 @@ export default async function AgendaPage({
   const mine = sp.mios === "1";
   const { start, end } = monthRange(month);
   const mineFilter = mine ? eq(events.assignedId, user.id) : undefined;
+  const accessFilter = matterAccessSql(user, events.matterId, { orNone: true });
   const base = db
     .select(eventSelect)
     .from(events)
@@ -38,7 +40,7 @@ export default async function AgendaPage({
     .leftJoin(users, eq(users.id, events.assignedId));
 
   const [monthEvents, overdue] = await Promise.all([
-    base.where(and(gte(events.startsAt, start), lt(events.startsAt, end), mineFilter)).orderBy(asc(events.startsAt)),
+    base.where(and(gte(events.startsAt, start), lt(events.startsAt, end), mineFilter, accessFilter)).orderBy(asc(events.startsAt)),
     db
       .select(eventSelect)
       .from(events)
@@ -50,6 +52,7 @@ export default async function AgendaPage({
           lt(events.startsAt, new Date(new Date().setHours(0, 0, 0, 0))),
           inArray(events.kind, ["plazo", "tarea"]),
           mineFilter,
+          accessFilter,
         ),
       )
       .orderBy(asc(events.startsAt))

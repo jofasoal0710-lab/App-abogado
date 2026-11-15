@@ -4,8 +4,10 @@ import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { matters, timeEntries } from "@/db/schema";
+import { timeEntries } from "@/db/schema";
 import { firstZodError, intOrNull, str, type ActionState } from "@/lib/actions";
+import { canAccessTimeEntry, getAccessibleMatter } from "@/lib/access";
+import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseDurationToMinutes, parseMoneyToCents } from "@/lib/money";
@@ -39,8 +41,7 @@ export async function addTimeEntryAction(_prev: ActionState, formData: FormData)
   });
   if (!parsed.success) return { error: firstZodError(parsed.error) };
 
-  const [matter] = await db.select({ id: matters.id }).from(matters).where(eq(matters.id, parsed.data.matterId)).limit(1);
-  if (!matter) return { error: "El expediente seleccionado no existe." };
+  if (!(await getAccessibleMatter(user, parsed.data.matterId))) return { error: ACCESS_DENIED };
 
   await db.insert(timeEntries).values({ ...parsed.data, userId: user.id });
   revalidatePath("/horas");
@@ -51,6 +52,7 @@ export async function addTimeEntryAction(_prev: ActionState, formData: FormData)
 
 export async function deleteTimeEntryAction(entryId: number) {
   const user = await requireUser();
+  if (!(await canAccessTimeEntry(user, entryId))) return;
   // Solo se pueden borrar entradas no facturadas; el autor o un administrador.
   const own = user.role === "admin" ? undefined : eq(timeEntries.userId, user.id);
   const [deleted] = await db

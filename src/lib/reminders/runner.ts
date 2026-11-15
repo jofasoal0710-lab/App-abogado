@@ -2,7 +2,8 @@ import "server-only";
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "@/db";
-import { events, matters, reminderLog, users } from "@/db/schema";
+import { events, matterMembers, matters, reminderLog, users } from "@/db/schema";
+import { hasMatterAccess } from "../access-rules";
 import { dayKey } from "../dates";
 import { getReminderConfig, isSmtpConfigured, type ReminderConfig } from "./config";
 import {
@@ -91,12 +92,16 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
       location: events.location,
       matterId: matters.id,
       matterNumber: matters.number,
+      matterVisibility: matters.visibility,
+      matterResponsibleId: matters.responsibleId,
       assignedId: assigned.id,
+      assignedRole: assigned.role,
       assignedName: assigned.name,
       assignedEmail: assigned.email,
       assignedActive: assigned.active,
       assignedOptIn: assigned.emailReminders,
       responsibleId: responsible.id,
+      responsibleRole: responsible.role,
       responsibleName: responsible.name,
       responsibleEmail: responsible.email,
       responsibleActive: responsible.active,
@@ -116,6 +121,11 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
     .select()
     .from(reminderLog)
     .where(inArray(reminderLog.eventId, rows.map((r) => r.id)));
+  // Miembros de los expedientes restringidos: los avisos solo llegan a quien puede ver el expediente.
+  const matterIds = [...new Set(rows.flatMap((r) => (r.matterId !== null ? [r.matterId] : [])))];
+  const members = matterIds.length
+    ? await db.select({ matterId: matterMembers.matterId, userId: matterMembers.userId }).from(matterMembers).where(inArray(matterMembers.matterId, matterIds))
+    : [];
   const logsFor = (eventId: number, eventDate: string) => logs.filter((l) => l.eventId === eventId && l.eventDate === eventDate);
 
   for (const r of rows) {
@@ -137,11 +147,19 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
     // Destinatario: la persona asignada; si no hay, el responsable del expediente.
     const candidate =
       r.assignedId !== null
-        ? { id: r.assignedId, name: r.assignedName!, email: r.assignedEmail!, active: r.assignedActive!, optIn: r.assignedOptIn! }
+        ? { id: r.assignedId, role: r.assignedRole!, name: r.assignedName!, email: r.assignedEmail!, active: r.assignedActive!, optIn: r.assignedOptIn! }
         : r.responsibleId !== null
-          ? { id: r.responsibleId, name: r.responsibleName!, email: r.responsibleEmail!, active: r.responsibleActive!, optIn: r.responsibleOptIn! }
+          ? { id: r.responsibleId, role: r.responsibleRole!, name: r.responsibleName!, email: r.responsibleEmail!, active: r.responsibleActive!, optIn: r.responsibleOptIn! }
           : null;
-    if (!candidate || !candidate.active || !candidate.optIn) {
+    const allowed =
+      !candidate ||
+      r.matterId === null ||
+      hasMatterAccess(
+        { id: candidate.id, role: candidate.role },
+        { visibility: r.matterVisibility!, responsibleId: r.matterResponsibleId },
+        members.filter((m) => m.matterId === r.matterId).map((m) => m.userId),
+      );
+    if (!candidate || !allowed || !candidate.active || !candidate.optIn) {
       withoutRecipient++;
       continue;
     }

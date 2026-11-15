@@ -4,6 +4,7 @@ import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm"
 import { Badge, EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters, users } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { areaLabels, entries, matterStatusLabels } from "@/lib/labels";
@@ -39,6 +40,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   else if (estado in matterStatusLabels) filters.push(eq(matters.status, estado as keyof typeof matterStatusLabels));
   if (area in areaLabels) filters.push(eq(matters.area, area as keyof typeof areaLabels));
   if (mine) filters.push(eq(matters.responsibleId, user.id));
+  filters.push(matterAccessSql(user, matters.id)); // confidencialidad
   const where = and(...filters);
 
   const [{ total }] = await db
@@ -54,6 +56,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       title: matters.title,
       area: matters.area,
       status: matters.status,
+      visibility: matters.visibility,
       openedAt: matters.openedAt,
       clientId: clients.id,
       clientName: clients.name,
@@ -144,6 +147,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <Link href={`/expedientes/${m.id}`} className="link">
                       {m.number}
                     </Link>
+                    {m.visibility === "restringido" && <span className="badge-amber ml-2">Restringido</span>}
                     <span className="block max-w-xs text-ink-700">{m.title}</span>
                   </td>
                   <td>

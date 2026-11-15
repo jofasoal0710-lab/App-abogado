@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui";
+import { getAccessibleMatter } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { eventFormOptions } from "@/lib/agenda-data";
 import { safeNext } from "@/lib/safe-redirect";
@@ -15,8 +16,9 @@ export default async function NewEventPage({
 }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const options = await eventFormOptions();
-  const matterId = Number(sp.expediente) || undefined;
+  const options = await eventFormOptions(user);
+  const requested = Number(sp.expediente) || undefined;
+  const matterId = requested && (await getAccessibleMatter(user, requested)) ? requested : undefined;
   const returnTo = safeNext(sp.returnTo, matterId ? `/expedientes/${matterId}?tab=agenda` : "/agenda");
 
   return (

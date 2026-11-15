@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ConfirmButton } from "@/components/form";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, invoices, matters } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { areaLabels, clientTypeLabels, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
@@ -32,11 +33,11 @@ export default async function ClientPage({
   const clientMatters = await db
     .select()
     .from(matters)
-    .where(eq(matters.clientId, id))
+    .where(and(eq(matters.clientId, id), matterAccessSql(user, matters.id)))
     .orderBy(desc(matters.openedAt));
 
   const clientInvoices = await db.query.invoices.findMany({
-    where: eq(invoices.clientId, id),
+    where: and(eq(invoices.clientId, id), matterAccessSql(user, invoices.matterId, { orNone: true })),
     with: { items: true },
     orderBy: desc(invoices.issueDate),
   });

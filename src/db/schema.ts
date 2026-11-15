@@ -41,6 +41,13 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "pagada",
   "anulada",
 ]);
+export const matterVisibilityEnum = pgEnum("matter_visibility", ["abierto", "restringido"]);
+export const accessActionEnum = pgEnum("access_action", [
+  "visibilidad",
+  "miembro_alta",
+  "miembro_baja",
+  "responsable",
+]);
 export const reminderStatusEnum = pgEnum("reminder_status", ["enviado", "error"]);
 export const itemUnitEnum = pgEnum("item_unit", ["horas", "unidades"]);
 export const paymentMethodEnum = pgEnum("payment_method", [
@@ -100,6 +107,11 @@ export const matters = pgTable(
       .references(() => clients.id, { onDelete: "restrict" }),
     area: matterAreaEnum().notNull().default("otros"),
     status: matterStatusEnum().notNull().default("abierto"),
+    /**
+     * abierto: lo ve todo el equipo. restringido: solo el responsable, los miembros
+     * añadidos explícitamente y los administradores.
+     */
+    visibility: matterVisibilityEnum().notNull().default("abierto"),
     responsibleId: integer("responsible_id").references(() => users.id, { onDelete: "set null" }),
     court: text(),
     courtCaseNumber: text("court_case_number"),
@@ -117,6 +129,41 @@ export const matters = pgTable(
     index("matters_status_idx").on(t.status),
     index("matters_responsible_idx").on(t.responsibleId),
   ],
+);
+
+export const matterMembers = pgTable(
+  "matter_members",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addedById: integer("added_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("matter_members_unique_idx").on(t.matterId, t.userId),
+    index("matter_members_user_idx").on(t.userId),
+  ],
+);
+
+/** Historial de cambios de acceso a un expediente (quién cambió qué y cuándo). */
+export const matterAccessLog = pgTable(
+  "matter_access_log",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+    action: accessActionEnum().notNull(),
+    detail: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("matter_access_log_matter_idx").on(t.matterId)],
 );
 
 export const matterNotes = pgTable(
@@ -301,10 +348,16 @@ export const mattersRelations = relations(matters, ({ one, many }) => ({
   client: one(clients, { fields: [matters.clientId], references: [clients.id] }),
   responsible: one(users, { fields: [matters.responsibleId], references: [users.id] }),
   notes: many(matterNotes),
+  members: many(matterMembers),
   events: many(events),
   documents: many(documents),
   timeEntries: many(timeEntries),
   invoices: many(invoices),
+}));
+
+export const matterMembersRelations = relations(matterMembers, ({ one }) => ({
+  matter: one(matters, { fields: [matterMembers.matterId], references: [matters.id] }),
+  user: one(users, { fields: [matterMembers.userId], references: [users.id] }),
 }));
 
 export const matterNotesRelations = relations(matterNotes, ({ one }) => ({
@@ -357,3 +410,4 @@ export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type ReminderLog = typeof reminderLog.$inferSelect;
+export type MatterMember = typeof matterMembers.$inferSelect;

@@ -7,7 +7,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { invoiceItems, invoices, matters, payments, timeEntries } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
-import { canManageInvoices, requireUser } from "@/lib/auth";
+import { canAccessInvoice, getAccessibleMatter } from "@/lib/access";
+import { ACCESS_DENIED } from "@/lib/access-rules";
+import { canManageInvoices, requireUser, type CurrentUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { invoiceTotals, parseDurationToMinutes, parseMoneyToCents, parseQuantityToHundredths } from "@/lib/money";
@@ -46,11 +48,12 @@ function refresh(id?: number) {
 /* ---------- Crear factura (borrador) ---------- */
 
 export async function createInvoiceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const clientId = intOrNull(formData, "clientId");
   const matterId = intOrNull(formData, "matterId");
   if (!clientId) return { error: "Selecciona un cliente." };
+  if (matterId && !(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
   const header = parseHeader(formData);
   if (!header.success) return { error: firstZodError(header.error) };
 
@@ -135,7 +138,9 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
 
 /* ---------- Edición del borrador ---------- */
 
-async function requireDraft(id: number) {
+async function requireDraft(id: number, user: CurrentUser) {
+  // Sin acceso al expediente de la factura se comporta como si no existiera.
+  if (!(await canAccessInvoice(user, id))) redirect("/facturas");
   const [inv] = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
   if (!inv) redirect("/facturas");
   if (inv.status !== "borrador") redirect(`/facturas/${id}?error=not_draft`);
@@ -147,8 +152,8 @@ export async function updateInvoiceHeaderAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
-  await requireDraft(id);
+  const user = await requireUser();
+  await requireDraft(id, user);
   const header = parseHeader(formData);
   if (!header.success) return { error: firstZodError(header.error) };
   await db.update(invoices).set(header.data).where(eq(invoices.id, id));
@@ -164,8 +169,8 @@ const itemSchema = z.object({
 });
 
 export async function addItemAction(invoiceId: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
-  await requireDraft(invoiceId);
+  const user = await requireUser();
+  await requireDraft(invoiceId, user);
 
   const unit = str(formData, "unit") === "horas" ? "horas" : "unidades";
   const quantity =
@@ -194,8 +199,8 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
 }
 
 export async function deleteItemAction(invoiceId: number, itemId: number) {
-  await requireUser();
-  await requireDraft(invoiceId);
+  const user = await requireUser();
+  await requireDraft(invoiceId, user);
   await db.transaction(async (tx) => {
     const [item] = await tx
       .delete(invoiceItems)
@@ -210,8 +215,8 @@ export async function deleteItemAction(invoiceId: number, itemId: number) {
 }
 
 export async function deleteDraftAction(id: number) {
-  await requireUser();
-  await requireDraft(id);
+  const user = await requireUser();
+  await requireDraft(id, user);
   await db.delete(invoices).where(eq(invoices.id, id)); // time_entries.invoice_id → NULL por la FK
   refresh();
   redirect("/facturas");
@@ -221,6 +226,7 @@ export async function deleteDraftAction(id: number) {
 
 export async function emitInvoiceAction(id: number) {
   const user = await requireUser();
+  if (!(await canAccessInvoice(user, id))) redirect("/facturas");
   if (!canManageInvoices(user)) redirect(`/facturas/${id}?error=forbidden`);
 
   let error: string | null = null;
@@ -267,7 +273,8 @@ export async function registerPaymentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await canAccessInvoice(user, invoiceId))) return { error: ACCESS_DENIED };
   const amount = parseMoneyToCents(str(formData, "amount"));
   const parsed = paymentSchema.safeParse({
     amountCents: amount ?? undefined,
@@ -304,6 +311,7 @@ export async function registerPaymentAction(
 
 export async function deletePaymentAction(invoiceId: number, paymentId: number) {
   const user = await requireUser();
+  if (!(await canAccessInvoice(user, invoiceId))) redirect("/facturas");
   if (!canManageInvoices(user)) redirect(`/facturas/${invoiceId}?error=forbidden`);
   await db.transaction(async (tx) => {
     await tx.delete(payments).where(and(eq(payments.id, paymentId), eq(payments.invoiceId, invoiceId)));
@@ -314,6 +322,7 @@ export async function deletePaymentAction(invoiceId: number, paymentId: number) 
 
 export async function voidInvoiceAction(id: number) {
   const user = await requireUser();
+  if (!(await canAccessInvoice(user, id))) redirect("/facturas");
   if (!canManageInvoices(user)) redirect(`/facturas/${id}?error=forbidden`);
 
   let error: string | null = null;

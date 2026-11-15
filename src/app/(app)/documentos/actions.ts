@@ -3,8 +3,10 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { documents, matters } from "@/db/schema";
+import { documents } from "@/db/schema";
 import { optStr, type ActionState } from "@/lib/actions";
+import { canAccessDocument, getAccessibleMatter } from "@/lib/access";
+import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { ALLOWED_TYPES, formatBytes, mimeForFilename, sanitizeFilename } from "@/lib/file-types";
@@ -29,8 +31,7 @@ export async function uploadDocumentAction(
     return { error: `Tipo de archivo no permitido. Formatos admitidos: ${Object.keys(ALLOWED_TYPES).join(", ")}.` };
   }
 
-  const [matter] = await db.select({ id: matters.id }).from(matters).where(eq(matters.id, matterId)).limit(1);
-  if (!matter) return { error: "El expediente no existe." };
+  if (!(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
 
   const storageKey = await saveFile(Buffer.from(await file.arrayBuffer()), name);
   try {
@@ -56,6 +57,7 @@ export async function uploadDocumentAction(
 export async function deleteDocumentAction(documentId: number) {
   const user = await requireUser();
   if (user.role === "asistente") return;
+  if (!(await canAccessDocument(user, documentId))) return;
 
   const [doc] = await db.delete(documents).where(eq(documents.id, documentId)).returning();
   if (!doc) return;

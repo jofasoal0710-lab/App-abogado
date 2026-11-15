@@ -5,8 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { documents, invoices, matterNotes, matters } from "@/db/schema";
+import { documents, invoices, matterMembers, matterNotes, matters, users } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
+import { canAccessNote, getAccessibleMatter } from "@/lib/access";
+import { logAccessChange } from "@/lib/access-log";
+import { ACCESS_DENIED, canManageMatterAccess, describeVisibility } from "@/lib/access-rules";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
@@ -28,6 +31,7 @@ const matterSchema = z
     billingType: z.enum(["por_horas", "tarifa_fija"]),
     fixedFeeCents: z.number().int().nonnegative().nullable(),
     openedAt: isoDate,
+    visibility: z.enum(["abierto", "restringido"]).optional(),
   })
   .refine((v) => v.billingType !== "tarifa_fija" || (v.fixedFeeCents ?? 0) > 0, {
     message: "Indica los honorarios pactados para la tarifa fija",
@@ -52,13 +56,14 @@ function parseMatter(formData: FormData) {
     billingType,
     fixedFeeCents: billingType === "tarifa_fija" ? fee : null,
     openedAt: str(formData, "openedAt") || todayISO(),
+    visibility: str(formData, "visibility") || undefined,
   });
   if (!parsed.success) return { error: firstZodError(parsed.error) } as const;
   return { data: parsed.data } as const;
 }
 
 export async function createMatterAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
   const result = parseMatter(formData);
   if ("error" in result) return { error: result.error };
 
@@ -76,11 +81,21 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     const number = formatNumber(prefix, year, nextSequence(last?.number, prefix, year));
     const [created] = await tx
       .insert(matters)
-      .values({ ...result.data, number })
+      .values({ ...result.data, visibility: result.data.visibility ?? "abierto", number })
       .returning({ id: matters.id });
+    // Quien crea un expediente restringido sin ser su responsable (ni administrador) no puede
+    // quedarse sin acceso a lo que acaba de crear: se le añade como miembro.
+    if (result.data.visibility === "restringido") {
+      if (user.role !== "admin" && result.data.responsibleId !== user.id) {
+        await tx.insert(matterMembers).values({ matterId: created.id, userId: user.id, addedById: user.id });
+      }
+    }
     return created;
   });
 
+  if (result.data.visibility === "restringido") {
+    await logAccessChange(row.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility("restringido")} (al crearlo)`);
+  }
   revalidatePath("/expedientes");
   redirect(`/expedientes/${row.id}`);
 }
@@ -90,11 +105,22 @@ export async function updateMatterAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
+  const current = await getAccessibleMatter(user, id);
+  if (!current) return { error: ACCESS_DENIED };
   const result = parseMatter(formData);
   if ("error" in result) return { error: result.error };
 
-  await db.update(matters).set(result.data).where(eq(matters.id, id));
+  // Solo los administradores y el responsable actual pueden cambiar quién es el responsable.
+  const canManage = canManageMatterAccess(user, current);
+  const { visibility: _ignored, ...editable } = result.data; // la visibilidad solo se cambia en la pestaña Acceso
+  const data = canManage ? editable : { ...editable, responsibleId: current.responsibleId };
+  await db.update(matters).set(data).where(eq(matters.id, id));
+  if (canManage && data.responsibleId !== current.responsibleId) {
+    const names = await db.select({ id: users.id, name: users.name }).from(users);
+    const nameOf = (uid: number | null) => names.find((n) => n.id === uid)?.name ?? "sin asignar";
+    await logAccessChange(id, user.id, "responsable", `Responsable: ${nameOf(current.responsibleId)} → ${nameOf(data.responsibleId)}`);
+  }
   revalidatePath("/expedientes");
   redirect(`/expedientes/${id}`);
 }
@@ -102,7 +128,8 @@ export async function updateMatterAction(
 const statusSchema = z.enum(["abierto", "en_curso", "en_espera", "cerrado", "archivado"]);
 
 export async function changeStatusAction(id: number, formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");
   const status = statusSchema.safeParse(str(formData, "status"));
   if (!status.success) redirect(`/expedientes/${id}`);
 
@@ -122,6 +149,7 @@ export async function addNoteAction(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireUser();
+  if (!(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
   const body = str(formData, "body");
   if (body.length < 2) return { error: "Escribe el contenido de la nota." };
   if (body.length > 10000) return { error: "La nota es demasiado larga (máximo 10.000 caracteres)." };
@@ -133,6 +161,7 @@ export async function addNoteAction(
 
 export async function deleteNoteAction(noteId: number, matterId: number) {
   const user = await requireUser();
+  if (!(await canAccessNote(user, noteId))) return;
   // Solo el autor o un administrador pueden borrar una nota.
   const condition =
     user.role === "admin"

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { documents, matters, users } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { likePattern, pageParam, qs } from "@/lib/search";
 import { DocumentsTable } from "./documents-table";
@@ -21,7 +22,7 @@ export default async function DocumentsPage({
   const q = (sp.q ?? "").trim();
   const page = pageParam(sp.page);
 
-  const where = q
+  const search = q
     ? and(
         or(
           ilike(documents.name, likePattern(q)),
@@ -31,6 +32,7 @@ export default async function DocumentsPage({
         ),
       )
     : undefined;
+  const where = and(search, matterAccessSql(user, matters.id));
 
   const [{ total }] = await db
     .select({ total: count() })

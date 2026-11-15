@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { events } from "@/db/schema";
+import { canAccessEvent } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { eventFormOptions } from "@/lib/agenda-data";
 import { safeNext } from "@/lib/safe-redirect";
@@ -19,12 +20,12 @@ export default async function EditEventPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const id = Number((await params).id);
-  if (!Number.isInteger(id)) notFound();
+  if (!Number.isInteger(id) || !(await canAccessEvent(user, id))) notFound();
   const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!event) notFound();
-  const options = await eventFormOptions();
+  const options = await eventFormOptions(user);
   const { returnTo } = await searchParams;
 
   return (
