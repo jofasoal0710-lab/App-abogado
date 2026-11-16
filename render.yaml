@@ -43,8 +43,12 @@ services:
         sync: false
       - key: S3_ENDPOINT
         sync: false
+      # Valores para Supabase Storage con el proyecto en Frankfurt. Con Cloudflare R2: S3_REGION «auto»
+      # (S3_FORCE_PATH_STYLE puede quedarse en «true»). Ver DEPLOY-RENDER.md, sección 3.
       - key: S3_REGION
-        value: auto
+        value: eu-central-1
+      - key: S3_FORCE_PATH_STYLE
+        value: "true"
       - key: S3_ACCESS_KEY_ID
         sync: false
       - key: S3_SECRET_ACCESS_KEY

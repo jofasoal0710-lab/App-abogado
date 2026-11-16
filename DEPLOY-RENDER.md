@@ -49,7 +49,19 @@ Los nombres de los menús de Supabase pueden variar un poco; lo importante es lo
 
 ## 3. Almacenamiento (bucket S3)
 
-1. Crea un bucket **privado** y un token de API con permiso de lectura y escritura **solo sobre ese bucket**. Anota *Access Key ID*, *Secret Access Key* y el *endpoint* S3 (en R2: `https://<ID_DE_CUENTA>.r2.cloudflarestorage.com`; región `auto`).
+Los documentos se suben **directamente del navegador al bucket** con una URL firmada de 10 minutos, y se descargan con otra de 60 segundos que la app solo emite tras comprobar el acceso.
+
+### Opción A — Supabase Storage (la misma cuenta que la base de datos)
+
+1. *Storage → New bucket*: nombre `documentos`, con **Public bucket desactivado** (privado).
+2. *Project Settings → Storage → S3 Connection*: activa la conexión por protocolo S3 y anota el **Endpoint** (`https://<ref-del-proyecto>.storage.supabase.co/storage/v1/s3`) y la **Region** (con el proyecto en Frankfurt, `eu-central-1`).
+3. En esa misma pantalla, *S3 Access Keys → New access key*: anota el **Access key ID** y el **Secret access key** (el secreto solo se muestra una vez). Esta clave da acceso a **todos** los buckets del proyecto: trátala como una contraseña.
+4. `render.yaml` ya trae `S3_REGION=eu-central-1` y `S3_FORCE_PATH_STYLE=true`, que es lo que necesita Supabase. Si tu región es otra, cámbiala en `render.yaml` (no solo en el panel: la siguiente sincronización del Blueprint la volvería a poner).
+5. CORS: Supabase no tiene un ajuste de CORS para esto. Si al subir un documento aparece un error de CORS, avísame.
+
+### Opción B — Cloudflare R2 (otro proveedor S3)
+
+1. Crea un bucket **privado** y un token de API con permiso de lectura y escritura **solo sobre ese bucket**. Anota *Access Key ID*, *Secret Access Key* y el *endpoint* S3 (`https://<ID_DE_CUENTA>.r2.cloudflarestorage.com`). Cloudflare puede pedir un método de pago para activar R2, aunque tiene tramo gratuito. En `render.yaml`, pon `S3_REGION` a `auto`.
 2. **CORS** (imprescindible; sin él el navegador no podrá subir documentos). La URL de Render la sabrás tras el primer despliegue; vuelve aquí entonces:
 
    ```json
@@ -137,7 +149,7 @@ Truco habitual: un servicio externo gratuito (por ejemplo [cron-job.org](https:/
 - **⚠ La memoria del build.** Medido en local, el build llega a un pico de **~1,1 GB** (Turbopack) o **~840 MB** (con `--webpack`, más lento). El plan gratuito tiene 512 MB de RAM. Render indica que un build que se queda sin memoria falla, pero **no he podido confirmar cuánta memoria tienen los builds del plan gratuito** (una respuesta antigua del personal de Render habla de 8 GB; puede no estar vigente). Si el primer build falla con *out of memory*, las salidas son: subir de plan, o compilar fuera de Render (por ejemplo, en GitHub Actions) y desplegar una imagen ya construida. Dímelo y lo preparo.
 - **El `render.yaml` contra Render.** Es YAML válido y sus campos coinciden con la documentación consultada, pero no se ha podido validar con Render. Puntos no confirmados: que la región `frankfurt` ofrezca instancias gratuitas (si el Blueprint se queja, cambia `region`) y que `NODE_VERSION` sea la forma de fijar la versión de Node (`package.json` también exige Node ≥ 22).
 - **Qué cabecera lleva la IP real del cliente en Render** (por eso `CLIENT_IP_HEADER` no está configurada).
-- Que R2/S3 acepte las URLs firmadas y el CORS (el emulador usado **no valida firmas**).
+- Que el proveedor real (Supabase Storage o R2) acepte las URLs firmadas y el CORS (el emulador usado **no valida firmas**). Las sumas de verificación automáticas del SDK están desactivadas porque varios proveedores compatibles con S3 las rechazan.
 - El comportamiento real tras dormirse y despertar.
 - **Supabase real**: no he podido conectarme a Supabase desde aquí. No está comprobado que su *Session pooler* presente un certificado válido para su nombre con la autoridad que se descarga del panel (si no, verás `Hostname/IP does not match certificate's altnames`; avísame), ni los nombres exactos de sus menús.
 
@@ -162,7 +174,8 @@ Si ya conectaste el repositorio a Netlify y ya no lo usas, **borra o desconecta 
 | `Hostname/IP does not match certificate's altnames` | No verificado con Supabase real (sección 8): avísame |
 | Errores de conexión con **Neon** | La cadena no termina en `?sslmode=require` |
 | La app no responde y en Supabase el proyecto aparece en pausa | Pasó una semana sin actividad: reactívalo desde su panel |
-| Al subir un documento: «No se pudo subir… CORS» | Falta la URL de Render en el CORS del bucket (sección 3) |
+| Al subir un documento: «No se pudo subir… CORS» | Con R2: falta la URL de Render en el CORS del bucket. Con Supabase: avísame (sección 3) |
+| Al subir o descargar: `SignatureDoesNotMatch` o `403` | Claves, `S3_ENDPOINT` o `S3_REGION` no coinciden con el proveedor (sección 3) |
 | La web tarda ~1 min la primera vez | El plan gratuito se había dormido (sección 6) |
 | Los avisos no salen a su hora | El servicio estaba dormido: ver sección 6 |
 | El build falla con *out of memory* | Memoria del build del plan gratuito (sección 8) |
