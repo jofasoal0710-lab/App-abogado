@@ -50,7 +50,7 @@ Netlify solo aloja la aplicación (funciones sin estado y disco efímero). Por e
 
 1. *Add new site → Import an existing project → GitHub* y elige este repositorio.
 2. **Rama de producción.** El repositorio solo tiene la rama `ccr-5f143f7a-if1jv4` (no existe `main`). En *Site configuration → Build & deploy → Continuous deployment → Branches and deploy contexts* pon esa rama como **Production branch**. Así, cada cambio que se suba a ella se publica automáticamente.
-3. El comando de build ya viene en `netlify.toml` (`npm run build:netlify`); no hace falta tocar nada más.
+3. El comando de build ya viene en `netlify.toml` (`npm run build:deploy`); no hace falta tocar nada más.
 4. Variables de entorno (*Site configuration → Environment variables*). Defínelas con ámbito **solo Production** (ver sección 7):
 
 | Variable | Obligatoria | Valor |
@@ -64,6 +64,7 @@ Netlify solo aloja la aplicación (funciones sin estado y disco efímero). Por e
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | ✓ | Las del token de R2 |
 | `APP_URL` | ✓ | `https://TU-SITIO.netlify.app` (enlaces de los correos y de la función programada) |
 | `APP_TIMEZONE` | ✓ | `Europe/Madrid` |
+| `CLIENT_IP_HEADER` | recomendada | `x-nf-client-connection-ip` (la IP real que entrega Netlify, para el límite de intentos de login) |
 | `FIRM_NAME`, `FIRM_TAX_ID`, `FIRM_ADDRESS`, `CURRENCY`, `DEFAULT_TAX_RATE` | ✓ | Datos del despacho y facturación |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | para avisos | Ver el README (Gmail/Outlook/dominio) |
 | `CRON_SECRET` | para avisos | Cadena aleatoria de ≥16 caracteres |

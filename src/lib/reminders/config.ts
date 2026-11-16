@@ -8,7 +8,8 @@ export function getReminderConfig() {
     offsets: parseOffsets(process.env.REMINDER_DAYS),
     hour: parseHour(process.env.REMINDER_HOUR),
     schedulerEnabled: process.env.REMINDERS_SCHEDULER === "true",
-    appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, ""),
+    // APP_URL, o la URL pública que Render asigna automáticamente (RENDER_EXTERNAL_URL).
+    appUrl: (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000").replace(/\/+$/, ""),
     cronSecret: process.env.CRON_SECRET ?? "",
     from: process.env.MAIL_FROM ?? "",
     firmName: firm.firmName,

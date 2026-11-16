@@ -11,7 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
-    "build:netlify": "node scripts/netlify-build.mjs"
+    "build:netlify": "node scripts/deploy-build.mjs",
+    "build:deploy": "node scripts/deploy-build.mjs",
+    "start:render": "next start -H 0.0.0.0 -p ${PORT:-10000}"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1169.0",
@@ -40,5 +42,8 @@
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  }
 }

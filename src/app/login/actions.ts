@@ -9,6 +9,7 @@ import { users } from "@/db/schema";
 import { str, type ActionState } from "@/lib/actions";
 import { MAX_PER_EMAIL, MAX_PER_IP_EMAIL, clearFailures, emailKey, ipEmailKey, isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { safeNext } from "@/lib/safe-redirect";
+import { clientIp } from "@/lib/client-ip";
 import { createSession, destroySession } from "@/lib/session";
 
 // Se compara siempre contra un hash real (aunque el usuario no exista) para que el
@@ -26,8 +27,8 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   if (!email || !password) return { error: "Introduce tu correo y contraseña." };
 
   const h = await headers();
-  // IP real del cliente: Netlify la entrega en x-nf-client-connection-ip; si no, la primera de x-forwarded-for.
-  const ip = h.get("x-nf-client-connection-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  // Solo se confía en la cabecera de IP que se configure (CLIENT_IP_HEADER); ver lib/client-ip.ts.
+  const ip = clientIp((name) => h.get(name));
   const byIp = ipEmailKey(ip, email);
   const byEmail = emailKey(email);
   if ((await isRateLimited(byIp, MAX_PER_IP_EMAIL)) || (await isRateLimited(byEmail, MAX_PER_EMAIL))) {

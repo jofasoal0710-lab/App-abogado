@@ -24,7 +24,8 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 
 ## Despliegue
 
-Guía paso a paso para publicar la aplicación en **Netlify** con despliegue continuo desde este repositorio (base de datos en Neon, documentos en un bucket S3/R2, avisos por correo): **[DEPLOY.md](DEPLOY.md)**.
+- **Render (plan gratuito)** — recomendado: **[DEPLOY-RENDER.md](DEPLOY-RENDER.md)** y [`render.yaml`](render.yaml). Servidor Node permanente, base de datos en Neon y documentos en un bucket S3.
+- **Netlify** — **[DEPLOY.md](DEPLOY.md)**. Funciona, pero al ser *serverless* exige adaptaciones y tiene límites (peticiones de ~6 MB, 60 s).
 
 ## Scripts
 

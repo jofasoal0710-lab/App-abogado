@@ -1,10 +1,13 @@
-// Build para Netlify. Una sola orden para todos los contextos; las decisiones se toman aquí:
-//  - Solo el contexto "production" aplica migraciones (los deploy previews y las ramas NUNCA tocan la BD).
+// Build para plataformas de alojamiento (Netlify, Render). Una sola orden; las decisiones se toman aquí:
+//  - Solo el despliegue de PRODUCCIÓN aplica migraciones (las previews/ramas NUNCA tocan la base de datos).
 //  - En producción se comprueban los ajustes que, si faltan, dejarían una app insegura o que pierde datos.
 import { spawnSync } from "node:child_process";
 
-const context = process.env.CONTEXT ?? "local";
+// Netlify indica el contexto en CONTEXT; Render marca los previews de pull request con IS_PULL_REQUEST=true.
+const onRender = process.env.RENDER === "true";
+const context = process.env.CONTEXT ?? (onRender ? (process.env.IS_PULL_REQUEST === "true" ? "preview" : "production") : "local");
 const isProd = context === "production";
+const platform = onRender ? "Render" : process.env.NETLIFY ? "Netlify" : "local";
 
 function fail(msg) {
   console.error(`\n✖ ${msg}\n`);
@@ -24,22 +27,23 @@ if (isProd) {
   if (!process.env.DATABASE_URL && !process.env.MIGRATE_DATABASE_URL) {
     fail("Falta DATABASE_URL (cadena de conexión de PostgreSQL).");
   }
-  // En Netlify el disco es efímero: con almacenamiento local los documentos se perderían.
+  // El disco de Netlify y el del plan gratuito de Render son efímeros: con almacenamiento local, cada
+  // reinicio o redespliegue borraría los documentos subidos.
   if ((process.env.STORAGE_DRIVER ?? "local") === "local" && process.env.ALLOW_LOCAL_STORAGE !== "true") {
     fail(
-      "STORAGE_DRIVER no es «s3»: en Netlify el disco es efímero y los documentos subidos se perderían. " +
-        "Configura el almacenamiento S3 (ver DEPLOY.md) o, solo para una prueba desechable, ALLOW_LOCAL_STORAGE=true.",
+      "STORAGE_DRIVER no es «s3»: en Netlify y en el plan gratuito de Render el disco es efímero y los documentos subidos se perderían. " +
+        "Configura el almacenamiento S3 (ver DEPLOY.md / DEPLOY-RENDER.md) o, si usas un disco persistente de pago, define ALLOW_LOCAL_STORAGE=true y UPLOAD_DIR.",
     );
   }
   if (process.env.SKIP_DB_MIGRATE === "true") {
     console.log("SKIP_DB_MIGRATE=true: no se aplican migraciones (hazlo tú con `npm run db:migrate`).");
   } else {
-    console.log("Aplicando migraciones de base de datos (contexto production)…");
+    console.log(`Aplicando migraciones de base de datos (${platform}, producción)…`);
     // Para migrar es mejor la conexión directa (sin pooler) si se ha configurado.
     run("npx", ["tsx", "src/db/migrate.ts"], { DATABASE_URL: process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL });
   }
 } else {
-  console.log(`Contexto «${context}»: no se aplican migraciones ni se exigen secretos de producción.`);
+  console.log(`Despliegue «${context}» (${platform}): no se aplican migraciones ni se exigen secretos de producción.`);
 }
 
 run("npx", ["next", "build"]);

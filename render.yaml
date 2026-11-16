@@ -1,0 +1,92 @@
+# Blueprint de Render — PLAN GRATUITO. Guía paso a paso: DEPLOY-RENDER.md
+#
+# Qué crea: un servicio web gratuito en Frankfurt que se redespliega solo al subir cambios a la rama indicada.
+# Qué NO crea: la base de datos (usa Neon, también gratuito, porque la base de datos gratuita de Render
+# CADUCA a los 30 días y se borra) ni el almacenamiento de documentos (un bucket S3 compatible).
+#
+# Las variables con `sync: false` se piden en el panel de Render al crear el Blueprint; las que llevan
+# `generateValue: true` las genera Render (aleatorias, 256 bits).
+services:
+  - type: web
+    name: app-abogado
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: ccr-5f143f7a-if1jv4
+    # --include=dev: el build necesita TypeScript, Tailwind y tsx aunque NODE_ENV sea «production».
+    # build:deploy aplica las migraciones de base de datos y compila (el pre-deploy solo existe en planes de pago).
+    buildCommand: npm ci --include=dev && npm run build:deploy
+    startCommand: npm run start:render
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # --- Secretos (los genera Render) ---
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+
+      # --- Base de datos (Neon u otro PostgreSQL externo) ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_POOL_MAX
+        value: "5"
+
+      # --- Documentos: S3 obligatorio, el disco del plan gratuito es efímero ---
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+      # --- Despacho y facturación (edítalos en el panel de Render cuando quieras) ---
+      - key: APP_TIMEZONE
+        value: Europe/Madrid
+      - key: FIRM_NAME
+        value: Bufete Ejemplo & Asociados
+      - key: FIRM_TAX_ID
+        value: B00000000
+      - key: FIRM_ADDRESS
+        value: Calle Mayor 1, 28001 Madrid
+      - key: CURRENCY
+        value: EUR
+      - key: DEFAULT_TAX_RATE
+        value: "21"
+
+      # --- Recordatorios: planificador interno (Render es un servidor permanente) ---
+      # Con el plan gratuito el servicio se duerme tras 15 min sin visitas y el planificador se duerme con él;
+      # al despertar se pone al día. Ver «Mantenerlo despierto» en DEPLOY-RENDER.md.
+      - key: REMINDERS_SCHEDULER
+        value: "true"
+      - key: REMINDER_HOUR
+        value: "8"
+
+      # --- Correo (opcional): añádelos desde el panel de Render cuando quieras activar los avisos ---
+      #   SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, MAIL_FROM
+      # APP_URL no hace falta: se usa la URL pública que Render asigna (RENDER_EXTERNAL_URL).
+
+# ---------------------------------------------------------------------------------------------------
+# ALTERNATIVA (no recomendada): base de datos gratuita de Render. Caduca a los 30 días de crearla y,
+# pasados 14 días más de gracia, se BORRA con sus datos. Solo para pruebas desechables.
+# Para usarla: descomenta este bloque y sustituye en el servicio `DATABASE_URL` por
+#   - key: DATABASE_URL
+#     fromDatabase:
+#       name: app-abogado-db
+#       property: connectionString
+#
+# databases:
+#   - name: app-abogado-db
+#     plan: free
+#     region: frankfurt
+#     databaseName: abogado
+#     user: abogado
