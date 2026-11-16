@@ -24,7 +24,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 
 ## Despliegue
 
-- **Render (plan gratuito)** — recomendado: **[DEPLOY-RENDER.md](DEPLOY-RENDER.md)** y [`render.yaml`](render.yaml). Servidor Node permanente, base de datos en Neon y documentos en un bucket S3.
+- **Render (plan gratuito)** — recomendado: **[DEPLOY-RENDER.md](DEPLOY-RENDER.md)** y [`render.yaml`](render.yaml). Servidor Node permanente, base de datos en Supabase (o Neon) y documentos en un bucket S3.
 - **Netlify** — **[DEPLOY.md](DEPLOY.md)**. Funciona, pero al ser *serverless* exige adaptaciones y tiene límites (peticiones de ~6 MB, 60 s).
 
 ## Scripts
@@ -157,6 +157,8 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - **Numeración fiscal**: solo las facturas emitidas reciben número, correlativo por serie (`FAC`, `RECT`) y año; los borradores no consumen números.
 - **Redondeo**: IVA y retención se redondean «half away from zero» para que un abono sea exactamente el negativo de la factura original.
 - **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
+- **Row Level Security en todas las tablas**, sin políticas: la app no se ve afectada (se conecta con el rol dueño de las tablas), pero cualquier otro rol queda sin acceso. En Supabase eso cierra su API REST automática. Las tablas nuevas deben llevar `.enableRLS()` en `src/db/schema.ts`.
+- **Conexión a la base de datos**: con `DATABASE_SSL_CA` (proveedores con autoridad propia, como Supabase) la conexión es siempre cifrada y verificada; el pool descarta las conexiones que el proveedor corta en vez de caerse.
 - **Zona horaria**: el proceso fija `APP_TIMEZONE` (por defecto `Europe/Madrid`) para que las horas de la agenda no dependan de dónde esté alojado el servidor.
 
 ## Despliegue y limitaciones conocidas

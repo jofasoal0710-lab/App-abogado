@@ -1,7 +1,7 @@
 # Blueprint de Render — PLAN GRATUITO. Guía paso a paso: DEPLOY-RENDER.md
 #
 # Qué crea: un servicio web gratuito en Frankfurt que se redespliega solo al subir cambios a la rama indicada.
-# Qué NO crea: la base de datos (usa Neon, también gratuito, porque la base de datos gratuita de Render
+# Qué NO crea: la base de datos (usa Supabase o Neon, gratuitos, porque la base de datos gratuita de Render
 # CADUCA a los 30 días y se borra) ni el almacenamiento de documentos (un bucket S3 compatible).
 #
 # Las variables con `sync: false` se piden en el panel de Render al crear el Blueprint; las que llevan
@@ -29,7 +29,8 @@ services:
       - key: CRON_SECRET
         generateValue: true
 
-      # --- Base de datos (Neon u otro PostgreSQL externo) ---
+      # --- Base de datos (Supabase con su «Session pooler», Neon u otro PostgreSQL externo) ---
+      # Con Supabase añade además DATABASE_SSL_CA (su certificado) desde el panel: ver DEPLOY-RENDER.md, sección 2.
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_POOL_MAX

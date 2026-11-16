@@ -12,12 +12,11 @@ import { count, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
+import { pgConfig } from "./connection";
 
 const { users, clients, matters, matterNotes, events, timeEntries, invoices, invoiceItems, payments } = schema;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ?? "postgres://abogado:abogado@localhost:5432/abogado",
-});
+const pool = new Pool(pgConfig());
 const db = drizzle(pool, { schema });
 
 const demo = process.argv.includes("--demo");

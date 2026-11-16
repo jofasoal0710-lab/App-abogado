@@ -71,6 +71,10 @@ export const paymentMethodEnum = pgEnum("payment_method", [
 ]);
 
 /* ---------- Tablas ---------- */
+// Todas las tablas llevan .enableRLS() (Row Level Security) SIN políticas. La app no se ve afectada:
+// se conecta con el rol dueño de las tablas, que no está sujeto a RLS. Pero cualquier otro rol queda
+// sin acceso; en Supabase eso cierra su API REST automática (roles «anon» y «authenticated»), que si
+// no publicaría estas tablas. Las tablas NUEVAS también deben llevar .enableRLS().
 
 export const users = pgTable(
   "users",
@@ -88,7 +92,7 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
-);
+).enableRLS();
 
 export const clients = pgTable(
   "clients",
@@ -108,7 +112,7 @@ export const clients = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("clients_name_idx").on(t.name)],
-);
+).enableRLS();
 
 export const matters = pgTable(
   "matters",
@@ -144,7 +148,7 @@ export const matters = pgTable(
     index("matters_status_idx").on(t.status),
     index("matters_responsible_idx").on(t.responsibleId),
   ],
-);
+).enableRLS();
 
 export const matterMembers = pgTable(
   "matter_members",
@@ -163,7 +167,7 @@ export const matterMembers = pgTable(
     uniqueIndex("matter_members_unique_idx").on(t.matterId, t.userId),
     index("matter_members_user_idx").on(t.userId),
   ],
-);
+).enableRLS();
 
 /** Historial de cambios de acceso a un expediente (quién cambió qué y cuándo). */
 export const matterAccessLog = pgTable(
@@ -179,7 +183,7 @@ export const matterAccessLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("matter_access_log_matter_idx").on(t.matterId)],
-);
+).enableRLS();
 
 /** Historial de cambios de confidencialidad de un cliente. */
 export const clientAccessLog = pgTable(
@@ -194,7 +198,7 @@ export const clientAccessLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("client_access_log_client_idx").on(t.clientId)],
-);
+).enableRLS();
 
 /** Registro de lecturas en expedientes restringidos/confidenciales y clientes confidenciales. */
 export const readAudit = pgTable(
@@ -212,7 +216,7 @@ export const readAudit = pgTable(
     index("read_audit_matter_idx").on(t.matterId, t.createdAt),
     index("read_audit_client_idx").on(t.clientId, t.createdAt),
   ],
-);
+).enableRLS();
 
 export const matterNotes = pgTable(
   "matter_notes",
@@ -226,7 +230,7 @@ export const matterNotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("matter_notes_matter_idx").on(t.matterId)],
-);
+).enableRLS();
 
 export const events = pgTable(
   "events",
@@ -248,7 +252,7 @@ export const events = pgTable(
     index("events_matter_idx").on(t.matterId),
     index("events_assigned_idx").on(t.assignedId),
   ],
-);
+).enableRLS();
 
 export const documents = pgTable(
   "documents",
@@ -267,7 +271,7 @@ export const documents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("documents_matter_idx").on(t.matterId)],
-);
+).enableRLS();
 
 export const invoices = pgTable(
   "invoices",
@@ -296,7 +300,7 @@ export const invoices = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("invoices_client_idx").on(t.clientId), index("invoices_status_idx").on(t.status)],
-);
+).enableRLS();
 
 export const timeEntries = pgTable(
   "time_entries",
@@ -323,7 +327,7 @@ export const timeEntries = pgTable(
     index("time_entries_user_idx").on(t.userId),
     index("time_entries_invoice_idx").on(t.invoiceId),
   ],
-);
+).enableRLS();
 
 export const invoiceItems = pgTable(
   "invoice_items",
@@ -345,7 +349,7 @@ export const invoiceItems = pgTable(
     timeEntryId: integer("time_entry_id").references(() => timeEntries.id, { onDelete: "set null" }),
   },
   (t) => [index("invoice_items_invoice_idx").on(t.invoiceId)],
-);
+).enableRLS();
 
 export const payments = pgTable(
   "payments",
@@ -361,7 +365,7 @@ export const payments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("payments_invoice_idx").on(t.invoiceId)],
-);
+).enableRLS();
 
 /**
  * Registro de recordatorios enviados. La clave única (evento, fecha del evento, antelación)
@@ -391,7 +395,7 @@ export const reminderLog = pgTable(
     uniqueIndex("reminder_log_unique_idx").on(t.eventId, t.eventDate, t.offsetDays),
     index("reminder_log_created_idx").on(t.createdAt),
   ],
-);
+).enableRLS();
 
 /**
  * Intentos fallidos de inicio de sesión (limitador de fuerza bruta). Vive en la base de datos y no en
@@ -401,7 +405,7 @@ export const loginAttempts = pgTable("login_attempts", {
   key: text().primaryKey(),
   count: integer().notNull().default(0),
   resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
-});
+}).enableRLS();
 
 /* ---------- Relaciones ---------- */
 

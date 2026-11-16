@@ -10,7 +10,7 @@ Guía para publicar la aplicación en **Render** con **despliegue continuo**: ca
 |---|---|
 | El servicio **se duerme tras 15 min sin visitas** y tarda cerca de un minuto en despertar ([Render](https://render.com/articles/platforms-with-a-real-free-tier-for-developers-in-2026)) | La primera visita tras un rato espera ~1 min. Ver sección 6 para mantenerlo despierto |
 | **Disco efímero** (los discos persistentes requieren plan de pago) | Los documentos **tienen que ir a un bucket S3**; con disco se perderían en cada reinicio |
-| La **base de datos gratuita de Render caduca a los 30 días** y se borra tras 14 más de gracia | Por eso este Blueprint usa **Neon** (gratuito y sin caducidad) y no la base de datos de Render |
+| La **base de datos gratuita de Render caduca a los 30 días** y se borra tras 14 más de gracia | Por eso se usa una base de datos externa gratuita, **Supabase** (o Neon), y no la de Render |
 | 750 horas de instancia gratuitas al mes por espacio de trabajo | Un servicio encendido 24/7 gasta ~744: cabe **uno** |
 
 Si el despacho va a usar la app a diario con datos reales, el plan gratuito es para **probar**; para producción seria conviene el plan de pago (sin dormirse, con copias y disco opcional). Ver sección 9.
@@ -20,14 +20,32 @@ Si el despacho va a usar la app a diario con datos reales, el plan gratuito es p
 | Pieza | Para qué | Coste |
 |---|---|---|
 | **Render** (servicio web) | La aplicación | Gratis |
-| **[Neon](https://neon.tech)** (PostgreSQL, región UE) | Todos los datos | Gratis |
+| **[Supabase](https://supabase.com)** (PostgreSQL, región Frankfurt) | Todos los datos | Gratis (ver sección 2) |
 | **Bucket S3** (Cloudflare R2, Backblaze B2, Supabase Storage…) | Documentos | Cada proveedor tiene un tramo gratuito; **comprueba si te pide tarjeta** |
 | **Servidor SMTP** (Gmail, Outlook, tu dominio) | Avisos por correo (opcional) | El que ya tengas |
 
-## 2. Base de datos (Neon)
+## 2. Base de datos (Supabase)
 
-1. Crea un proyecto en Neon, región **UE**.
-2. Copia la cadena de conexión (termina en `?sslmode=require`). Será `DATABASE_URL`.
+Los nombres de los menús de Supabase pueden variar un poco; lo importante es lo que se elige en cada paso.
+
+1. **Proyecto.** En [supabase.com](https://supabase.com), *New project*:
+   - **Database password**: genera una larga **solo con letras y números** (los símbolos habría que codificarlos dentro de la cadena). Guárdala en un lugar seguro: Supabase no la vuelve a mostrar.
+   - **Region**: **Central EU (Frankfurt)**. Es la región del servicio de Render y está en la UE.
+2. **Cadena de conexión.** Botón **Connect** → *Connection string* → método **Session pooler** (ni *Direct connection* ni *Transaction pooler*). Tiene esta forma:
+
+   ```
+   postgresql://postgres.<ref-del-proyecto>:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+   ```
+
+   Cópiala tal cual y sustituye `[YOUR-PASSWORD]` (corchetes incluidos) por la contraseña. Será `DATABASE_URL`.
+   - *Por qué Session pooler:* la conexión directa de Supabase usa IPv6, que Render no admite de forma fiable. El *Session pooler* funciona por IPv4 y cada conexión se comporta como una sesión normal (migraciones y bloqueos funcionan igual). El *Transaction pooler* (puerto 6543) no debe usarse.
+3. **Certificado.** *Project Settings → Database → SSL Configuration → Download certificate*. Abre el fichero con un editor de texto y copia **todo** su contenido, incluidas las líneas `-----BEGIN CERTIFICATE-----` y `-----END CERTIFICATE-----`. Será `DATABASE_SSL_CA`. En esa misma sección puedes activar *Enforce SSL on incoming connections*.
+   - *Por qué:* Supabase firma el certificado de la base de datos con una autoridad propia que Node no reconoce, y sin ella la conexión se rechaza (`unable to verify the first certificate`). Con `DATABASE_SSL_CA` la app **verifica** que habla con tu base de datos (cadena del certificado y nombre del servidor) en vez de desactivar la comprobación. El certificado no es secreto.
+4. **Cierra la API automática.** *Project Settings → Data API*: desactiva *Enable Data API* (o quita `public` de los esquemas expuestos).
+   - *Por qué:* Supabase publica por defecto las tablas del esquema `public` en una API REST que la app no usa. Además, todas las tablas de la app tienen **Row Level Security** activada sin políticas, de modo que esa API no podría leer ni escribir nada aunque siguiera activa; desactivarla es una segunda barrera.
+5. **Plan gratuito** (comprueba las condiciones actuales en Supabase): la base de datos tiene un tamaño máximo (500 MB al escribir esto) y **el proyecto se pausa tras una semana sin actividad**; se reactiva desde el panel de Supabase sin perder datos. Revisa también qué copias de seguridad incluye tu plan: con datos reales de un despacho conviene, además, una copia propia periódica (`pg_dump`).
+
+**Alternativa: Neon.** Proyecto en región UE (Frankfurt), cadena **directa** (sin `-pooler` en el nombre del servidor) terminada en `?sslmode=require`. No necesita `DATABASE_SSL_CA`: su certificado lo emite una autoridad pública.
 
 ## 3. Almacenamiento (bucket S3)
 
@@ -53,10 +71,14 @@ Si el despacho va a usar la app a diario con datos reales, el plan gratuito es p
 
 | Variable | Valor |
 |---|---|
-| `DATABASE_URL` | Cadena de Neon |
+| `DATABASE_URL` | Cadena del *Session pooler* de Supabase (sección 2) |
 | `S3_BUCKET` | Nombre del bucket |
 | `S3_ENDPOINT` | Endpoint S3 del proveedor |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Las del token |
+
+   Añade además, con *Add Environment Variable*, **`DATABASE_SSL_CA`** con el certificado de Supabase (sección 2). No está en `render.yaml`, así que Render no la pide.
+
+   Si el servicio ya existe porque el primer despliegue falló por falta de variables (`✖ Falta DATABASE_URL…`), no hace falta repetir el Blueprint: rellénalas en *Environment* y pulsa *Manual Deploy → Deploy latest commit*.
 
    `AUTH_SECRET` y `CRON_SECRET` **los genera Render** (aleatorios). No hay que poner `APP_URL`: se usa la URL pública que Render asigna.
 3. Pulsa *Apply*. El primer despliegue **aplica las migraciones** (crea las tablas), compila y arranca. El `render.yaml` ya apunta a la rama `ccr-5f143f7a-if1jv4`.
@@ -64,10 +86,11 @@ Si el despacho va a usar la app a diario con datos reales, el plan gratuito es p
 
 ## 5. Primer administrador y datos del despacho
 
-El primer despliegue crea las tablas pero **ningún usuario**. Créalo desde tu ordenador contra la base de datos de producción, **sin** `--demo`:
+El primer despliegue crea las tablas pero **ningún usuario**. Créalo desde tu ordenador (con una copia del repositorio y `npm ci`) contra la base de datos de producción, **sin** `--demo`:
 
 ```bash
-DATABASE_URL="<cadena de Neon>" \
+DATABASE_URL="<cadena del Session pooler>" \
+DATABASE_SSL_CA="$(cat <ruta-del-certificado-descargado>)" \
 SEED_ADMIN_EMAIL="tu@correo.com" SEED_ADMIN_PASSWORD="una-contraseña-larga-y-única" \
 npm run db:seed
 ```
@@ -88,21 +111,27 @@ Truco habitual: un servicio externo gratuito (por ejemplo [cron-job.org](https:/
 ## 7. Cambios posteriores (despliegue continuo) y seguridad
 
 - Cada `git push` a la rama compila, aplica las migraciones pendientes y publica. Render conserva despliegues anteriores.
-- **Las migraciones son solo hacia delante**: revertir un despliegue no deshace la base de datos. Antes de una migración delicada, crea una rama/copia en Neon.
+- **Las migraciones son solo hacia delante**: revertir un despliegue no deshace la base de datos. Antes de una migración delicada, haz una copia de la base de datos (`pg_dump`, o las copias de Supabase si tu plan las incluye).
 - Un build de producción que falla con un mensaje que empieza por `✖` es una salvaguarda del script de build (`AUTH_SECRET`, base de datos o almacenamiento): el mensaje dice qué falta.
 - **No hay autenticación en dos pasos**: usa contraseñas largas y únicas.
-- **Protección de datos (RGPD):** son datos de clientes de un despacho. Usa regiones UE y formaliza los contratos de encargado del tratamiento con Render, Neon y el proveedor del bucket.
+- **Protección de datos (RGPD):** son datos de clientes de un despacho. Usa regiones UE y formaliza los contratos de encargado del tratamiento con Render, Supabase y el proveedor del bucket.
 - Límite de login: 5 fallos por IP+correo y 15 por correo cada 15 min. Para desbloquear: `delete from login_attempts;`.
 - **IP del cliente:** el límite por IP solo se fía de la cabecera que indiques en `CLIENT_IP_HEADER`. En Render **no he podido confirmar** qué cabecera lleva la IP real, así que no está configurada: se usa `X-Forwarded-For`, que un atacante podría falsear. El límite **por correo** no depende de la IP y sigue protegiendo.
 
 ## 8. Qué está verificado y qué no
 
 **Verificado en local**, simulando Render con la mayor fidelidad posible: una **copia limpia del repositorio** (como un clon nuevo), `npm ci --include=dev` con `NODE_ENV=production`, el `buildCommand` y el `startCommand` exactos de `render.yaml`, `PORT=10000`, las variables de entorno de producción y un emulador S3:
-- El build aplica **las 6 migraciones sobre una base de datos vacía** (16 tablas), compila, y en producción se niega a continuar sin secreto, base de datos o almacenamiento S3. Un preview de pull request no migra ni exige secretos.
+- El build aplica **las migraciones sobre una base de datos vacía** (16 tablas), compila, y en producción se niega a continuar sin secreto, base de datos o almacenamiento S3. Un preview de pull request no migra ni exige secretos.
 - El servidor arranca en el puerto indicado y **en todas las interfaces**; `/api/health` responde también **con PostgreSQL parado**; el planificador de recordatorios arranca.
 - Todo el flujo de documentos con subida directa (21 comprobaciones) contra ese servidor.
 - Una cabecera de IP falsa **no** se acepta salvo que se configure `CLIENT_IP_HEADER`, y con ella configurada el límite por IP funciona.
 - **Memoria en marcha: ~155–165 MB** (cabe de sobra en 512 MB).
+
+**Preparación para Supabase, verificada en local** con un PostgreSQL con TLS cuyo certificado firma una autoridad propia (como hace Supabase):
+- Sin `DATABASE_SSL_CA` la conexión se rechaza; con ella conecta por TLS 1.3. Una autoridad ajena o un nombre de servidor distinto se rechazan (la verificación es real), y ni siquiera `?sslmode=disable` en la cadena puede desactivar el cifrado.
+- Las 8 migraciones se aplican desde cero por TLS, y toda la aplicación (más de 300 comprobaciones de extremo a extremo) funciona con todas sus conexiones cifradas.
+- Con los permisos que Supabase da por defecto a su rol anónimo, ese rol ve **0 filas** en todas las tablas y no puede insertar, modificar ni borrar (sin RLS vería los datos: comprobado como control).
+- Si el proveedor corta una conexión inactiva (Supabase y Neon lo hacen al pausar o reiniciar), la app ya no se cae: descarta esa conexión y abre otra.
 
 **NO verificado** (solo se sabrá en el primer despliegue real):
 - **⚠ La memoria del build.** Medido en local, el build llega a un pico de **~1,1 GB** (Turbopack) o **~840 MB** (con `--webpack`, más lento). El plan gratuito tiene 512 MB de RAM. Render indica que un build que se queda sin memoria falla, pero **no he podido confirmar cuánta memoria tienen los builds del plan gratuito** (una respuesta antigua del personal de Render habla de 8 GB; puede no estar vigente). Si el primer build falla con *out of memory*, las salidas son: subir de plan, o compilar fuera de Render (por ejemplo, en GitHub Actions) y desplegar una imagen ya construida. Dímelo y lo preparo.
@@ -110,10 +139,11 @@ Truco habitual: un servicio externo gratuito (por ejemplo [cron-job.org](https:/
 - **Qué cabecera lleva la IP real del cliente en Render** (por eso `CLIENT_IP_HEADER` no está configurada).
 - Que R2/S3 acepte las URLs firmadas y el CORS (el emulador usado **no valida firmas**).
 - El comportamiento real tras dormirse y despertar.
+- **Supabase real**: no he podido conectarme a Supabase desde aquí. No está comprobado que su *Session pooler* presente un certificado válido para su nombre con la autoridad que se descarga del panel (si no, verás `Hostname/IP does not match certificate's altnames`; avísame), ni los nombres exactos de sus menús.
 
 ## 9. Si más adelante pasas al plan de pago
 
-Cambiar `plan: free` por uno de pago en `render.yaml` elimina el dormirse. Con un disco persistente puedes usar `STORAGE_DRIVER=local`, `UPLOAD_DIR` apuntando al disco y `ALLOW_LOCAL_STORAGE=true` (los documentos quedarían en un único servidor; el bucket S3 sigue siendo la opción más robusta). La base de datos de Render de pago también sustituye a Neon si prefieres todo en un sitio.
+Cambiar `plan: free` por uno de pago en `render.yaml` elimina el dormirse. Con un disco persistente puedes usar `STORAGE_DRIVER=local`, `UPLOAD_DIR` apuntando al disco y `ALLOW_LOCAL_STORAGE=true` (los documentos quedarían en un único servidor; el bucket S3 sigue siendo la opción más robusta). La base de datos de Render de pago también sustituye a Supabase si prefieres todo en un sitio.
 
 ## 10. Netlify
 
@@ -124,7 +154,14 @@ Si ya conectaste el repositorio a Netlify y ya no lo usas, **borra o desconecta 
 | Síntoma | Causa probable |
 |---|---|
 | El build falla con `✖ AUTH_SECRET…` / `✖ DATABASE_URL…` / `✖ STORAGE_DRIVER…` | Falta una variable (sección 4) |
-| Errores de conexión a la base de datos | La cadena no termina en `?sslmode=require` |
+| `unable to verify the first certificate` o `self-signed certificate in certificate chain` | Falta `DATABASE_SSL_CA` o no es el certificado de tu proyecto (sección 2) |
+| `DATABASE_SSL_CA no es un certificado PEM` | El certificado se copió incompleto: deben ir también las líneas `BEGIN` y `END` |
+| `ENETUNREACH` o una dirección IPv6 en el error | Se usó la conexión directa de Supabase: usa la del *Session pooler* |
+| `Tenant or user not found` | En la cadena del pooler el usuario debe ser `postgres.<ref-del-proyecto>`: cópiala tal cual de Supabase |
+| `password authentication failed` | Contraseña mal sustituida en la cadena (o con símbolos sin codificar) |
+| `Hostname/IP does not match certificate's altnames` | No verificado con Supabase real (sección 8): avísame |
+| Errores de conexión con **Neon** | La cadena no termina en `?sslmode=require` |
+| La app no responde y en Supabase el proyecto aparece en pausa | Pasó una semana sin actividad: reactívalo desde su panel |
 | Al subir un documento: «No se pudo subir… CORS» | Falta la URL de Render en el CORS del bucket (sección 3) |
 | La web tarda ~1 min la primera vez | El plan gratuito se había dormido (sección 6) |
 | Los avisos no salen a su hora | El servicio estaba dormido: ver sección 6 |
