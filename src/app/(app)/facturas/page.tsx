@@ -4,7 +4,7 @@ import { and, count, desc, eq, ilike, lt, or, type SQL } from "drizzle-orm";
 import { Badge, EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { clients, invoices } from "@/db/schema";
-import { matterAccessSql } from "@/lib/access";
+import { invoiceAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
 import { summarizeInvoice } from "@/lib/invoices";
@@ -35,7 +35,7 @@ export default async function InvoicesPage({
   } else if (estado in invoiceStatusLabels) {
     filters.push(eq(invoices.status, estado as keyof typeof invoiceStatusLabels));
   }
-  filters.push(matterAccessSql(user, invoices.matterId, { orNone: true }));
+  filters.push(invoiceAccessSql(user));
   const where = and(...filters);
 
   const [{ total }] = await db

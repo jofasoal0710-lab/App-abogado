@@ -5,7 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/form";
 import { EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters, timeEntries, users } from "@/db/schema";
-import { getAccessibleMatter, matterAccessSql } from "@/lib/access";
+import { clientAccessSql, getAccessibleClient, getAccessibleMatter, matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, formatDate, todayISO } from "@/lib/dates";
@@ -33,7 +33,7 @@ export default async function NewInvoicePage({
         .innerJoin(clients, eq(clients.id, matters.clientId))
         .where(and(inArray(matters.status, ["abierto", "en_curso", "en_espera", "cerrado"]), matterAccessSql(user, matters.id)))
         .orderBy(asc(clients.name), desc(matters.number)),
-      db.select({ id: clients.id, name: clients.name }).from(clients).orderBy(asc(clients.name)),
+      db.select({ id: clients.id, name: clients.name }).from(clients).where(clientAccessSql(user, clients.id)).orderBy(asc(clients.name)),
     ]);
     return (
       <>
@@ -82,7 +82,7 @@ export default async function NewInvoicePage({
     if (!matter) notFound();
     clientId = matter.clientId;
   }
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId!)).limit(1);
+  const client = await getAccessibleClient(user, clientId!);
   if (!client) notFound();
 
   const pending = matter

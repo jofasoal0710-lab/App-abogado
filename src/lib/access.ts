@@ -2,32 +2,53 @@ import "server-only";
 import { and, asc, eq, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { documents, events, invoices, matterMembers, matterNotes, matters, timeEntries, users, type Matter } from "@/db/schema";
+import { clients, documents, events, invoices, matterMembers, matterNotes, matters, timeEntries, users, type Client, type Matter } from "@/db/schema";
 import type { AccessUser } from "./access-rules";
 
 /**
  * Fragmento SQL "el usuario puede ver el expediente cuyo id está en `matterIdCol`".
- * Es la traducción exacta de hasMatterAccess() y sirve en cualquier consulta (con o sin joins).
- * Devuelve undefined para administradores (sin restricción), así que se puede pasar a and(...).
+ * Es la traducción exacta de hasMatterAccess(). Los administradores ya NO están exentos:
+ * ven los abiertos y restringidos, no los confidenciales (salvo que sean responsable o miembro).
  *
- * `orNone: true` deja pasar también las filas sin expediente (eventos y facturas sueltos).
+ * `orNone: true` deja pasar también las filas sin expediente (eventos sueltos).
  */
-export function matterAccessSql(
-  user: AccessUser,
-  matterIdCol: SQLWrapper,
-  opts: { orNone?: boolean } = {},
-): SQL | undefined {
-  if (user.role === "admin") return undefined;
+export function matterAccessSql(user: AccessUser, matterIdCol: SQLWrapper, opts: { orNone?: boolean } = {}): SQL {
+  const adminSees = user.role === "admin" ? sql`or m_acc."visibility" = 'restringido'` : sql``;
   const allowed = sql`exists (
     select 1 from "matters" as m_acc
     where m_acc."id" = ${matterIdCol}
       and (
         m_acc."visibility" = 'abierto'
+        ${adminSees}
         or m_acc."responsible_id" = ${user.id}
         or exists (select 1 from "matter_members" as mm_acc where mm_acc."matter_id" = m_acc."id" and mm_acc."user_id" = ${user.id})
       )
   )`;
   return opts.orNone ? sql`(${matterIdCol} is null or ${allowed})` : allowed;
+}
+
+/** Traducción SQL de hasClientAccess(): abierto, creado por mí, o con acceso a algún expediente suyo. */
+export function clientAccessSql(user: AccessUser, clientIdCol: SQLWrapper): SQL {
+  return sql`exists (
+    select 1 from "clients" as c_acc
+    where c_acc."id" = ${clientIdCol}
+      and (
+        c_acc."visibility" = 'abierto'
+        or c_acc."created_by_id" = ${user.id}
+        or exists (select 1 from "matters" as mc_acc where mc_acc."client_id" = c_acc."id" and ${matterAccessSql(user, sql`mc_acc."id"`)})
+      )
+  )`;
+}
+
+/**
+ * Una factura con expediente sigue al expediente; una factura suelta (sin expediente) sigue al cliente,
+ * para que la lista de facturas no delate un cliente confidencial.
+ */
+export function invoiceAccessSql(user: AccessUser): SQL {
+  return sql`(
+    (${invoices.matterId} is null and ${clientAccessSql(user, invoices.clientId)})
+    or (${invoices.matterId} is not null and ${matterAccessSql(user, invoices.matterId)})
+  )`;
 }
 
 /** Expediente si existe Y el usuario tiene acceso; null en cualquier otro caso (no se distingue). */
@@ -89,15 +110,67 @@ export function canAccessNote(user: AccessUser, noteId: number) {
 }
 
 export function canAccessInvoice(user: AccessUser, invoiceId: number) {
-  return exists(
-    db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.id, invoiceId), matterAccessSql(user, invoices.matterId, { orNone: true }))).limit(1),
-  );
+  return exists(db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.id, invoiceId), invoiceAccessSql(user))).limit(1));
 }
 
-/** Personas que se pueden añadir a un expediente: activas, no administradoras (ya lo ven todo), ni responsable ni miembros. */
+/** Cliente si existe Y el usuario puede verlo; null en cualquier otro caso. */
+export async function getAccessibleClient(user: AccessUser, clientId: number): Promise<Client | null> {
+  const [c] = await db.select().from(clients).where(and(eq(clients.id, clientId), clientAccessSql(user, clients.id))).limit(1);
+  return c ?? null;
+}
+
+/** Para páginas: 404 si no existe o no hay acceso. */
+export async function requireClientPage(user: AccessUser, clientId: number): Promise<Client> {
+  const c = await getAccessibleClient(user, clientId);
+  if (!c) notFound();
+  return c;
+}
+
+/** Personas que se pueden añadir a un expediente: activas y que no sean ya responsable ni miembros (los administradores también: en un confidencial no tienen acceso por rol). */
 export async function listAddableUsers(matterId: number, responsibleId: number | null) {
   const members = await db.select({ userId: matterMembers.userId }).from(matterMembers).where(eq(matterMembers.matterId, matterId));
   const taken = new Set([...members.map((m) => m.userId), ...(responsibleId ? [responsibleId] : [])]);
   const all = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.active, true)).orderBy(asc(users.name));
-  return all.filter((u) => u.role !== "admin" && !taken.has(u.id));
+  return all.filter((u) => !taken.has(u.id));
+}
+
+/** Responsable y miembros de un expediente, con su estado de activación. */
+export async function getHolders(matterId: number) {
+  const [m] = await db.select({ responsibleId: matters.responsibleId }).from(matters).where(eq(matters.id, matterId)).limit(1);
+  const [responsible] = m?.responsibleId
+    ? await db.select({ id: users.id, active: users.active }).from(users).where(eq(users.id, m.responsibleId)).limit(1)
+    : [];
+  const members = await db
+    .select({ id: users.id, active: users.active })
+    .from(matterMembers)
+    .innerJoin(users, eq(users.id, matterMembers.userId))
+    .where(eq(matterMembers.matterId, matterId));
+  return { responsible: responsible ?? null, members };
+}
+
+/** Expedientes confidenciales de los que este usuario es el ÚNICO titular activo (desactivarlo los dejaría huérfanos). */
+export async function countSoleHolderConfidential(userId: number): Promise<number> {
+  const r = await db.execute(sql`
+    select count(*)::int as n from "matters" m
+    where m."visibility" = 'confidencial'
+      and (m."responsible_id" = ${userId} or exists (select 1 from "matter_members" x where x."matter_id" = m."id" and x."user_id" = ${userId}))
+      and not exists (
+        select 1 from "users" u
+        where u."active" and u."id" <> ${userId}
+          and (u."id" = m."responsible_id" or exists (select 1 from "matter_members" y where y."matter_id" = m."id" and y."user_id" = u."id"))
+      )`);
+  return Number((r.rows[0] as { n: number }).n);
+}
+
+/** Expedientes confidenciales sin ninguna persona activa con acceso: nadie puede verlos ni gestionarlos. */
+export async function listOrphanConfidentialMatters(): Promise<{ id: number; number: string; title: string }[]> {
+  const r = await db.execute(sql`
+    select m."id", m."number", m."title" from "matters" m
+    where m."visibility" = 'confidencial'
+      and not exists (
+        select 1 from "users" u
+        where u."active" and (u."id" = m."responsible_id" or exists (select 1 from "matter_members" y where y."matter_id" = m."id" and y."user_id" = u."id"))
+      )
+    order by m."number"`);
+  return r.rows as { id: number; number: string; title: string }[];
 }

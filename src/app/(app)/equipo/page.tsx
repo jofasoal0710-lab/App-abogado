@@ -5,9 +5,11 @@ import { Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { users, type User } from "@/db/schema";
 import type { ActionState } from "@/lib/actions";
+import { listOrphanConfidentialMatters } from "@/lib/access";
 import { requireAdmin } from "@/lib/auth";
 import { entries, roleLabels } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
+import { claimOrphanMatterAction } from "../expedientes/access-actions";
 import { createUserAction, updateUserAction } from "./actions";
 
 export const metadata: Metadata = { title: "Equipo" };
@@ -15,10 +17,40 @@ export const metadata: Metadata = { title: "Equipo" };
 export default async function TeamPage() {
   await requireAdmin();
   const all = await db.select().from(users).orderBy(asc(users.name));
+  const orphans = await listOrphanConfidentialMatters();
 
   return (
     <>
       <PageHeader title="Equipo" subtitle="Usuarios con acceso al sistema" />
+
+      {orphans.length > 0 && (
+        <section className="mb-8 overflow-hidden rounded-lg border border-red-200 bg-red-50/50">
+          <h2 className="border-b border-red-200 px-5 py-3 font-serif text-lg font-semibold text-red-800">
+            Expedientes confidenciales sin ninguna persona activa con acceso ({orphans.length})
+          </h2>
+          <p className="px-5 pt-3 text-sm text-ink-700">
+            Nadie puede ver ni gestionar estos expedientes (su responsable y miembros están inactivos o no existen). Como administrador puedes reclamar el acceso; el motivo
+            queda registrado en el historial del expediente. Solo se ofrece cuando de verdad están huérfanos.
+          </p>
+          <ul className="divide-y divide-red-100">
+            {orphans.map((o) => (
+              <li key={o.id} className="px-5 py-3">
+                <p className="text-sm font-medium text-ink-900">
+                  {o.number} · {o.title}
+                </p>
+                <ActionForm action={claimOrphanMatterAction.bind(null, o.id)}>
+                  <div className="mt-2 flex flex-wrap items-end gap-3">
+                    <Field label="Motivo (obligatorio, quedará registrado)" className="min-w-72 flex-1">
+                      <input className="input" name="reason" required minLength={10} maxLength={500} />
+                    </Field>
+                    <SubmitButton className="btn-danger">Reclamar acceso</SubmitButton>
+                  </div>
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card mb-8">
         <ul className="divide-y divide-ink-100">

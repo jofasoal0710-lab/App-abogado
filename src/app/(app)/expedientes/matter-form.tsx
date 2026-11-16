@@ -58,10 +58,11 @@ export function MatterForm({
           </select>
         </Field>
         {!matter && (
-          <Field label="Visibilidad" hint="Restringido: solo el responsable, los miembros que añadas y los administradores. Podrás cambiarlo en la pestaña Acceso.">
+          <Field label="Visibilidad" hint="Restringido: responsable, miembros y administradores. Confidencial: solo responsable y miembros (ni los administradores); exige responsable. Podrás cambiarlo en la pestaña Acceso.">
             <select className="input" name="visibility" defaultValue="abierto">
               <option value="abierto">Abierto (todo el equipo)</option>
-              <option value="restringido">Restringido (confidencial)</option>
+              <option value="restringido">Restringido (miembros y administradores)</option>
+              <option value="confidencial">Confidencial (ni los administradores)</option>
             </select>
           </Field>
         )}

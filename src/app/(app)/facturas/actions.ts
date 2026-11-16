@@ -7,8 +7,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { invoiceItems, invoices, matters, payments, timeEntries } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
-import { canAccessInvoice, getAccessibleMatter } from "@/lib/access";
-import { ACCESS_DENIED } from "@/lib/access-rules";
+import { canAccessInvoice, getAccessibleClient, getAccessibleMatter } from "@/lib/access";
+import { ACCESS_DENIED, CLIENT_ACCESS_DENIED } from "@/lib/access-rules";
 import { canManageInvoices, requireUser, type CurrentUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, todayISO } from "@/lib/dates";
@@ -53,6 +53,7 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
   const clientId = intOrNull(formData, "clientId");
   const matterId = intOrNull(formData, "matterId");
   if (!clientId) return { error: "Selecciona un cliente." };
+  if (!(await getAccessibleClient(user, clientId))) return { error: CLIENT_ACCESS_DENIED };
   if (matterId && !(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
   const header = parseHeader(formData);
   if (!header.success) return { error: firstZodError(header.error) };

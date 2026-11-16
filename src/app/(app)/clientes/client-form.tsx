@@ -8,10 +8,13 @@ import Link from "next/link";
 export function ClientForm({
   action,
   client,
+  canSetConfidential = false,
   cancelHref,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   client?: Client;
+  /** Solo en el alta, y no para asistentes. */
+  canSetConfidential?: boolean;
   cancelHref: string;
 }) {
   return (
@@ -41,6 +44,14 @@ export function ClientForm({
         <Field label="Dirección" className="sm:col-span-3">
           <input className="input" name="address" defaultValue={client?.address ?? ""} maxLength={500} />
         </Field>
+        {!client && canSetConfidential && (
+          <Field label="Visibilidad" hint="Confidencial: solo lo verás tú y quien tenga acceso a sus expedientes." className="sm:col-span-3">
+            <select className="input max-w-xs" name="visibility" defaultValue="abierto">
+              <option value="abierto">Abierto (todo el equipo)</option>
+              <option value="confidencial">Confidencial</option>
+            </select>
+          </Field>
+        )}
         <Field label="Notas internas" className="sm:col-span-3">
           <textarea className="input min-h-24" name="notes" defaultValue={client?.notes ?? ""} maxLength={5000} />
         </Field>

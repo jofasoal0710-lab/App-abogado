@@ -3,6 +3,8 @@ import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "@/db";
 import { events, matterMembers, matters, reminderLog, users } from "@/db/schema";
+import { matterAccessSql } from "../access";
+import type { AccessUser } from "../access-rules";
 import { hasMatterAccess } from "../access-rules";
 import { dayKey } from "../dates";
 import { getReminderConfig, isSmtpConfigured, type ReminderConfig } from "./config";
@@ -211,10 +213,19 @@ async function execute(cfg: ReminderConfig, now: Date): Promise<RunResult> {
 }
 
 /** Vista previa: qué se enviaría en la próxima ejecución (no envía ni registra nada). */
-export async function previewReminders(now = new Date()) {
+export async function previewReminders(viewer: AccessUser, now = new Date()) {
   const cfg = getReminderConfig();
   const { due, withoutRecipient } = await collectDue(cfg, now);
-  return { groups: groupByRecipient(due), withoutRecipient };
+  // Quien mira la vista previa solo ve los avisos de expedientes a los que él mismo tiene acceso
+  // (un administrador no puede enterarse de lo que ocurre en un expediente confidencial).
+  const matterIds = [...new Set(due.flatMap((d) => (d.item.matterId !== null ? [d.item.matterId] : [])))];
+  const visible = new Set(
+    matterIds.length
+      ? (await db.select({ id: matters.id }).from(matters).where(and(inArray(matters.id, matterIds), matterAccessSql(viewer, matters.id)))).map((m) => m.id)
+      : [],
+  );
+  const shown = due.filter((d) => d.item.matterId === null || visible.has(d.item.matterId));
+  return { groups: groupByRecipient(shown), withoutRecipient };
 }
 
 async function record(

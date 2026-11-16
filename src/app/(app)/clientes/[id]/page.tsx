@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { ConfirmButton } from "@/components/form";
-import { Badge, EmptyState, PageHeader } from "@/components/ui";
+import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form";
+import { ReadBeacon } from "@/components/read-beacon";
+import { Badge, EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
-import { clients, invoices, matters } from "@/db/schema";
-import { matterAccessSql } from "@/lib/access";
+import { clientAccessLog, invoices, matters, readAudit, users } from "@/db/schema";
+import { invoiceAccessSql, matterAccessSql, requireClientPage } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
-import { formatDate } from "@/lib/dates";
+import { formatDate, formatDateTime } from "@/lib/dates";
 import { areaLabels, clientTypeLabels, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
 import { formatMoney, invoiceTotals } from "@/lib/money";
-import { deleteClientAction } from "../actions";
+import { READ_VERBS } from "@/lib/read-audit";
+import { deleteClientAction, setClientVisibilityAction } from "../actions";
 
 export const metadata: Metadata = { title: "Cliente" };
 
@@ -27,8 +29,17 @@ export default async function ClientPage({
   if (!Number.isInteger(id)) notFound();
   const { error } = await searchParams;
 
-  const [client] = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
-  if (!client) notFound();
+  const client = await requireClientPage(user, id); // 404 si no existe o es un cliente confidencial que no ves
+  const canManageClient = user.role === "admin" || (user.role !== "asistente" && client.createdById === user.id);
+  const accessLog = canManageClient
+    ? await db
+        .select({ id: clientAccessLog.id, detail: clientAccessLog.detail, createdAt: clientAccessLog.createdAt, actor: users.name })
+        .from(clientAccessLog)
+        .leftJoin(users, eq(users.id, clientAccessLog.actorId))
+        .where(eq(clientAccessLog.clientId, id))
+        .orderBy(desc(clientAccessLog.createdAt), desc(clientAccessLog.id))
+        .limit(20)
+    : [];
 
   const clientMatters = await db
     .select()
@@ -37,16 +48,34 @@ export default async function ClientPage({
     .orderBy(desc(matters.openedAt));
 
   const clientInvoices = await db.query.invoices.findMany({
-    where: and(eq(invoices.clientId, id), matterAccessSql(user, invoices.matterId, { orNone: true })),
+    where: and(eq(invoices.clientId, id), invoiceAccessSql(user)),
     with: { items: true },
     orderBy: desc(invoices.issueDate),
   });
 
+  const reads =
+    canManageClient && client.visibility === "confidencial"
+      ? await db
+          .select({ id: readAudit.id, kind: readAudit.kind, detail: readAudit.detail, createdAt: readAudit.createdAt, who: users.name })
+          .from(readAudit)
+          .leftJoin(users, eq(users.id, readAudit.userId))
+          .where(eq(readAudit.clientId, id))
+          .orderBy(desc(readAudit.createdAt), desc(readAudit.id))
+          .limit(50)
+      : [];
+
   return (
     <>
+      {client.visibility === "confidencial" && <ReadBeacon clientId={client.id} kind="cliente" detail={client.name} />}
       <PageHeader
         title={client.name}
-        subtitle={`${clientTypeLabels[client.type]}${client.taxId ? ` · ${client.taxId}` : ""}`}
+        subtitle={
+          <>
+            {clientTypeLabels[client.type]}
+            {client.taxId ? ` · ${client.taxId}` : ""}
+            {client.visibility === "confidencial" && <span className="badge-amber ml-2">Confidencial</span>}
+          </>
+        }
         actions={
           <>
             <Link href={`/expedientes/nuevo?cliente=${client.id}`} className="btn-primary">
@@ -149,6 +178,64 @@ export default async function ClientPage({
             )}
           </section>
         </div>
+
+        {canManageClient && (
+          <section className="card card-pad lg:col-span-3">
+            <h2 className="mb-1 font-serif text-lg font-semibold">Confidencialidad</h2>
+            <p className="mb-4 text-sm text-ink-600">
+              {client.visibility === "confidencial"
+                ? "Confidencial: el cliente solo lo ve quien lo dio de alta o tiene acceso a alguno de sus expedientes. Sus expedientes nunca pueden ser abiertos. Los administradores lo ven si tienen acceso a algún expediente suyo (los restringidos incluidos); para ocultarlo también a ellos, marca sus expedientes como confidenciales."
+                : "Abierto: lo ve todo el equipo. Si lo haces confidencial, solo lo verá quien tenga acceso a alguno de sus expedientes (o lo diera de alta)."}
+            </p>
+            <ActionForm action={setClientVisibilityAction.bind(null, client.id)}>
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Visibilidad del cliente" className="w-80">
+                  <select className="input" name="visibility" defaultValue={client.visibility}>
+                    <option value="abierto">Abierto (todo el equipo)</option>
+                    <option value="confidencial">Confidencial</option>
+                  </select>
+                </Field>
+                <SubmitButton>Guardar</SubmitButton>
+              </div>
+              <p className="hint mt-2">Al hacerlo confidencial, sus expedientes abiertos pasan a restringidos; quien deje de verlos pierde también los eventos que tuviera asignados en ellos.</p>
+            </ActionForm>
+            {accessLog.length > 0 && (
+              <table className="table mt-5">
+                <tbody>
+                  {accessLog.map((l) => (
+                    <tr key={l.id}>
+                      <td className="whitespace-nowrap">{formatDateTime(l.createdAt)}</td>
+                      <td>{l.detail}</td>
+                      <td className="text-ink-500">{l.actor ?? "Usuario eliminado"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {client.visibility === "confidencial" && (
+              <>
+                <h3 className="label mt-6">Lecturas recientes (últimas 50)</h3>
+                {reads.length === 0 ? (
+                  <p className="text-sm text-ink-500">Aún no se ha registrado ninguna lectura.</p>
+                ) : (
+                  <table className="table">
+                    <tbody>
+                      {reads.map((r) => (
+                        <tr key={r.id}>
+                          <td className="whitespace-nowrap">{formatDateTime(r.createdAt)}</td>
+                          <td>{r.who ?? "Usuario eliminado"}</td>
+                          <td className="text-ink-700">
+                            {READ_VERBS[r.kind]} {r.detail}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            )}
+          </section>
+        )}
       </div>
     </>
   );

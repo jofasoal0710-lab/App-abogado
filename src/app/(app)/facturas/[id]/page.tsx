@@ -3,10 +3,11 @@ import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ActionForm, ConfirmButton, PrintButton, SubmitButton } from "@/components/form";
+import { ReadBeacon } from "@/components/read-beacon";
 import { Badge, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
-import { matterAccessSql } from "@/lib/access";
+import { invoiceAccessSql } from "@/lib/access";
 import { canManageInvoices, requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { formatDate, todayISO } from "@/lib/dates";
@@ -40,7 +41,7 @@ export default async function InvoicePage({
   const { error } = await searchParams;
 
   const inv = await db.query.invoices.findFirst({
-    where: and(eq(invoices.id, id), matterAccessSql(user, invoices.matterId, { orNone: true })),
+    where: and(eq(invoices.id, id), invoiceAccessSql(user)),
     with: { client: true, matter: true, items: { orderBy: (i) => asc(i.id) }, payments: { orderBy: (p) => asc(p.paidAt) } },
   });
   if (!inv) notFound();
@@ -51,8 +52,14 @@ export default async function InvoicePage({
   const manage = canManageInvoices(user);
   const errorMessage = invoiceErrorMessage(error);
 
+  const label = inv.number ?? `Borrador #${inv.id}`;
   return (
     <>
+      {inv.matter && inv.matter.visibility !== "abierto" ? (
+        <ReadBeacon matterId={inv.matter.id} kind="factura" detail={label} />
+      ) : (
+        !inv.matter && inv.client.visibility === "confidencial" && <ReadBeacon clientId={inv.client.id} kind="factura" detail={label} />
+      )}
       <PageHeader
         title={inv.number ?? `Borrador #${inv.id}`}
         subtitle={

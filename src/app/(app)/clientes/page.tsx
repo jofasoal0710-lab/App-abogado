@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { count, desc, ilike, or } from "drizzle-orm";
+import { and, count, desc, ilike, or } from "drizzle-orm";
 import { EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { clients } from "@/db/schema";
+import { clientAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { clientTypeLabels } from "@/lib/labels";
 import { likePattern, pageParam, qs } from "@/lib/search";
@@ -16,12 +17,12 @@ export default async function ClientsPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const page = pageParam(sp.page);
 
-  const where = q
+  const search = q
     ? or(
         ilike(clients.name, likePattern(q)),
         ilike(clients.taxId, likePattern(q)),
@@ -29,6 +30,7 @@ export default async function ClientsPage({
         ilike(clients.phone, likePattern(q)),
       )
     : undefined;
+  const where = and(search, clientAccessSql(user, clients.id));
 
   const [{ total }] = await db.select({ total: count() }).from(clients).where(where);
   const rows = await db

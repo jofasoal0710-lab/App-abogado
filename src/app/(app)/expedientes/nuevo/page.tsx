@@ -3,6 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, users } from "@/db/schema";
+import { clientAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { createMatterAction } from "../actions";
 import { MatterForm } from "../matter-form";
@@ -17,7 +18,7 @@ export default async function NewMatterPage({
   const user = await requireUser();
   const { cliente } = await searchParams;
   const [allClients, lawyers] = await Promise.all([
-    db.select({ id: clients.id, name: clients.name }).from(clients).orderBy(asc(clients.name)),
+    db.select({ id: clients.id, name: clients.name }).from(clients).where(clientAccessSql(user, clients.id)).orderBy(asc(clients.name)),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.active, true)).orderBy(asc(users.name)),
   ]);
 

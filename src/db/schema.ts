@@ -41,12 +41,21 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "pagada",
   "anulada",
 ]);
-export const matterVisibilityEnum = pgEnum("matter_visibility", ["abierto", "restringido"]);
+/**
+ * abierto: todo el equipo. restringido: responsable, miembros y administradores.
+ * confidencial: responsable y miembros, SIN excepción para administradores (muralla china).
+ */
+export const matterVisibilityEnum = pgEnum("matter_visibility", ["abierto", "restringido", "confidencial"]);
+/** confidencial: solo lo ve quien tenga acceso a alguno de sus expedientes (o lo creó). */
+export const clientVisibilityEnum = pgEnum("client_visibility", ["abierto", "confidencial"]);
+export const readKindEnum = pgEnum("read_kind", ["ficha", "documento", "factura", "cliente"]);
 export const accessActionEnum = pgEnum("access_action", [
   "visibilidad",
   "miembro_alta",
   "miembro_baja",
   "responsable",
+  "reclamacion",
+  "reasignacion",
 ]);
 export const reminderStatusEnum = pgEnum("reminder_status", ["enviado", "error"]);
 export const itemUnitEnum = pgEnum("item_unit", ["horas", "unidades"]);
@@ -90,6 +99,9 @@ export const clients = pgTable(
     phone: text(),
     address: text(),
     notes: text(),
+    visibility: clientVisibilityEnum().notNull().default("abierto"),
+    /** Quien dio de alta al cliente: siempre lo ve, aunque sea confidencial y aún no tenga expedientes. */
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("clients_name_idx").on(t.name)],
@@ -164,6 +176,39 @@ export const matterAccessLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("matter_access_log_matter_idx").on(t.matterId)],
+);
+
+/** Historial de cambios de confidencialidad de un cliente. */
+export const clientAccessLog = pgTable(
+  "client_access_log",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+    detail: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("client_access_log_client_idx").on(t.clientId)],
+);
+
+/** Registro de lecturas en expedientes restringidos/confidenciales y clientes confidenciales. */
+export const readAudit = pgTable(
+  "read_audit",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    matterId: integer("matter_id").references(() => matters.id, { onDelete: "cascade" }),
+    clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    kind: readKindEnum().notNull(),
+    detail: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("read_audit_matter_idx").on(t.matterId, t.createdAt),
+    index("read_audit_client_idx").on(t.clientId, t.createdAt),
+  ],
 );
 
 export const matterNotes = pgTable(
@@ -411,3 +456,4 @@ export type Payment = typeof payments.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type ReminderLog = typeof reminderLog.$inferSelect;
 export type MatterMember = typeof matterMembers.$inferSelect;
+export type ReadAudit = typeof readAudit.$inferSelect;

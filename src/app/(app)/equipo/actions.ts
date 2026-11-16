@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { firstZodError, str, type ActionState } from "@/lib/actions";
+import { countSoleHolderConfidential } from "@/lib/access";
 import { requireAdmin } from "@/lib/auth";
 import { parseMoneyToCents } from "@/lib/money";
 
@@ -75,6 +76,14 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
     const [target] = await db.select({ role: users.role, active: users.active }).from(users).where(eq(users.id, id));
     if (target?.role === "admin" && target.active && n === 0) {
       return { error: "Debe quedar al menos un administrador activo." };
+    }
+  }
+
+  // No se puede desactivar a la única persona con acceso a un expediente confidencial: quedaría huérfano.
+  if (!active) {
+    const n = await countSoleHolderConfidential(id);
+    if (n > 0) {
+      return { error: `No se puede desactivar: es la única persona activa con acceso a ${n} expediente(s) confidencial(es). Que su responsable añada antes a otra persona.` };
     }
   }
 

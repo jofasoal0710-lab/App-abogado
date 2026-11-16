@@ -7,11 +7,11 @@ import { ClientForm } from "../client-form";
 export const metadata: Metadata = { title: "Nuevo cliente" };
 
 export default async function NewClientPage() {
-  await requireUser();
+  const user = await requireUser();
   return (
     <>
       <PageHeader title="Nuevo cliente" />
-      <ClientForm action={createClientAction} cancelHref="/clientes" />
+      <ClientForm action={createClientAction} canSetConfidential={user.role !== "asistente"} cancelHref="/clientes" />
     </>
   );
 }

@@ -7,9 +7,10 @@ import { z } from "zod";
 import { db } from "@/db";
 import { documents, invoices, matterMembers, matterNotes, matters, users } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
-import { canAccessNote, getAccessibleMatter } from "@/lib/access";
+import { canAccessNote, getAccessibleClient, getAccessibleMatter, getHolders } from "@/lib/access";
+import { reassignLostAccessEvents } from "@/lib/access-effects";
 import { logAccessChange } from "@/lib/access-log";
-import { ACCESS_DENIED, canManageMatterAccess, describeVisibility } from "@/lib/access-rules";
+import { ACCESS_DENIED, CLIENT_ACCESS_DENIED, activeHolderIds, canManageMatterAccess, describeVisibility, minimumMatterVisibility } from "@/lib/access-rules";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
@@ -31,7 +32,7 @@ const matterSchema = z
     billingType: z.enum(["por_horas", "tarifa_fija"]),
     fixedFeeCents: z.number().int().nonnegative().nullable(),
     openedAt: isoDate,
-    visibility: z.enum(["abierto", "restringido"]).optional(),
+    visibility: z.enum(["abierto", "restringido", "confidencial"]).optional(),
   })
   .refine((v) => v.billingType !== "tarifa_fija" || (v.fixedFeeCents ?? 0) > 0, {
     message: "Indica los honorarios pactados para la tarifa fija",
@@ -67,6 +68,16 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
   const result = parseMatter(formData);
   if ("error" in result) return { error: result.error };
 
+  // El cliente debe ser uno que puedas ver; si es confidencial, sus expedientes nunca son abiertos.
+  const client = await getAccessibleClient(user, result.data.clientId);
+  if (!client) return { error: CLIENT_ACCESS_DENIED };
+  const visibility = minimumMatterVisibility(client, result.data.visibility ?? "abierto");
+  if (visibility === "confidencial") {
+    if (result.data.responsibleId === null) return { error: "Un expediente confidencial necesita un responsable." };
+    const [resp] = await db.select({ active: users.active }).from(users).where(eq(users.id, result.data.responsibleId));
+    if (!resp?.active) return { error: "El responsable de un expediente confidencial debe ser una persona activa." };
+  }
+
   const year = new Date().getFullYear();
   const prefix = "EXP";
   const row = await db.transaction(async (tx) => {
@@ -81,20 +92,22 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     const number = formatNumber(prefix, year, nextSequence(last?.number, prefix, year));
     const [created] = await tx
       .insert(matters)
-      .values({ ...result.data, visibility: result.data.visibility ?? "abierto", number })
+      .values({ ...result.data, visibility, number })
       .returning({ id: matters.id });
-    // Quien crea un expediente restringido sin ser su responsable (ni administrador) no puede
-    // quedarse sin acceso a lo que acaba de crear: se le añade como miembro.
-    if (result.data.visibility === "restringido") {
-      if (user.role !== "admin" && result.data.responsibleId !== user.id) {
-        await tx.insert(matterMembers).values({ matterId: created.id, userId: user.id, addedById: user.id });
-      }
+    // Quien crea un expediente restringido o confidencial sin ser su responsable no puede quedarse sin
+    // acceso a lo que acaba de crear: se le añade como miembro. (Un administrador ya ve los restringidos,
+    // pero no los confidenciales.)
+    const creatorNeedsMembership =
+      (visibility === "restringido" && user.role !== "admin") || visibility === "confidencial";
+    if (creatorNeedsMembership && result.data.responsibleId !== user.id) {
+      await tx.insert(matterMembers).values({ matterId: created.id, userId: user.id, addedById: user.id });
     }
     return created;
   });
 
-  if (result.data.visibility === "restringido") {
-    await logAccessChange(row.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility("restringido")} (al crearlo)`);
+  if (visibility !== "abierto") {
+    const why = visibility !== (result.data.visibility ?? "abierto") ? " (el cliente es confidencial)" : " (al crearlo)";
+    await logAccessChange(row.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(visibility)}${why}`);
   }
   revalidatePath("/expedientes");
   redirect(`/expedientes/${row.id}`);
@@ -115,13 +128,36 @@ export async function updateMatterAction(
   const canManage = canManageMatterAccess(user, current);
   const { visibility: _ignored, ...editable } = result.data; // la visibilidad solo se cambia en la pestaña Acceso
   const data = canManage ? editable : { ...editable, responsibleId: current.responsibleId };
-  await db.update(matters).set(data).where(eq(matters.id, id));
+
+  // Un expediente confidencial no puede quedarse sin responsable activo (nadie podría gestionarlo).
+  if (current.visibility === "confidencial" && data.responsibleId !== current.responsibleId) {
+    if (data.responsibleId === null) return { error: "Un expediente confidencial necesita un responsable." };
+    const [next] = await db.select({ active: users.active }).from(users).where(eq(users.id, data.responsibleId));
+    if (!next?.active) return { error: "El responsable de un expediente confidencial debe ser una persona activa." };
+  }
+
+  // Cambiar de cliente: solo a uno que puedas ver, y un cliente confidencial no admite expedientes abiertos.
+  let visibility = current.visibility;
+  if (data.clientId !== current.clientId) {
+    const newClient = await getAccessibleClient(user, data.clientId);
+    if (!newClient) return { error: CLIENT_ACCESS_DENIED };
+    const min = minimumMatterVisibility(newClient, current.visibility);
+    if (min !== current.visibility) {
+      visibility = min;
+      await logAccessChange(id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(min)} (el nuevo cliente es confidencial)`);
+    }
+  }
+  await db.update(matters).set({ ...data, visibility }).where(eq(matters.id, id));
   if (canManage && data.responsibleId !== current.responsibleId) {
     const names = await db.select({ id: users.id, name: users.name }).from(users);
     const nameOf = (uid: number | null) => names.find((n) => n.id === uid)?.name ?? "sin asignar";
     await logAccessChange(id, user.id, "responsable", `Responsable: ${nameOf(current.responsibleId)} → ${nameOf(data.responsibleId)}`);
   }
+  // El responsable anterior puede haber perdido el acceso, y con él sus eventos pendientes.
+  await reassignLostAccessEvents(id, user.id);
   revalidatePath("/expedientes");
+  // Si quien edita ya no ve el expediente (se quitó como responsable), no se le deja en un 404.
+  if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");
   redirect(`/expedientes/${id}`);
 }
 
@@ -172,7 +208,9 @@ export async function deleteNoteAction(noteId: number, matterId: number) {
 }
 
 export async function deleteMatterAction(id: number) {
-  await requireAdmin();
+  const user = await requireAdmin();
+  // Ser administrador no basta: sin acceso (p. ej. un confidencial) tampoco se puede borrar.
+  if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");
 
   const [{ n }] = await db.select({ n: count() }).from(invoices).where(eq(invoices.matterId, id));
   if (n > 0) redirect(`/expedientes/${id}?error=has_invoices`);

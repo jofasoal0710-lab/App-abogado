@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/form";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { events, matters, reminderLog } from "@/db/schema";
+import { matterAccessSql } from "@/lib/access";
 import { requireAdmin } from "@/lib/auth";
 import { formatDate, formatDateTime, formatTime, relativeDays } from "@/lib/dates";
 import { eventKindLabels } from "@/lib/labels";
@@ -21,12 +22,12 @@ function describeOffsets(offsets: number[]): string {
 }
 
 export default async function RemindersPage() {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const cfg = getReminderConfig();
   const smtpOk = isSmtpConfigured(cfg);
 
   const [preview, history] = await Promise.all([
-    smtpOk ? previewReminders() : Promise.resolve(null),
+    smtpOk ? previewReminders(admin) : Promise.resolve(null),
     db
       .select({
         id: reminderLog.id,
@@ -47,6 +48,7 @@ export default async function RemindersPage() {
       .from(reminderLog)
       .innerJoin(events, eq(events.id, reminderLog.eventId))
       .leftJoin(matters, eq(matters.id, events.matterId))
+      .where(matterAccessSql(admin, events.matterId, { orNone: true }))
       .orderBy(desc(reminderLog.createdAt), desc(reminderLog.id))
       .limit(50),
   ]);

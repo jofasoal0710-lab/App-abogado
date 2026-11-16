@@ -40,7 +40,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 - **Documentos**: subida por expediente (máx. 25 MB, lista de extensiones permitida), descarga autenticada.
 - **Horas**: registro con tarifa congelada por entrada; las facturadas quedan bloqueadas.
 - **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada / anulada; cobros parciales, IVA configurable, vista imprimible (Imprimir / PDF).
-- **Permisos por expediente**: cada expediente es *abierto* (lo ve todo el equipo) o *restringido* (ver abajo).
+- **Permisos y confidencialidad**: expedientes abiertos, restringidos o confidenciales (ni los administradores), clientes confidenciales y registro de lecturas (ver abajo).
 - **Recordatorios** (solo administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
 - **Equipo** (solo administradores): altas, roles, tarifa horaria, desactivación y si recibe avisos por correo.
 
@@ -52,25 +52,42 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Eliminar clientes / documentos | ✓ | ✓ | – |
 | Eliminar expedientes, gestionar equipo | ✓ | – | – |
 | Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
+| Ver expedientes **confidenciales** | solo si es responsable o miembro | ídem | ídem |
 | Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
 | Emitir/anular facturas, borrar cobros | ✓ | ✓ | – |
 
-## Permisos por expediente
+## Permisos y confidencialidad
 
-Cada expediente tiene una **visibilidad**:
-- **Abierto** (por defecto): lo ve todo el equipo, como antes.
-- **Restringido**: solo lo ven su **responsable**, los **miembros** que se añadan en la pestaña *Acceso* y los **administradores**.
+**Expedientes: tres niveles de visibilidad**
 
-Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo administradores y el responsable). Esa pestaña lista quién tiene acceso y guarda un **historial** de cambios (visibilidad, altas y bajas de miembros, cambios de responsable).
+| Nivel | Quién lo ve |
+|---|---|
+| **Abierto** (por defecto) | Todo el equipo |
+| **Restringido** | Responsable, miembros añadidos y administradores |
+| **Confidencial** | Solo responsable y miembros. **Ni los administradores** (muralla china) |
 
-**Qué cubre.** Todo lo que cuelga del expediente: notas, documentos (incluida la descarga), horas, eventos de agenda, facturas y cobros. Quien no tiene acceso no ve el expediente en listas, búsquedas, ficha de cliente, panel ni cifras, y las direcciones directas devuelven **404** (no revelan que existe). Los avisos por correo tampoco se envían a quien no pueda ver el expediente, y no se puede asignar un evento a alguien sin acceso.
+Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo el responsable y los administradores *con acceso*). Esa pestaña muestra quién tiene acceso, un **historial** de cambios (visibilidad, miembros, responsable, reasignaciones, reclamaciones) y las **lecturas recientes**.
 
-**Qué no cubre** (limitaciones conocidas):
-- Los **administradores lo ven todo**; no hay "muralla china" frente a ellos.
-- Los **clientes** son visibles para todo el equipo, y las facturas sin expediente también.
-- Borrar un cliente con expedientes ocultos responde "tiene expedientes o facturas asociados": revela que hay algo, no qué.
-- Se registran los cambios de acceso, **no las lecturas** (quién abrió qué).
-- Un evento ya asignado a alguien que luego pierde el acceso sigue asignado, aunque deje de verlo y de recibir avisos.
+**Qué cubre.** Todo lo que cuelga del expediente: notas, documentos (incluida la descarga), horas, agenda, facturas y cobros; en listas, búsquedas, ficha de cliente, panel y cifras, y en **cada** acción del servidor. Quien no tiene acceso recibe **404** (no se revela que existe). Los avisos por correo no se envían a quien no pueda ver el expediente y no se puede asignar un evento a alguien sin acceso.
+
+**Clientes confidenciales.** Un cliente confidencial solo lo ve quien lo dio de alta o quien tiene acceso a alguno de sus expedientes; sus expedientes nunca pueden ser abiertos (al marcar un cliente como confidencial, sus expedientes abiertos pasan a restringidos). Las facturas sueltas (sin expediente) siguen al cliente. Lo gestionan su creador o un administrador con acceso (no los asistentes).
+
+**Salvaguardas contra el bloqueo.** Un confidencial exige responsable activo; quien lo hace confidencial debe ser responsable o miembro (si no, se bloquearía a sí mismo); no se puede quitar a la última persona activa con acceso ni desactivar a la única persona activa que tiene acceso a un confidencial; ser administrador no basta para eliminar un expediente sin acceso.
+
+**Procedimiento de emergencia.** Si un confidencial queda sin ninguna persona activa con acceso, aparece **solo a los administradores** en *Equipo*, que pueden reclamarlo con un **motivo obligatorio** que queda en el historial. Solo funciona cuando de verdad está huérfano. Es la única excepción deliberada a la muralla china.
+
+**Reasignación.** Cuando alguien pierde el acceso (se le quita como miembro, se restringe el expediente, cambia el responsable o el cliente pasa a ser confidencial), sus eventos **pendientes** en ese expediente pasan al responsable y queda anotado. Los completados no se tocan.
+
+**Registro de lecturas.** En expedientes restringidos/confidenciales y clientes confidenciales se anotan las aperturas de ficha, facturas y descargas de documentos (quién y cuándo; lo repetido en 10 min cuenta una vez). Lo abierto no se registra. Lo ven el responsable y los administradores con acceso.
+
+**Limitaciones conocidas**
+- Un administrador **ve los restringidos** (y, por tanto, el cliente confidencial si tiene un expediente restringido suyo). Para ocultárselo, marca los expedientes como **confidenciales**.
+- Los números de expediente y de factura son correlativos: un hueco en la serie revela que existe algo oculto (no qué).
+- Borrar un cliente con expedientes ocultos responde "tiene expedientes o facturas asociados".
+- Las aperturas de pantalla se registran **desde el navegador**: una persona técnica podría evitarlas bloqueando esa llamada. Las **descargas** se registran siempre en el servidor. Las lecturas no se pueden borrar desde la aplicación y se conservan indefinidamente.
+- No se registran listas ni búsquedas, solo el acceso a fichas, facturas y documentos.
+- La reasignación no avisa por separado al nuevo responsable (le llegan los recordatorios normales).
+- Los administradores de la base de datos, evidentemente, ven todo: esto protege dentro de la aplicación, no frente a quien tenga acceso directo a PostgreSQL o a `UPLOAD_DIR`.
 
 ## Recordatorios por correo
 

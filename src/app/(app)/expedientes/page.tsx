@@ -148,6 +148,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                       {m.number}
                     </Link>
                     {m.visibility === "restringido" && <span className="badge-amber ml-2">Restringido</span>}
+                    {m.visibility === "confidencial" && <span className="badge-red ml-2">Confidencial</span>}
                     <span className="block max-w-xs text-ink-700">{m.title}</span>
                   </td>
                   <td>

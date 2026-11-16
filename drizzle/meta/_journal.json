@@ -22,6 +22,20 @@
       "when": 1794707295786,
       "tag": "0002_gigantic_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794793235142,
+      "tag": "0003_square_odin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794793337108,
+      "tag": "0004_common_sentinels",
+      "breakpoints": true
     }
   ]
 }

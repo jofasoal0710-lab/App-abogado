@@ -4,9 +4,10 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { notFound } from "next/navigation";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form";
+import { ReadBeacon } from "@/components/read-beacon";
 import { Badge, EmptyState, Field, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/db";
-import { documents, events, invoices, matterAccessLog, matterMembers, matterNotes, matters, clients, timeEntries, users } from "@/db/schema";
+import { documents, events, invoices, matterAccessLog, matterMembers, readAudit, matterNotes, matters, clients, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
 import { listAddableUsers, matterAccessSql } from "@/lib/access";
 import { canManageMatterAccess } from "@/lib/access-rules";
@@ -22,6 +23,7 @@ import { TimeEntryForm } from "../../horas/time-entry-form";
 import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction } from "../actions";
 import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
 import { roleLabels } from "@/lib/labels";
+import { READ_VERBS } from "@/lib/read-audit";
 
 export const metadata: Metadata = { title: "Expediente" };
 
@@ -84,12 +86,16 @@ export default async function MatterPage({
   const base = `/expedientes/${id}`;
   return (
     <>
+      {matter.visibility !== "abierto" && (
+        <ReadBeacon key={tab} matterId={id} kind="ficha" detail={`${matter.number} · ${TABS.find(([t]) => t === tab)?.[1]}`} />
+      )}
       <PageHeader
         title={matter.title}
         subtitle={
           <>
             {matter.number} · <Link className="link" href={`/clientes/${client.id}`}>{client.name}</Link> · {areaLabels[matter.area]}
             {matter.visibility === "restringido" && <span className="badge-amber ml-2">Restringido</span>}
+            {matter.visibility === "confidencial" && <span className="badge-red ml-2">Confidencial</span>}
           </>
         }
         actions={
@@ -108,6 +114,11 @@ export default async function MatterPage({
         }
       />
 
+      {sp.error === "last_holder" && (
+        <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          No se puede quitar a la última persona activa con acceso a un expediente confidencial: nadie podría gestionarlo. Añade antes a otra persona.
+        </p>
+      )}
       {sp.error === "has_invoices" && (
         <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           No se puede eliminar un expediente con facturas asociadas. Archívalo en su lugar.
@@ -383,7 +394,7 @@ async function AccessTab({
   canManage: boolean;
 }) {
   const addedBy = alias(users, "added_by");
-  const [members, addable, log] = await Promise.all([
+  const [members, addable, log, reads] = await Promise.all([
     db
       .select({ userId: matterMembers.userId, name: users.name, role: users.role, createdAt: matterMembers.createdAt, addedBy: addedBy.name })
       .from(matterMembers)
@@ -401,30 +412,43 @@ async function AccessTab({
           .orderBy(desc(matterAccessLog.createdAt), desc(matterAccessLog.id))
           .limit(30)
       : Promise.resolve([]),
+    canManage && matter.visibility !== "abierto"
+      ? db
+          .select({ id: readAudit.id, kind: readAudit.kind, detail: readAudit.detail, createdAt: readAudit.createdAt, who: users.name })
+          .from(readAudit)
+          .leftJoin(users, eq(users.id, readAudit.userId))
+          .where(eq(readAudit.matterId, matter.id))
+          .orderBy(desc(readAudit.createdAt), desc(readAudit.id))
+          .limit(50)
+      : Promise.resolve([]),
   ]);
-  const restricted = matter.visibility === "restringido";
 
   return (
     <div className="space-y-6">
       <section className="card card-pad">
         <h2 className="mb-1 font-serif text-lg font-semibold">Visibilidad</h2>
         <p className="mb-4 text-sm text-ink-600">
-          {restricted
-            ? "Restringido: solo lo ven el responsable, los miembros de la lista y los administradores. El resto del equipo ni siquiera sabe que existe."
-            : "Abierto: lo ve todo el equipo. Los miembros de la lista solo se tienen en cuenta si lo restringes."}
+          {matter.visibility === "confidencial"
+            ? "Confidencial: solo lo ven el responsable y los miembros de la lista. Ni siquiera los administradores, salvo que sean responsable o miembros. El resto del equipo no sabe que existe."
+            : matter.visibility === "restringido"
+              ? "Restringido: solo lo ven el responsable, los miembros de la lista y los administradores. El resto del equipo ni siquiera sabe que existe."
+              : "Abierto: lo ve todo el equipo. Los miembros de la lista solo se tienen en cuenta si lo restringes."}
         </p>
         {canManage ? (
           <ActionForm action={setVisibilityAction.bind(null, matter.id)}>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Visibilidad" className="w-64">
+              <Field label="Visibilidad" className="w-80">
                 <select className="input" name="visibility" defaultValue={matter.visibility}>
                   <option value="abierto">Abierto (todo el equipo)</option>
-                  <option value="restringido">Restringido (confidencial)</option>
+                  <option value="restringido">Restringido (miembros y administradores)</option>
+                  <option value="confidencial">Confidencial (ni los administradores)</option>
                 </select>
               </Field>
               <SubmitButton>Guardar</SubmitButton>
             </div>
-            <p className="hint mt-2">Al restringirlo, quien no sea miembro dejará de verlo, incluidos los eventos que tenga asignados en este expediente.</p>
+            <p className="hint mt-2">
+              Al restringirlo, quien no sea miembro dejará de verlo y los eventos pendientes que tuviera asignados pasarán al responsable. Para hacerlo confidencial hace falta un responsable activo y que tú seas responsable o miembro (los administradores deben añadirse antes como miembro).
+            </p>
           </ActionForm>
         ) : (
           <p className="text-sm text-ink-500">Solo los administradores y el responsable pueden cambiarla.</p>
@@ -440,7 +464,11 @@ async function AccessTab({
               <span className="ml-2 text-ink-500">Responsable</span>
             </span>
           </li>
-          <li className="px-5 py-3 text-ink-600">Los administradores siempre tienen acceso.</li>
+          <li className="px-5 py-3 text-ink-600">
+            {matter.visibility === "confidencial"
+              ? "Los administradores NO tienen acceso por su rol: solo si figuran como responsable o miembros."
+              : "Los administradores siempre tienen acceso."}
+          </li>
           {members.map((m) => (
             <li key={m.userId} className="flex items-center justify-between gap-3 px-5 py-3">
               <span>
@@ -500,6 +528,32 @@ async function AccessTab({
               </tbody>
             </table>
           )}
+        </section>
+      )}
+
+      {canManage && matter.visibility !== "abierto" && (
+        <section className="card overflow-x-auto">
+          <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Lecturas recientes (últimas 50)</h2>
+          {reads.length === 0 ? (
+            <EmptyState title="Aún no se ha registrado ninguna lectura">Se registran las aperturas de la ficha y las descargas de documentos.</EmptyState>
+          ) : (
+            <table className="table">
+              <tbody>
+                {reads.map((r) => (
+                  <tr key={r.id}>
+                    <td className="whitespace-nowrap">{formatDateTime(r.createdAt)}</td>
+                    <td>{r.who ?? "Usuario eliminado"}</td>
+                    <td className="text-ink-700">
+                      {READ_VERBS[r.kind]} {r.detail}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="border-t border-ink-100 px-5 py-3 text-xs text-ink-500">
+            Un mismo acceso repetido en menos de 10 minutos se anota una sola vez. Las lecturas se conservan indefinidamente.
+          </p>
         </section>
       )}
     </div>

@@ -5,7 +5,7 @@ import { Badge, EmptyState, Stat } from "@/components/ui";
 import { db } from "@/db";
 import { clients, events, invoices, matters, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
-import { matterAccessSql } from "@/lib/access";
+import { invoiceAccessSql, matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
 import { summarizeInvoice } from "@/lib/invoices";
@@ -66,7 +66,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .orderBy(desc(matters.openedAt), desc(matters.id))
       .limit(6),
     db.query.invoices.findMany({
-      where: and(eq(invoices.status, "emitida"), matterAccessSql(user, invoices.matterId, { orNone: true })),
+      where: and(eq(invoices.status, "emitida"), invoiceAccessSql(user)),
       with: { items: true, payments: true, client: true },
       orderBy: asc(invoices.dueDate),
     }),

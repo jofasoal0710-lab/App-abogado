@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { documents } from "@/db/schema";
 import { matterAccessSql } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
+import { logRead } from "@/lib/read-audit";
 import { openFile } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   } catch {
     return new Response("El archivo no está disponible", { status: 410 });
   }
+
+  await logRead(user, { matterId: doc.matterId, kind: "documento", detail: doc.name });
 
   const encoded = encodeURIComponent(doc.name);
   return new Response(Readable.toWeb(stream) as ReadableStream, {
