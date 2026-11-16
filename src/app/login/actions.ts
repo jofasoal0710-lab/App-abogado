@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { str, type ActionState } from "@/lib/actions";
-import { clearFailures, isRateLimited, registerFailure } from "@/lib/rate-limit";
+import { MAX_PER_EMAIL, MAX_PER_IP_EMAIL, clearFailures, emailKey, ipEmailKey, isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { safeNext } from "@/lib/safe-redirect";
 import { createSession, destroySession } from "@/lib/session";
 
@@ -26,9 +26,11 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   if (!email || !password) return { error: "Introduce tu correo y contraseña." };
 
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  const key = `${ip}|${email}`;
-  if (isRateLimited(key)) {
+  // IP real del cliente: Netlify la entrega en x-nf-client-connection-ip; si no, la primera de x-forwarded-for.
+  const ip = h.get("x-nf-client-connection-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const byIp = ipEmailKey(ip, email);
+  const byEmail = emailKey(email);
+  if ((await isRateLimited(byIp, MAX_PER_IP_EMAIL)) || (await isRateLimited(byEmail, MAX_PER_EMAIL))) {
     return { error: "Demasiados intentos fallidos. Inténtalo de nuevo en 15 minutos." };
   }
 
@@ -40,11 +42,14 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
 
   const valid = await bcrypt.compare(password, user?.passwordHash ?? getDummyHash());
   if (!user || !user.active || !valid) {
-    registerFailure(key);
+    await registerFailure(byIp);
+    await registerFailure(byEmail);
     return { error: "Correo o contraseña incorrectos." };
   }
 
-  clearFailures(key);
+  // Solo se borra el contador de esta IP: el del correo expira solo (si no, un atacante lo reiniciaría
+  // haciendo que la víctima inicie sesión).
+  await clearFailures(byIp);
   await createSession(user.id);
   redirect(next);
 }

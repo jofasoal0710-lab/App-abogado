@@ -27,6 +27,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  // ?respectHour=1: solo actúa a partir de REMINDER_HOUR (hora local del despacho). Lo usa la función
+  // programada de Netlify, que se ejecuta cada hora en UTC.
+  const { hour } = getReminderConfig();
+  if (new URL(request.url).searchParams.get("respectHour") === "1" && new Date().getHours() < hour) {
+    return Response.json({ status: "waiting", reason: `Aún no son las ${hour}:00 (hora local del despacho).` });
+  }
+
   const result = await runReminders();
   return Response.json(result, { status: result.status === "skipped" ? 503 : 200 });
 }

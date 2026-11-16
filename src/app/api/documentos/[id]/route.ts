@@ -5,7 +5,7 @@ import { documents } from "@/db/schema";
 import { matterAccessSql } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
 import { logRead } from "@/lib/read-audit";
-import { openFile } from "@/lib/storage";
+import { openFile, presignDownload, storageDriver } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +24,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .where(and(eq(documents.id, id), matterAccessSql(user, documents.matterId)))
     .limit(1);
   if (!doc) return new Response("No encontrado", { status: 404 });
+
+  // Almacenamiento S3: tras comprobar el acceso y registrar la lectura, se redirige a una URL de 60 s.
+  // (Servir el fichero a través de la función no vale: en Netlify las respuestas se limitan a ~6 MB.)
+  if (storageDriver() === "s3") {
+    await logRead(user, { matterId: doc.matterId, kind: "documento", detail: doc.name });
+    const url = await presignDownload(doc.storageKey, doc.name, doc.mimeType);
+    return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
+  }
 
   let stream: Readable;
   try {

@@ -382,6 +382,16 @@ export const reminderLog = pgTable(
   ],
 );
 
+/**
+ * Intentos fallidos de inicio de sesión (limitador de fuerza bruta). Vive en la base de datos y no en
+ * memoria porque en serverless cada petición puede ejecutarse en una instancia distinta.
+ */
+export const loginAttempts = pgTable("login_attempts", {
+  key: text().primaryKey(),
+  count: integer().notNull().default(0),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+});
+
 /* ---------- Relaciones ---------- */
 
 export const clientsRelations = relations(clients, ({ many }) => ({

@@ -22,6 +22,10 @@ Para probar con datos de ejemplo: `npm run db:seed -- --demo`
 
 Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`.
 
+## Despliegue
+
+Guía paso a paso para publicar la aplicación en **Netlify** con despliegue continuo desde este repositorio (base de datos en Neon, documentos en un bucket S3/R2, avisos por correo): **[DEPLOY.md](DEPLOY.md)**.
+
 ## Scripts
 
 | Comando | Qué hace |
@@ -121,13 +125,13 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - **Dinero en céntimos (enteros)**. Las líneas por horas guardan la cantidad en minutos, de modo que `1 h 25 min × 150 €/h = 212,50 €` es exacto.
 - **Concurrencia**: la numeración de expedientes y facturas usa bloqueos consultivos de PostgreSQL dentro de la transacción; las horas se bloquean (`FOR UPDATE`) al facturar, así que dos facturas simultáneas no pueden cobrar las mismas horas.
 - **Numeración fiscal**: una factura anulada conserva su número; solo las emitidas reciben número.
-- **Seguridad**: sesión JWT firmada en cookie `httpOnly`; `proxy.ts` hace el filtrado optimista y **cada página y Server Action vuelve a comprobar usuario y rol**; contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos como descarga con `nosniff`.
+- **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
 - **Zona horaria**: el proceso fija `APP_TIMEZONE` (por defecto `Europe/Madrid`) para que las horas de la agenda no dependan de dónde esté alojado el servidor.
 
 ## Despliegue y limitaciones conocidas
 
 - Define `AUTH_SECRET` y `DATABASE_URL` reales, sirve la app tras HTTPS y haz copias de seguridad de la base de datos **y** de `UPLOAD_DIR`.
-- Los documentos se guardan en disco local; con varias réplicas hay que pasar a almacenamiento compartido (S3 o similar).
-- El limitador de intentos de login es en memoria (una sola instancia).
+- Los documentos usan disco local por defecto (`STORAGE_DRIVER=local`, para un servidor propio con disco persistente) o almacenamiento compatible con S3 (`STORAGE_DRIVER=s3`, obligatorio en Netlify; ver [DEPLOY.md](DEPLOY.md)).
+- El limitador de intentos de login vive en la base de datos (5 fallos por IP+correo y 15 por correo, cada 15 min): sirve con varias instancias. Un atacante podría bloquear temporalmente a un usuario concreto con 15 intentos.
 - Sin retención IRPF, facturas rectificativas ni facturación electrónica oficial (Verifactu/FacturaE).
 - Sin firma electrónica ni portal de clientes.

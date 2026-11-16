@@ -1,10 +1,14 @@
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Field } from "@/components/ui";
+import { storageDriver } from "@/lib/storage";
 import { uploadDocumentAction } from "./actions";
+import { DirectUploadForm } from "./direct-upload-form";
 
 const CATEGORIES = ["Demanda / escrito", "Contrato", "Sentencia / resolución", "Prueba", "Correspondencia", "Identificación", "Otros"];
 
 export function UploadForm({ matterId }: { matterId: number }) {
+  // Con almacenamiento S3 el navegador sube directamente al bucket; con disco local, por el servidor.
+  if (storageDriver() === "s3") return <DirectUploadForm matterId={matterId} categories={CATEGORIES} />;
   return (
     <ActionForm action={uploadDocumentAction.bind(null, matterId)} resetOnSuccess className="card card-pad">
       <div className="grid gap-3 sm:grid-cols-3">

@@ -61,16 +61,19 @@ export async function runReminders(opts: { now?: Date } = {}): Promise<RunResult
   }
 
   // Un solo ejecutor a la vez (varias réplicas, planificador + botón manual…).
+  // Bloqueo a nivel de TRANSACCIÓN (no de sesión): es el único seguro detrás de un pooler en modo
+  // transacción (PgBouncer, Neon), donde dos consultas de una sesión pueden ir a conexiones distintas.
   const lockClient = await pool.connect();
+  let began = false;
   try {
-    const { rows } = await lockClient.query("select pg_try_advisory_lock(hashtext($1)) as ok", [LOCK_KEY]);
+    await lockClient.query("BEGIN");
+    began = true;
+    const { rows } = await lockClient.query("select pg_try_advisory_xact_lock(hashtext($1)) as ok", [LOCK_KEY]);
     if (!rows[0].ok) return emptyResult({ status: "locked", reason: "Ya hay otra ejecución en curso." });
-    try {
-      return await execute(cfg, now);
-    } finally {
-      await lockClient.query("select pg_advisory_unlock(hashtext($1))", [LOCK_KEY]);
-    }
+    return await execute(cfg, now);
   } finally {
+    // La transacción solo existe para sostener el bloqueo; al terminar se libera.
+    if (began) await lockClient.query("ROLLBACK").catch(() => undefined);
     lockClient.release();
   }
 }

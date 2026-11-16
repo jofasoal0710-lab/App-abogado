@@ -9,3 +9,4 @@ storage/*
 !storage/.gitkeep
 coverage
 .DS_Store
+.netlify

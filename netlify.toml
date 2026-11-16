@@ -1,0 +1,11 @@
+# Despliegue en Netlify. Guía completa en DEPLOY.md.
+[build]
+  command = "npm run build:netlify"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# La función programada de recordatorios vive en netlify/functions/reminders.mts
+[functions]
+  directory = "netlify/functions"
