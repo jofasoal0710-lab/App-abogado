@@ -59,7 +59,7 @@ describe("importes y totales", () => {
   });
 
   it("sin líneas el total es cero", () => {
-    expect(invoiceTotals([], 21)).toEqual({ subtotalCents: 0, taxCents: 0, totalCents: 0 });
+    expect(invoiceTotals([], 21)).toEqual({ subtotalCents: 0, taxCents: 0, withholdingCents: 0, totalCents: 0 });
   });
 });
 

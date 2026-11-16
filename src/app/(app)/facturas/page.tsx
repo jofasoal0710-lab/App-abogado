@@ -5,8 +5,9 @@ import { Badge, EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { clients, invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
-import { requireUser } from "@/lib/auth";
+import { canManageInvoices, requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
+import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { entries, invoiceStatusLabels } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
@@ -32,6 +33,8 @@ export default async function InvoicesPage({
   if (estado === "vencidas") {
     filters.push(eq(invoices.status, "emitida"));
     filters.push(lt(invoices.dueDate, today));
+  } else if (estado === "rectificativas") {
+    filters.push(eq(invoices.kind, "rectificativa"));
   } else if (estado in invoiceStatusLabels) {
     filters.push(eq(invoices.status, estado as keyof typeof invoiceStatusLabels));
   }
@@ -61,15 +64,24 @@ export default async function InvoicesPage({
       })
     : [];
 
+  const adjustments = await loadAdjustments(db, rows.filter((r) => r.kind === "factura").map((r) => r.id));
+
   return (
     <>
       <PageHeader
         title="Facturas"
         subtitle={`${total} ${total === 1 ? "factura" : "facturas"}`}
         actions={
-          <Link href="/facturas/nueva" className="btn-primary">
-            Nueva factura
-          </Link>
+          <>
+            {canManageInvoices(user) && (
+              <Link href="/facturas/exportar" className="btn-secondary">
+                Exportar CSV
+              </Link>
+            )}
+            <Link href="/facturas/nueva" className="btn-primary">
+              Nueva factura
+            </Link>
+          </>
         }
       />
       <form className="mb-4 flex flex-wrap gap-2" role="search">
@@ -82,6 +94,7 @@ export default async function InvoicesPage({
             </option>
           ))}
           <option value="vencidas">Vencidas sin cobrar</option>
+          <option value="rectificativas">Rectificativas</option>
         </select>
         <button className="btn-secondary">Filtrar</button>
         {(q || estado) && (
@@ -108,13 +121,14 @@ export default async function InvoicesPage({
             </thead>
             <tbody>
               {rows.map((inv) => {
-                const s = summarizeInvoice(inv, today);
+                const s = summarizeInvoice(inv, today, adjustments.get(inv.id));
                 return (
                   <tr key={inv.id} className="row-link">
                     <td>
                       <Link className="link" href={`/facturas/${inv.id}`}>
                         {inv.number ?? `Borrador #${inv.id}`}
                       </Link>
+                      {inv.kind === "rectificativa" && <span className="badge-amber ml-2">Rectificativa</span>}
                     </td>
                     <td>{inv.client.name}</td>
                     <td className="whitespace-nowrap">{formatDate(inv.issueDate)}</td>
@@ -122,6 +136,7 @@ export default async function InvoicesPage({
                     <td className="whitespace-nowrap">
                       <Badge kind="invoice" value={inv.status} label={invoiceStatusLabels[inv.status]} />
                       {s.overdue && <span className="badge-red ml-1">Vencida</span>}
+                      {s.rectified && <span className="badge-amber ml-1">Rectificada</span>}
                     </td>
                     <td className="text-right tabular-nums">{formatMoney(s.totalCents)}</td>
                     <td className="text-right tabular-nums">{s.outstandingCents ? formatMoney(s.outstandingCents) : "—"}</td>

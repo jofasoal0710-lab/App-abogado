@@ -10,8 +10,9 @@ export const INVOICE_ERRORS = {
   zero_total: "El total de la factura debe ser mayor que cero.",
   not_emitted_pay: "Solo se pueden registrar cobros en facturas emitidas.",
   overpay: "El importe supera lo pendiente de cobro de la factura.",
-  not_emitted_void: "Solo se pueden anular facturas emitidas.",
-  has_payments: "Elimina primero los cobros registrados para poder anular la factura.",
+  not_rectifiable: "Solo se puede rectificar una factura emitida que no sea ya una rectificativa.",
+  rectify_exceeds: "La rectificación abona más de lo facturado (contando las demás rectificativas ya emitidas).",
+  rectification_payment: "Una factura rectificativa no admite cobros: su efecto se aplica sobre la factura original.",
 } as const;
 
 export type InvoiceErrorCode = keyof typeof INVOICE_ERRORS;

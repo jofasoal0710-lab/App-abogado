@@ -72,16 +72,30 @@ export function parseMoneyToCents(input: string): number | null {
   return negative ? -cents : cents;
 }
 
-/** Importe de una línea, redondeado al céntimo. */
-export function lineAmountCents(item: LineItem): number {
-  const divisor = item.unit === "horas" ? 60 : 100;
-  return Math.round((item.quantity * item.unitPriceCents) / divisor);
+/**
+ * Redondeo «mitad lejos de cero»: 212,5 → 213 y −212,5 → −213. Con Math.round, −212,5 daría −212 y un
+ * abono no sería EXACTAMENTE el negativo de la factura que corrige.
+ */
+export function roundAway(x: number): number {
+  const r = x < 0 ? -Math.round(-x) : Math.round(x);
+  return r === 0 ? 0 : r; // evita -0
 }
 
-export function invoiceTotals(items: LineItem[], taxRatePercent: number) {
+/** Importe de una línea, redondeado al céntimo (negativo en las líneas de una rectificativa). */
+export function lineAmountCents(item: LineItem): number {
+  const divisor = item.unit === "horas" ? 60 : 100;
+  return roundAway((item.quantity * item.unitPriceCents) / divisor);
+}
+
+/**
+ * Totales de una factura: base, IVA, retención de IRPF (sobre la base, no sobre el IVA) y total a pagar
+ * (= base + IVA − retención). Cada concepto se redondea una sola vez, al céntimo.
+ */
+export function invoiceTotals(items: LineItem[], taxRatePercent: number, withholdingRatePercent = 0) {
   const subtotalCents = items.reduce((sum, it) => sum + lineAmountCents(it), 0);
-  const taxCents = Math.round((subtotalCents * taxRatePercent) / 100);
-  return { subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
+  const taxCents = roundAway((subtotalCents * taxRatePercent) / 100);
+  const withholdingCents = roundAway((subtotalCents * withholdingRatePercent) / 100);
+  return { subtotalCents, taxCents, withholdingCents, totalCents: subtotalCents + taxCents - withholdingCents };
 }
 
 /** Importe de un tiempo facturable: minutos × tarifa horaria. */

@@ -76,9 +76,12 @@ export default async function MatterPage({
     with: { items: true, payments: true },
     orderBy: desc(invoices.issueDate),
   });
-  const active = matterInvoices.filter((i) => i.status !== "anulada");
-  const invoicedCents = active.reduce((s, i) => s + invoiceTotals(i.items, i.taxRate).totalCents, 0);
-  const invoicedSubtotal = active.reduce((s, i) => s + invoiceTotals(i.items, i.taxRate).subtotalCents, 0);
+  // «Facturado» y «cobrado» cuentan solo lo emitido (los borradores no son facturas todavía); las rectificativas
+  // emitidas restan. Para no facturar dos veces los honorarios fijos, los borradores normales sí cuentan.
+  const active = matterInvoices.filter((i) => i.status === "emitida" || i.status === "pagada");
+  const forFixedFee = matterInvoices.filter((i) => i.status !== "anulada" && !(i.kind === "rectificativa" && i.status === "borrador"));
+  const invoicedCents = active.reduce((s, i) => s + invoiceTotals(i.items, i.taxRate, i.withholdingRate).totalCents, 0);
+  const invoicedSubtotal = forFixedFee.reduce((s, i) => s + invoiceTotals(i.items, i.taxRate, i.withholdingRate).subtotalCents, 0);
   const paidCents = active.reduce((s, i) => s + i.payments.reduce((p, x) => p + x.amountCents, 0), 0);
   const toInvoiceCents =
     matter.billingType === "tarifa_fija" ? Math.max(0, (matter.fixedFeeCents ?? 0) - invoicedSubtotal) : pending.cents;
@@ -147,7 +150,7 @@ export default async function MatterPage({
           value={formatMoney(toInvoiceCents)}
           hint={matter.billingType === "tarifa_fija" ? "Honorarios fijos aún no facturados" : `${formatDuration(pending.minutes)} facturables`}
         />
-        <Stat label="Facturado (IVA incl.)" value={formatMoney(invoicedCents)} hint={`${active.length} ${active.length === 1 ? "factura" : "facturas"}`} />
+        <Stat label="Facturado (total a pagar)" value={formatMoney(invoicedCents)} hint={`${active.length} ${active.length === 1 ? "factura" : "facturas"}`} />
         <Stat
           label="Pendiente de cobro"
           value={formatMoney(Math.max(0, invoicedCents - paidCents))}
@@ -231,7 +234,7 @@ export default async function MatterPage({
                     <td>
                       <Badge kind="invoice" value={inv.status} label={invoiceStatusLabels[inv.status]} />
                     </td>
-                    <td className="text-right tabular-nums">{formatMoney(invoiceTotals(inv.items, inv.taxRate).totalCents)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(invoiceTotals(inv.items, inv.taxRate, inv.withholdingRate).totalCents)}</td>
                   </tr>
                 ))}
               </tbody>

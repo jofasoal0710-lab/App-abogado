@@ -8,6 +8,7 @@ import { eventSelect } from "@/lib/agenda-data";
 import { invoiceAccessSql, matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
+import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { areaLabels, matterStatusLabels } from "@/lib/labels";
 import { formatDuration, formatMoney } from "@/lib/money";
@@ -72,7 +73,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     }),
   ]);
 
-  const summaries = emitted.map((inv) => ({ inv, s: summarizeInvoice(inv, today) }));
+  const adjustments = await loadAdjustments(db, emitted.filter((i) => i.kind === "factura").map((i) => i.id));
+  const summaries = emitted.map((inv) => ({ inv, s: summarizeInvoice(inv, today, adjustments.get(inv.id)) }));
   const outstanding = summaries.reduce((sum, x) => sum + x.s.outstandingCents, 0);
   const overdueInvoices = summaries.filter((x) => x.s.overdue);
   const overdueAmount = overdueInvoices.reduce((sum, x) => sum + x.s.outstandingCents, 0);

@@ -163,13 +163,14 @@ export default async function ClientPage({
                         <Link href={`/facturas/${inv.id}`} className="link">
                           {inv.number ?? `Borrador #${inv.id}`}
                         </Link>
+                        {inv.kind === "rectificativa" && <span className="badge-amber ml-2">Rectificativa</span>}
                       </td>
                       <td>{formatDate(inv.issueDate)}</td>
                       <td>
                         <Badge kind="invoice" value={inv.status} label={invoiceStatusLabels[inv.status]} />
                       </td>
                       <td className="text-right tabular-nums">
-                        {formatMoney(invoiceTotals(inv.items, inv.taxRate).totalCents)}
+                        {formatMoney(invoiceTotals(inv.items, inv.taxRate, inv.withholdingRate).totalCents)}
                       </td>
                     </tr>
                   ))}

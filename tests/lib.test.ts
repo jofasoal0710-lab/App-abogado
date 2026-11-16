@@ -69,7 +69,7 @@ import { summarizeInvoice } from "../src/lib/invoices";
 describe("resumen de factura", () => {
   const items = [{ unit: "horas" as const, quantity: 120, unitPriceCents: 10000 }]; // 200,00
   it("calcula pendiente y vencimiento solo en facturas emitidas", () => {
-    const base = { taxRate: 21, items, payments: [{ amountCents: 10000 }], dueDate: "2026-11-01" };
+    const base = { kind: "factura" as const, withholdingRate: 0, taxRate: 21, items, payments: [{ amountCents: 10000 }], dueDate: "2026-11-01" };
     const emitted = summarizeInvoice({ ...base, status: "emitida" }, "2026-11-14");
     expect(emitted.totalCents).toBe(24200);
     expect(emitted.outstandingCents).toBe(14200);

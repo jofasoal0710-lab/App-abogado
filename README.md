@@ -44,7 +44,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 - **Agenda y plazos**: calendario mensual, audiencias/plazos/reuniones/tareas, alerta de plazos vencidos sin completar.
 - **Documentos**: subida por expediente (máx. 25 MB, lista de extensiones permitida), descarga autenticada.
 - **Horas**: registro con tarifa congelada por entrada; las facturadas quedan bloqueadas.
-- **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada / anulada; cobros parciales, IVA configurable, vista imprimible (Imprimir / PDF).
+- **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada; cobros parciales, IVA y **retención IRPF** configurables, **facturas rectificativas** (serie `RECT-2026-0001`), **PDF** de cada factura y **exportación CSV** del libro de facturas (ver «Facturación» abajo).
 - **Permisos y confidencialidad**: expedientes abiertos, restringidos o confidenciales (ni los administradores), clientes confidenciales y registro de lecturas (ver abajo).
 - **Recordatorios** (solo administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
 - **Equipo** (solo administradores): altas, roles, tarifa horaria, desactivación y si recibe avisos por correo.
@@ -59,7 +59,9 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
 | Ver expedientes **confidenciales** | solo si es responsable o miembro | ídem | ídem |
 | Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
-| Emitir/anular facturas, borrar cobros | ✓ | ✓ | – |
+| Emitir facturas, registrar/borrar cobros | ✓ | ✓ | – |
+| Crear facturas rectificativas, exportar el libro de facturas (CSV) | ✓ | ✓ | – |
+| Descargar el PDF de una factura | ✓ (si ve el expediente/cliente) | ✓ (ídem) | ✓ (ídem) |
 
 ## Permisos y confidencialidad
 
@@ -94,6 +96,33 @@ Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo el res
 - La reasignación no avisa por separado al nuevo responsable (le llegan los recordatorios normales).
 - Los administradores de la base de datos, evidentemente, ven todo: esto protege dentro de la aplicación, no frente a quien tenga acceso directo a PostgreSQL o a `UPLOAD_DIR`.
 
+## Facturación
+
+**Ciclo**: borrador (editable, sin número) → emitida (número correlativo por serie y año) → pagada. Una factura emitida **ya no se anula ni se edita**: se corrige con una **rectificativa**. (Se retiró deliberadamente el botón «Anular»: en España una factura emitida no se «borra», se rectifica.)
+
+**Retención IRPF**
+- Cada factura lleva un porcentaje de retención (0–60 %). Por defecto 15 % cuando el cliente es una **empresa** y 0 % para particulares; el valor por defecto se cambia con `DEFAULT_WITHHOLDING_RATE`.
+- Se calcula sobre la **base imponible** (no sobre el IVA): `total = base + IVA − retención`.
+- Se muestra en pantalla, en el PDF, en el CSV y en los totales pendientes.
+
+**Facturas rectificativas** (solo administradores y abogados)
+- Se crean desde una factura emitida («Rectificar»), con **motivo obligatorio**. Nacen en borrador con las líneas de la original en negativo (abono total); se pueden ajustar para una rectificación parcial («por diferencias»: las líneas son el **cambio** respecto a la original, con signo).
+- Al emitirse reciben número de la **serie propia `RECT`** (no consumen números de `FAC`, que sigue sin huecos).
+- La rectificativa nunca puede abonar **más de lo facturado**: la suma de la original y de todas sus rectificativas emitidas no puede quedar por debajo de 0. Dos abonos totales simultáneos de la misma factura no pasan los dos (bloqueo en la base de datos).
+- La factura original muestra «rectificada por RECT-…», su **total neto** y su **saldo a favor del cliente** si ya estaba cobrada; las rectificativas no se cobran.
+- Si la factura tenía horas vinculadas, al emitir una rectificativa total se puede elegir **liberar esas horas** para volver a facturarlas.
+- Los importes de un abono son **exactamente** el negativo de los de la original (redondeo simétrico «half away from zero»; hay una prueba de propiedad con 500 casos aleatorios).
+
+**PDF**: `/api/facturas/<id>/pdf` (botón «Descargar PDF» en la ficha). Se genera en el servidor con `pdf-lib` (sin navegador ni servicios externos): despacho, cliente con NIF, líneas, base, IVA, retención, total, referencia a la original en las rectificativas, paginación y marca de agua «BORRADOR» en borradores. La ruta exige sesión y respeta el acceso al expediente/cliente (404 si no se ve); la descarga de una factura de un expediente confidencial **queda en el registro de lecturas**. Las fuentes estándar del PDF solo cubren el alfabeto latino occidental: los caracteres fuera de él (p. ej. emojis) se sustituyen por «?».
+
+**Exportación CSV** (`/facturas/exportar`, solo administradores y abogados): libro de facturas **emitidas** (no borradores) por rango de fechas, con accesos rápidos por trimestre y resumen de totales netos (base, IVA, retención). Formato para Excel en español (`;` como separador, coma decimal, BOM UTF-8, fechas `dd/mm/aaaa`), importes en negativo para las rectificativas y columnas «Rectifica a» y «Motivo». Solo incluye lo que el usuario puede ver (las facturas de un expediente confidencial no salen en el CSV de quien no tiene acceso), con un máximo de 20.000 filas, y neutraliza la **inyección de fórmulas** (un nombre de cliente como `=HIPERVINCULO(...)` sale como texto).
+
+**Supuestos fiscales a validar con vuestro gestor** (la app los aplica tal cual; no sustituyen el asesoramiento profesional):
+1. Retención del 15 % por defecto para clientes empresa (en los 3 primeros años de actividad suele ser el 7 %; configurable por factura).
+2. Las rectificativas son **«por diferencias»** (no «por sustitución») y siguen la serie `RECT`.
+3. No hay **suplidos** (gastos pagados por cuenta del cliente) ni tipos de IVA distintos por línea: un solo IVA por factura.
+4. No hay **facturación electrónica oficial** (Verifactu / FacturaE): el PDF y el CSV son documentos de gestión, no el registro oficial de facturación.
+
 ## Recordatorios por correo
 
 Cada persona recibe **un solo correo resumen** con los plazos, audiencias, reuniones y tareas que tiene asignados y que toca avisar. Si un evento no tiene responsable, el aviso va al responsable de su expediente.
@@ -125,7 +154,8 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 
 - **Dinero en céntimos (enteros)**. Las líneas por horas guardan la cantidad en minutos, de modo que `1 h 25 min × 150 €/h = 212,50 €` es exacto.
 - **Concurrencia**: la numeración de expedientes y facturas usa bloqueos consultivos de PostgreSQL dentro de la transacción; las horas se bloquean (`FOR UPDATE`) al facturar, así que dos facturas simultáneas no pueden cobrar las mismas horas.
-- **Numeración fiscal**: una factura anulada conserva su número; solo las emitidas reciben número.
+- **Numeración fiscal**: solo las facturas emitidas reciben número, correlativo por serie (`FAC`, `RECT`) y año; los borradores no consumen números.
+- **Redondeo**: IVA y retención se redondean «half away from zero» para que un abono sea exactamente el negativo de la factura original.
 - **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
 - **Zona horaria**: el proceso fija `APP_TIMEZONE` (por defecto `Europe/Madrid`) para que las horas de la agenda no dependan de dónde esté alojado el servidor.
 
@@ -134,5 +164,6 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - Define `AUTH_SECRET` y `DATABASE_URL` reales, sirve la app tras HTTPS y haz copias de seguridad de la base de datos **y** de `UPLOAD_DIR`.
 - Los documentos usan disco local por defecto (`STORAGE_DRIVER=local`, para un servidor propio con disco persistente) o almacenamiento compatible con S3 (`STORAGE_DRIVER=s3`, obligatorio en Netlify; ver [DEPLOY.md](DEPLOY.md)).
 - El limitador de intentos de login vive en la base de datos (5 fallos por IP+correo y 15 por correo, cada 15 min): sirve con varias instancias. Un atacante podría bloquear temporalmente a un usuario concreto con 15 intentos.
-- Sin retención IRPF, facturas rectificativas ni facturación electrónica oficial (Verifactu/FacturaE).
+- Sin facturación electrónica oficial (Verifactu/FacturaE), ni suplidos, ni varios tipos de IVA por factura (ver «Facturación»).
+- El PDF se genera en el servidor: en **Netlify** una respuesta de función no puede superar ~6 MB (una factura normal pesa unas decenas de KB, pero una con cientos de líneas puede acercarse); la exportación CSV se limita a 20.000 filas por la misma razón.
 - Sin firma electrónica ni portal de clientes.

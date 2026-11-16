@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -58,6 +59,8 @@ export const accessActionEnum = pgEnum("access_action", [
   "reasignacion",
 ]);
 export const reminderStatusEnum = pgEnum("reminder_status", ["enviado", "error"]);
+/** factura normal o factura rectificativa (serie propia, referida a otra factura). */
+export const invoiceKindEnum = pgEnum("invoice_kind", ["factura", "rectificativa"]);
 export const itemUnitEnum = pgEnum("item_unit", ["horas", "unidades"]);
 export const paymentMethodEnum = pgEnum("payment_method", [
   "transferencia",
@@ -281,6 +284,14 @@ export const invoices = pgTable(
     dueDate: date("due_date"),
     /** Porcentaje de IVA/IGIC aplicado (21 = 21 %). */
     taxRate: integer("tax_rate").notNull().default(21),
+    /** Retención de IRPF aplicada sobre la base imponible (15 = 15 %). 0 = sin retención. */
+    withholdingRate: integer("withholding_rate").notNull().default(0),
+    kind: invoiceKindEnum().notNull().default("factura"),
+    /** Solo en rectificativas: la factura que rectifican (nunca se modifica la original). */
+    rectifiesInvoiceId: integer("rectifies_invoice_id").references((): AnyPgColumn => invoices.id, { onDelete: "restrict" }),
+    rectificationReason: text("rectification_reason"),
+    /** Solo en rectificativas: al emitirla, libera las horas facturadas en la original para volver a facturarlas. */
+    releaseHours: boolean("release_hours").notNull().default(false),
     notes: text(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -442,6 +453,8 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   items: many(invoiceItems),
   payments: many(payments),
   timeEntries: many(timeEntries),
+  rectifies: one(invoices, { fields: [invoices.rectifiesInvoiceId], references: [invoices.id], relationName: "rectification" }),
+  rectifications: many(invoices, { relationName: "rectification" }),
 }));
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
