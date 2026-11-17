@@ -98,7 +98,11 @@ Los documentos se suben **directamente del navegador al bucket** con una URL fir
 
 ## 5. Primer administrador y datos del despacho
 
-El primer despliegue crea las tablas pero **ningún usuario**. Créalo desde tu ordenador (con una copia del repositorio y `npm ci`) contra la base de datos de producción, **sin** `--demo`:
+El primer despliegue crea las tablas pero **ningún usuario**.
+
+**Opción fácil, desde el panel de Render.** En *Environment* añade `SEED_ADMIN_EMAIL` (tu correo) y `SEED_ADMIN_PASSWORD` (al menos 10 caracteres) y despliega. El build crea ese administrador **solo si la base de datos no tiene ningún usuario**; en los despliegues siguientes no hace nada. La contraseña no aparece en el log. Cuando hayas entrado por primera vez, **borra `SEED_ADMIN_PASSWORD`** del panel (ya no hace falta y así no queda guardada).
+
+**Opción alternativa, desde tu ordenador** (con una copia del repositorio y `npm ci`), contra la base de datos de producción, **sin** `--demo`:
 
 ```bash
 DATABASE_URL="<cadena del Session pooler>" \
@@ -165,7 +169,9 @@ Si ya conectaste el repositorio a Netlify y ya no lo usas, **borra o desconecta 
 
 | Síntoma | Causa probable |
 |---|---|
-| El build falla con `✖ AUTH_SECRET…` / `✖ DATABASE_URL…` / `✖ STORAGE_DRIVER…` | Falta una variable (sección 4) |
+| El build se detiene con `✖ Hay N problemas en las variables de entorno` | Debajo están **todos** los problemas a la vez, cada uno con qué cambiar y dónde. Corrígelos en *Environment* y vuelve a desplegar |
+| El build se detiene con `✖ No se pudo conectar con la base de datos` | La línea siguiente explica la causa (contraseña, certificado, pooler, proyecto en pausa…) y qué cambiar |
+| El build falla con `✖ AUTH_SECRET…` / `✖ STORAGE_DRIVER…` | Falta una variable (sección 4) |
 | `unable to verify the first certificate` o `self-signed certificate in certificate chain` | Falta `DATABASE_SSL_CA` o no es el certificado de tu proyecto (sección 2) |
 | `DATABASE_SSL_CA no es un certificado PEM` | El certificado se copió incompleto: deben ir también las líneas `BEGIN` y `END` |
 | `ENETUNREACH` o una dirección IPv6 en el error | Se usó la conexión directa de Supabase: usa la del *Session pooler* |

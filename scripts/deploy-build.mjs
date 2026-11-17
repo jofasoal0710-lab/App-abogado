@@ -24,9 +24,6 @@ if (isProd) {
   if (secret.length < 32 || /cambia-esto/i.test(secret)) {
     fail("AUTH_SECRET falta o es demasiado corto/de ejemplo (mínimo 32 caracteres). Genera uno con: openssl rand -base64 32");
   }
-  if (!process.env.DATABASE_URL && !process.env.MIGRATE_DATABASE_URL) {
-    fail("Falta DATABASE_URL (cadena de conexión de PostgreSQL).");
-  }
   // El disco de Netlify y el del plan gratuito de Render son efímeros: con almacenamiento local, cada
   // reinicio o redespliegue borraría los documentos subidos.
   if ((process.env.STORAGE_DRIVER ?? "local") === "local" && process.env.ALLOW_LOCAL_STORAGE !== "true") {
@@ -35,12 +32,20 @@ if (isProd) {
         "Configura el almacenamiento S3 (ver DEPLOY.md / DEPLOY-RENDER.md) o, si usas un disco persistente de pago, define ALLOW_LOCAL_STORAGE=true y UPLOAD_DIR.",
     );
   }
+  // Base de datos, almacenamiento y primer administrador: todos los problemas a la vez, en castellano.
+  run("npx", ["tsx", "src/db/preflight.ts"]);
   if (process.env.SKIP_DB_MIGRATE === "true") {
     console.log("SKIP_DB_MIGRATE=true: no se aplican migraciones (hazlo tú con `npm run db:migrate`).");
   } else {
     console.log(`Aplicando migraciones de base de datos (${platform}, producción)…`);
     // Para migrar es mejor la conexión directa (sin pooler) si se ha configurado.
     run("npx", ["tsx", "src/db/migrate.ts"], { DATABASE_URL: process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL });
+  }
+  // Primer administrador desde el panel (sin instalar nada en local): solo si la base de datos aún no
+  // tiene NINGÚN usuario; en los despliegues siguientes no hace nada. Nunca con datos de demostración.
+  if (process.env.SEED_ADMIN_EMAIL && process.env.SEED_ADMIN_PASSWORD) {
+    console.log("Primer administrador (SEED_ADMIN_EMAIL): se crea solo si todavía no hay usuarios…");
+    run("npx", ["tsx", "src/db/seed.ts"]);
   }
 } else {
   console.log(`Despliegue «${context}» (${platform}): no se aplican migraciones ni se exigen secretos de producción.`);
