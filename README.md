@@ -59,6 +59,8 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
 | Ver expedientes **confidenciales** | solo si es responsable o miembro | ídem | ídem |
 | Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
+| Cambiar su propia contraseña y ver sus sesiones («Mi cuenta») | ✓ | ✓ | ✓ |
+| Restablecer contraseñas de otros, cerrar sus sesiones, ver el registro de seguridad | ✓ | – | – |
 | Registrar cobros | ✓ | ✓ | ✓ |
 | Emitir facturas, borrar cobros | ✓ | ✓ | – |
 | Crear facturas rectificativas, exportar el libro de facturas (CSV) | ✓ | ✓ | – |
@@ -124,6 +126,14 @@ Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo el res
 3. No hay **suplidos** (gastos pagados por cuenta del cliente) ni tipos de IVA distintos por línea: un solo IVA por factura.
 4. No hay **facturación electrónica oficial** (Verifactu / FacturaE): el PDF y el CSV son documentos de gestión, no el registro oficial de facturación.
 
+## Cuentas, sesiones y registro de seguridad
+
+- **Contraseña provisional y cambio obligatorio.** Al crear una cuenta, el administrador pone una contraseña provisional; al entrar por primera vez la persona tiene que elegir la suya (hasta entonces no puede usar nada: ni páginas, ni descargas, ni acciones). Lo mismo cuando un administrador restablece una contraseña. Así el administrador nunca conoce la contraseña definitiva de nadie.
+- **«Mi cuenta»** (todas las personas): cambiar la propia contraseña (pide la actual; 5 intentos fallidos la bloquean 15 min), ver las sesiones abiertas (navegador, IP, desde cuándo) y cerrar las de otros dispositivos.
+- **Sesiones en el servidor, de 12 horas como máximo.** Cerrar sesión, cambiar la contraseña, restablecerla o desactivar a alguien anula sus sesiones **al instante**, aunque alguien hubiera copiado la cookie. En la base de datos solo se guarda un hash del identificador de sesión.
+- **Avisos por correo** (si hay SMTP configurado): cuando cambia la contraseña de una cuenta, a su titular (si la restableció un administrador, se dice cuál; si a la vez cambió el correo, se avisa a la dirección anterior). Nunca incluyen la contraseña.
+- **Registro de seguridad** (pantalla «Seguridad», solo administradores): inicios de sesión correctos, fallidos (con el motivo) y bloqueados, cierres de sesión, cambios y restablecimientos de contraseña, altas, cambios de rol y de correo, desactivaciones y sesiones cerradas; con fecha, quién, a quién e IP. Nunca guarda contraseñas ni tokens. Los intentos bloqueados se anotan una vez por correo y ventana (no se puede inundar el registro). Se conserva un año.
+
 ## Recordatorios por correo
 
 Cada persona recibe **un solo correo resumen** con los plazos, audiencias, reuniones y tareas que tiene asignados y que toca avisar. Si un evento no tiene responsable, el aviso va al responsable de su expediente.
@@ -159,7 +169,7 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - **Concurrencia**: la numeración de expedientes y facturas usa bloqueos consultivos de PostgreSQL dentro de la transacción; las horas se bloquean (`FOR UPDATE`) al facturar, así que dos facturas simultáneas no pueden cobrar las mismas horas. Las ediciones de un borrador (cabecera, líneas, eliminarlo) bloquean la factura igual que la emisión y comprueban que sigue en borrador, así que nada puede modificar ni borrar una factura ya emitida aunque coincida en el mismo instante.
 - **Numeración fiscal**: solo las facturas emitidas reciben número, correlativo por serie (`FAC`, `RECT`) y año; los borradores no consumen números.
 - **Redondeo**: IVA y retención se redondean «half away from zero» para que un abono sea exactamente el negativo de la factura original.
-- **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas (la ruta se interpreta como lo haría el navegador, que elimina tabuladores y saltos de línea y trata «\» como «/», y se exige que siga en el mismo origen); cabecera HSTS (solo HTTPS) y sin `X-Powered-By`; correo SMTP siempre cifrado; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
+- **Seguridad**: sesión con estado en el servidor (12 h, revocable al instante) en cookie `httpOnly` firmada; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas (la ruta se interpreta como lo haría el navegador, que elimina tabuladores y saltos de línea y trata «\» como «/», y se exige que siga en el mismo origen); cabecera HSTS (solo HTTPS) y sin `X-Powered-By`; correo SMTP siempre cifrado; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
 - **Row Level Security en todas las tablas**, sin políticas: la app no se ve afectada (se conecta con el rol dueño de las tablas), pero cualquier otro rol queda sin acceso. En Supabase eso cierra su API REST automática. Las tablas nuevas deben llevar `.enableRLS()` en `src/db/schema.ts`.
 - **Conexión a la base de datos**: con `DATABASE_SSL_CA` (proveedores con autoridad propia, como Supabase) la conexión es siempre cifrada y verificada; el pool descarta las conexiones que el proveedor corta en vez de caerse.
 - **Zona horaria**: el proceso fija `APP_TIMEZONE` (por defecto `Europe/Madrid`) para que las horas de la agenda no dependan de dónde esté alojado el servidor.

@@ -8,10 +8,18 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { firstZodError, str, type ActionState } from "@/lib/actions";
 import { countSoleHolderConfidential } from "@/lib/access";
+import { notifyPasswordChanged } from "@/lib/account-mail";
 import { requireAdmin } from "@/lib/auth";
+import { roleLabels } from "@/lib/labels";
 import { parseMoneyToCents } from "@/lib/money";
+import { PASSWORD_MAX, PASSWORD_MIN } from "@/lib/passwords";
+import { logSecurityEvent, requestMeta } from "@/lib/security-log";
+import { revokeSessions } from "@/lib/session";
 
-const passwordSchema = z.string().min(10, "La contraseña debe tener al menos 10 caracteres").max(200);
+const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN, `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`)
+  .max(PASSWORD_MAX);
 
 const baseSchema = z.object({
   name: z.string().min(2, "El nombre es obligatorio").max(150),
@@ -41,20 +49,33 @@ async function emailTaken(email: string, exceptId?: number) {
 }
 
 export async function createUserAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const parsed = parseBase(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const password = passwordSchema.safeParse(String(formData.get("password") ?? ""));
   if (!password.success) return { error: firstZodError(password.error) };
   if (await emailTaken(parsed.data.email)) return { error: "Ya existe un usuario con ese correo." };
 
-  await db.insert(users).values({
-    ...parsed.data,
-    emailReminders: formData.get("emailReminders") === "on",
-    passwordHash: await bcrypt.hash(password.data, 12),
+  const [created] = await db
+    .insert(users)
+    .values({
+      ...parsed.data,
+      emailReminders: formData.get("emailReminders") === "on",
+      passwordHash: await bcrypt.hash(password.data, 12),
+      // Es una contraseña provisional: al entrar por primera vez tendrá que elegir la suya.
+      mustChangePassword: true,
+    })
+    .returning({ id: users.id });
+  const { ip } = await requestMeta();
+  await logSecurityEvent("usuario_creado", {
+    actorId: admin.id,
+    targetId: created.id,
+    email: parsed.data.email,
+    ip,
+    detail: `Rol: ${roleLabels[parsed.data.role]}`,
   });
   revalidatePath("/equipo");
-  return { ok: `Usuario ${parsed.data.name} creado.` };
+  return { ok: `Usuario ${parsed.data.name} creado. Al entrar por primera vez tendrá que elegir su propia contraseña.` };
 }
 
 export async function updateUserAction(id: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -62,8 +83,16 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
   const parsed = parseBase(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const active = formData.get("active") === "on";
+  const newPassword = String(formData.get("password") ?? "");
 
+  // Cada uno cambia su contraseña en «Mi cuenta» (pidiendo la actual), también los administradores.
+  if (newPassword && id === admin.id) return { error: "Para cambiar tu propia contraseña usa «Mi cuenta»." };
   if (await emailTaken(parsed.data.email, id)) return { error: "Ya existe otro usuario con ese correo." };
+  const [before] = await db
+    .select({ name: users.name, email: users.email, role: users.role, active: users.active })
+    .from(users)
+    .where(eq(users.id, id));
+  if (!before) return { error: "Ese usuario no existe." };
 
   // Evita quedarse sin administradores (ni auto-bloquearse).
   const losesAdmin = parsed.data.role !== "admin" || !active;
@@ -87,7 +116,6 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
     }
   }
 
-  const newPassword = String(formData.get("password") ?? "");
   const set: Partial<typeof users.$inferInsert> = {
     ...parsed.data,
     active,
@@ -97,9 +125,47 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
     const pw = passwordSchema.safeParse(newPassword);
     if (!pw.success) return { error: firstZodError(pw.error) };
     set.passwordHash = await bcrypt.hash(pw.data, 12);
+    // Contraseña provisional: el administrador la conoce, así que el titular deberá cambiarla al entrar.
+    set.mustChangePassword = true;
+    set.passwordChangedAt = new Date();
   }
 
   await db.update(users).set(set).where(eq(users.id, id));
+
+  // Efectos de seguridad y registro de cada cambio sensible.
+  const { ip } = await requestMeta();
+  const base = { actorId: admin.id, targetId: id, email: parsed.data.email, ip };
+  const notes: string[] = [];
+  if (newPassword) {
+    const closed = await revokeSessions(id);
+    await logSecurityEvent("contrasena_restablecida", { ...base, detail: closed ? `Se cerraron ${closed} sesión(es) abiertas` : null });
+    // Aviso a la dirección ANTERIOR: si a la vez se cambió el correo, el titular legítimo se entera igual.
+    const sent = await notifyPasswordChanged({ name: before.name, email: before.email }, { name: admin.name });
+    notes.push(`deberá elegir una contraseña nueva al entrar${closed ? ` (se cerraron ${closed} sesión(es))` : ""}${sent ? "; se le ha avisado por correo" : ""}`);
+  }
+  if (before.role !== parsed.data.role) {
+    await logSecurityEvent("rol_cambiado", { ...base, detail: `${roleLabels[before.role]} → ${roleLabels[parsed.data.role]}` });
+  }
+  if (before.email.toLowerCase() !== parsed.data.email) {
+    await logSecurityEvent("correo_cambiado", { ...base, detail: `${before.email} → ${parsed.data.email}` });
+  }
+  if (before.active && !active) {
+    const closed = await revokeSessions(id);
+    await logSecurityEvent("usuario_desactivado", { ...base, detail: closed ? `Se cerraron ${closed} sesión(es) abiertas` : null });
+  } else if (!before.active && active) {
+    await logSecurityEvent("usuario_reactivado", base);
+  }
+
   revalidatePath("/equipo");
-  return { ok: "Cambios guardados." };
+  return { ok: notes.length ? `Cambios guardados: ${notes.join("; ")}.` : "Cambios guardados." };
+}
+
+/** Cierra todas las sesiones abiertas de una persona (p. ej. si ha perdido el portátil). */
+export async function revokeUserSessionsAction(id: number, _prev: ActionState): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const closed = await revokeSessions(id);
+  const { ip } = await requestMeta();
+  await logSecurityEvent("sesiones_cerradas", { actorId: admin.id, targetId: id, ip, detail: `${closed} sesión(es) cerrada(s) por un administrador` });
+  revalidatePath("/equipo");
+  return { ok: closed ? `Se han cerrado ${closed} sesión(es).` : "No tenía sesiones abiertas." };
 }

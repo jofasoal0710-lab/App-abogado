@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Field } from "@/components/ui";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { safeNext } from "@/lib/safe-redirect";
 import { loginAction } from "./actions";
@@ -15,8 +15,10 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  // Quien ya tiene sesión no necesita ver el login.
-  if (await getCurrentUser()) redirect(safeNext(next));
+  // Quien ya tiene sesión no necesita ver el login (y si debe cambiar la contraseña, va a hacerlo).
+  const user = await getSessionUser();
+  if (user?.mustChangePassword) redirect("/cambiar-contrasena");
+  if (user) redirect(safeNext(next));
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">

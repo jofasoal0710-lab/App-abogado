@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { asc } from "drizzle-orm";
+import { asc, count, gt, sql } from "drizzle-orm";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
-import { users, type User } from "@/db/schema";
+import { sessions, users, type User } from "@/db/schema";
 import type { ActionState } from "@/lib/actions";
 import { listOrphanConfidentialMatters } from "@/lib/access";
 import { requireAdmin } from "@/lib/auth";
 import { entries, roleLabels } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
 import { claimOrphanMatterAction } from "../expedientes/access-actions";
-import { createUserAction, updateUserAction } from "./actions";
+import { createUserAction, revokeUserSessionsAction, updateUserAction } from "./actions";
 
 export const metadata: Metadata = { title: "Equipo" };
 
@@ -18,6 +18,15 @@ export default async function TeamPage() {
   await requireAdmin();
   const all = await db.select().from(users).orderBy(asc(users.name));
   const orphans = await listOrphanConfidentialMatters();
+  const openSessions = new Map(
+    (
+      await db
+        .select({ userId: sessions.userId, n: count() })
+        .from(sessions)
+        .where(gt(sessions.expiresAt, sql`now()`))
+        .groupBy(sessions.userId)
+    ).map((r) => [r.userId, r.n]),
+  );
 
   return (
     <>
@@ -61,6 +70,7 @@ export default async function TeamPage() {
                   <div>
                     <p className="font-medium text-ink-900">
                       {u.name} {!u.active && <span className="badge-gray ml-1">Inactivo</span>}
+                      {u.active && u.mustChangePassword && <span className="badge-amber ml-1">Debe elegir su contraseña</span>}
                     </p>
                     <p className="text-xs text-ink-500">{u.email}</p>
                   </div>
@@ -74,6 +84,14 @@ export default async function TeamPage() {
                 </summary>
                 <div className="border-t border-ink-100 bg-ink-50/50 px-5 py-4">
                   <UserForm action={updateUserAction.bind(null, u.id)} user={u} />
+                  <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-ink-100 pt-3 text-sm text-ink-600">
+                    <span>Sesiones abiertas: {openSessions.get(u.id) ?? 0}</span>
+                    {(openSessions.get(u.id) ?? 0) > 0 && (
+                      <ActionForm action={revokeUserSessionsAction.bind(null, u.id)}>
+                        <SubmitButton className="btn-secondary btn-sm">Cerrar sus sesiones</SubmitButton>
+                      </ActionForm>
+                    )}
+                  </div>
                 </div>
               </details>
             </li>
@@ -122,7 +140,14 @@ function UserForm({
             defaultValue={user ? (user.hourlyRateCents / 100).toFixed(2).replace(".", ",") : ""}
           />
         </Field>
-        <Field label={user ? "Nueva contraseña (opcional)" : "Contraseña"} hint="Mínimo 10 caracteres">
+        <Field
+          label={user ? "Restablecer contraseña (opcional)" : "Contraseña provisional"}
+          hint={
+            user
+              ? "Provisional: deberá cambiarla al entrar, se cerrarán sus sesiones y se le avisará por correo. Mínimo 10 caracteres."
+              : "Deberá cambiarla por una suya al entrar por primera vez. Mínimo 10 caracteres."
+          }
+        >
           <input className="input" type="password" name="password" autoComplete="new-password" required={!user} />
         </Field>
         <div className="space-y-2 self-end pb-2 text-sm text-ink-700">

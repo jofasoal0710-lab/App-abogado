@@ -89,6 +89,12 @@ export const users = pgTable(
     active: boolean().notNull().default(true),
     /** Recibe por correo los recordatorios de plazos y eventos que tiene asignados. */
     emailReminders: boolean("email_reminders").notNull().default(true),
+    /**
+     * Debe elegir una contraseña nueva antes de usar la aplicación: al crearle la cuenta y cuando un
+     * administrador se la restablece. Así el administrador nunca conoce la contraseña definitiva.
+     */
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
@@ -407,6 +413,47 @@ export const loginAttempts = pgTable("login_attempts", {
   resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
 }).enableRLS();
 
+/**
+ * Sesiones abiertas. La cookie lleva un token firmado con un identificador aleatorio; aquí solo se guarda
+ * su hash (quien lea la base de datos no puede suplantar a nadie). Cerrar sesión, cambiar la contraseña o
+ * desactivar a alguien borra filas de esta tabla y la cookie correspondiente deja de valer al instante.
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ip: text(),
+    userAgent: text("user_agent"),
+  },
+  (t) => [index("sessions_user_idx").on(t.userId)],
+).enableRLS();
+
+/**
+ * Registro de seguridad: inicios de sesión (correctos, fallidos y bloqueados), cierres, cambios de
+ * contraseña y cambios en las cuentas. Nunca guarda contraseñas ni tokens.
+ */
+export const securityEvents = pgTable(
+  "security_events",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    kind: text().notNull(),
+    /** Quién lo hizo (null si no había sesión, p. ej. un intento de login fallido). */
+    actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+    /** A qué cuenta afecta. */
+    targetId: integer("target_id").references(() => users.id, { onDelete: "set null" }),
+    /** Correo tecleado en un intento de login (puede no existir). */
+    email: text(),
+    ip: text(),
+    detail: text(),
+  },
+  (t) => [index("security_events_at_idx").on(t.at), index("security_events_target_idx").on(t.targetId, t.at)],
+).enableRLS();
+
 /* ---------- Relaciones ---------- */
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -482,5 +529,6 @@ export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type ReminderLog = typeof reminderLog.$inferSelect;
+export type SecurityEvent = typeof securityEvents.$inferSelect;
 export type MatterMember = typeof matterMembers.$inferSelect;
 export type ReadAudit = typeof readAudit.$inferSelect;

@@ -100,7 +100,9 @@ Los documentos se suben **directamente del navegador al bucket** con una URL fir
 
 El primer despliegue crea las tablas pero **ningún usuario**.
 
-**Opción fácil, desde el panel de Render.** En *Environment* añade `SEED_ADMIN_EMAIL` (tu correo) y `SEED_ADMIN_PASSWORD` (al menos 10 caracteres) y despliega. El build crea ese administrador **solo si la base de datos no tiene ningún usuario**; en los despliegues siguientes no hace nada. La contraseña no aparece en el log. Cuando hayas entrado por primera vez, **borra `SEED_ADMIN_PASSWORD`** del panel (ya no hace falta y así no queda guardada).
+**Opción fácil, desde el panel de Render.** En *Environment* añade `SEED_ADMIN_EMAIL` (tu correo) y `SEED_ADMIN_PASSWORD` (al menos 10 caracteres) y despliega. El build crea ese administrador **solo si la base de datos no tiene ningún usuario**; en los despliegues siguientes no hace nada. La contraseña no aparece en el log. Es **provisional**: al entrar por primera vez la aplicación te pedirá elegir una nueva, así que la del panel deja de servir. Aun así, **borra `SEED_ADMIN_PASSWORD`** del panel cuando hayas entrado.
+
+Las personas que des de alta en «Equipo» también reciben una contraseña provisional y eligen la suya al entrar.
 
 **Opción alternativa, desde tu ordenador** (con una copia del repositorio y `npm ci`), contra la base de datos de producción, **sin** `--demo`:
 

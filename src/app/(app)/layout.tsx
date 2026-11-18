@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Nav, type NavItem } from "@/components/nav";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
@@ -19,8 +20,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? [
           { href: "/recordatorios", label: "Recordatorios" },
           { href: "/equipo", label: "Equipo" },
+          { href: "/seguridad", label: "Seguridad" },
         ]
       : []),
+    { href: "/cuenta", label: "Mi cuenta" },
   ];
 
   return (
@@ -33,7 +36,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Nav items={items} />
         </div>
         <div className="mt-auto hidden border-t border-white/10 px-6 pt-4 lg:block">
-          <p className="truncate text-sm font-medium text-white">{user.name}</p>
+          <Link href="/cuenta" className="block truncate text-sm font-medium text-white hover:underline">
+            {user.name}
+          </Link>
           <p className="text-xs text-ink-400">{roleLabels[user.role]}</p>
           <form action={logoutAction} className="mt-3">
             <button className="text-xs font-medium text-ink-300 hover:text-white">Cerrar sesión</button>
@@ -42,7 +47,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <div className="min-w-0 flex-1">
         <div className="no-print flex items-center justify-end gap-3 border-b border-ink-200 bg-white px-6 py-2 text-sm lg:hidden">
-          <span className="text-ink-600">{user.name}</span>
+          <Link href="/cuenta" className="text-ink-600 hover:underline">
+            {user.name}
+          </Link>
           <form action={logoutAction}>
             <button className="link">Salir</button>
           </form>

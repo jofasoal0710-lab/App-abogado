@@ -58,11 +58,15 @@ async function main() {
         passwordHash: hash,
         role: "admin",
         hourlyRateCents: 15000,
+        // En producción la contraseña inicial es provisional (está en una variable de entorno o se imprime):
+        // al entrar por primera vez hay que elegir otra. Con --demo no, para poder probar sin más pasos.
+        mustChangePassword: !demo,
       })
       .returning({ id: users.id });
     adminId = admin.id;
     console.log(`Administrador creado: ${adminEmail}${generated ? `  contraseña: ${adminPassword}` : ""}`);
-    if (generated) console.log("Guarda esta contraseña ahora: no se volverá a mostrar. Cámbiala desde «Equipo».");
+    if (generated) console.log("Guarda esta contraseña ahora: no se volverá a mostrar.");
+    if (!demo) console.log("Al entrar por primera vez la aplicación te pedirá elegir una contraseña nueva.");
   }
 
   if (!demo) return;
