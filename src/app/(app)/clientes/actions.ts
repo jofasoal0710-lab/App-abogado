@@ -42,8 +42,11 @@ export async function createClientAction(_prev: ActionState, formData: FormData)
 
   // Solo administradores y abogados pueden dar de alta un cliente confidencial.
   const visibility = str(formData, "visibility") === "confidencial" && user.role !== "asistente" ? "confidencial" : "abierto";
-  const [row] = await db.insert(clients).values({ ...parsed.data, visibility, createdById: user.id }).returning({ id: clients.id });
-  if (visibility === "confidencial") await logClientAccessChange(row.id, user.id, "Cliente creado como confidencial");
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(clients).values({ ...parsed.data, visibility, createdById: user.id }).returning({ id: clients.id });
+    if (visibility === "confidencial") await logClientAccessChange(created.id, user.id, "Cliente creado como confidencial", tx);
+    return created;
+  });
   revalidatePath("/clientes");
   redirect(`/clientes/${row.id}`);
 }
@@ -92,19 +95,22 @@ export async function setClientVisibilityAction(clientId: number, _prev: ActionS
   const target = str(formData, "visibility") === "confidencial" ? "confidencial" : "abierto";
   if (target === client.visibility) return { ok: "Sin cambios." };
 
-  await db.update(clients).set({ visibility: target }).where(eq(clients.id, clientId));
-  await logClientAccessChange(clientId, user.id, target === "confidencial" ? "Cliente marcado como confidencial" : "Cliente ya no es confidencial");
-
-  let converted = 0;
-  if (target === "confidencial") {
-    const open = await db.select({ id: matters.id }).from(matters).where(and(eq(matters.clientId, clientId), eq(matters.visibility, "abierto")));
-    for (const m of open) {
-      await db.update(matters).set({ visibility: "restringido" }).where(eq(matters.id, m.id));
-      await logAccessChange(m.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility("restringido")} (el cliente pasó a ser confidencial)`);
-      await reassignLostAccessEvents(m.id, user.id);
-      converted++;
+  // Todo o nada: el cliente, sus expedientes abiertos, el historial y la reasignación de eventos.
+  const converted = await db.transaction(async (tx) => {
+    await tx.update(clients).set({ visibility: target }).where(eq(clients.id, clientId));
+    await logClientAccessChange(clientId, user.id, target === "confidencial" ? "Cliente marcado como confidencial" : "Cliente ya no es confidencial", tx);
+    let n = 0;
+    if (target === "confidencial") {
+      const open = await tx.select({ id: matters.id }).from(matters).where(and(eq(matters.clientId, clientId), eq(matters.visibility, "abierto")));
+      for (const m of open) {
+        await tx.update(matters).set({ visibility: "restringido" }).where(eq(matters.id, m.id));
+        await logAccessChange(m.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility("restringido")} (el cliente pasó a ser confidencial)`, tx);
+        await reassignLostAccessEvents(m.id, user.id, tx);
+        n++;
+      }
     }
-  }
+    return n;
+  });
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${clientId}`);
   revalidatePath("/expedientes");

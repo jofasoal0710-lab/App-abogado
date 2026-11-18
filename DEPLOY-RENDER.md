@@ -58,6 +58,9 @@ Los documentos se suben **directamente del navegador al bucket** con una URL fir
 3. En esa misma pantalla, *S3 Access Keys → New access key*: anota el **Access key ID** y el **Secret access key** (el secreto solo se muestra una vez). Esta clave da acceso a **todos** los buckets del proyecto: trátala como una contraseña.
 4. `render.yaml` ya trae `S3_REGION=eu-central-1` y `S3_FORCE_PATH_STYLE=true`, que es lo que necesita Supabase. Si tu región es otra, cámbiala en `render.yaml` (no solo en el panel: la siguiente sincronización del Blueprint la volvería a poner).
 5. CORS: Supabase no tiene un ajuste de CORS para esto. Si al subir un documento aparece un error de CORS, avísame.
+6. **Tamaño máximo por fichero (recomendado):** en la configuración del bucket `documentos` (*Edit bucket*), activa la restricción de tamaño de subida y ponla en **25 MB**, el máximo que admite la app. Así el propio almacenamiento rechaza ficheros mayores aunque alguien manipule la subida.
+
+La app borra cada hora las subidas que nunca llegaron a registrarse (pestaña cerrada a mitad, por ejemplo) y limita a 100 cada 15 minutos las subidas que puede preparar una persona. Solo toca ficheros creados por la propia app; y si de pronto pareciera que «sobran» muchos (por ejemplo, porque `DATABASE_URL` apunta a otra base de datos), no borra nada y lo deja anotado en el log.
 
 ### Opción B — Cloudflare R2 (otro proveedor S3)
 
@@ -133,8 +136,9 @@ Truco habitual: un servicio externo gratuito (por ejemplo [cron-job.org](https:/
 - Un build de producción que falla con un mensaje que empieza por `✖` es una salvaguarda del script de build (`AUTH_SECRET`, base de datos o almacenamiento): el mensaje dice qué falta.
 - **No hay autenticación en dos pasos**: usa contraseñas largas y únicas.
 - **Protección de datos (RGPD):** son datos de clientes de un despacho. Usa regiones UE y formaliza los contratos de encargado del tratamiento con Render, Supabase y el proveedor del bucket.
-- Límite de login: 5 fallos por IP+correo y 15 por correo cada 15 min. Para desbloquear: `delete from login_attempts;`.
-- **IP del cliente:** el límite por IP solo se fía de la cabecera que indiques en `CLIENT_IP_HEADER`. En Render **no he podido confirmar** qué cabecera lleva la IP real, así que no está configurada: se usa `X-Forwarded-For`, que un atacante podría falsear. El límite **por correo** no depende de la IP y sigue protegiendo.
+- Límite de login: 5 fallos por IP+correo y 15 por correo cada 15 min; y, si la IP es fiable (ver abajo), 30 fallos por IP entre todas las cuentas. Para desbloquear: `delete from login_attempts;`.
+- **IP del cliente (`CLIENT_IP_HEADER`):** sin ella, la IP que se anota puede estar falseada y el límite por IP entre cuentas está desactivado (a propósito: si todo pareciera venir de la misma IP, bloquearía a todo el despacho). Para configurarla: entra como administrador en **Seguridad → Detección de la IP de origen**; ahí ves qué cabeceras llegan y con qué IP. Busca tu IP pública (p. ej. «cuál es mi IP» en un buscador), elige la cabecera que la contiene **sola** y añádela en *Environment* como `CLIENT_IP_HEADER`.
+- **Política de seguridad de contenido (CSP):** cada página solo ejecuta los scripts de la propia app (con un *nonce* por respuesta); un HTML inyectado no puede ejecutar código. Si añades algo externo (analítica, chat…), habría que permitirlo en `src/lib/csp.ts`.
 
 ## 8. Qué está verificado y qué no
 
@@ -165,7 +169,7 @@ Cambiar `plan: free` por uno de pago en `render.yaml` elimina el dormirse. Con u
 
 ## 10. Netlify
 
-Si ya conectaste el repositorio a Netlify y ya no lo usas, **borra o desconecta ese sitio** en Netlify para que deje de intentar desplegar y fallar con cada cambio. Los ficheros de Netlify (`netlify.toml`, `DEPLOY.md`) pueden quedarse en el repositorio sin molestar.
+La CSP usa `src/proxy.ts`, que en Netlify se ejecutaría como función de borde: **no está verificado en Netlify** (el despliegue recomendado es Render). Si ya conectaste el repositorio a Netlify y ya no lo usas, **borra o desconecta ese sitio** en Netlify para que deje de intentar desplegar y fallar con cada cambio. Los ficheros de Netlify (`netlify.toml`, `DEPLOY.md`) pueden quedarse en el repositorio sin molestar.
 
 ## 11. Problemas frecuentes
 

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { getReminderConfig } from "@/lib/reminders/config";
+import { runMaintenance } from "@/lib/maintenance";
 import { runReminders } from "@/lib/reminders/runner";
 
 export const dynamic = "force-dynamic";
@@ -35,5 +36,7 @@ export async function POST(request: Request) {
   }
 
   const result = await runReminders();
-  return Response.json(result, { status: result.status === "skipped" ? 503 : 200 });
+  // Mantenimiento (limpieza de subidas abandonadas): independiente de que el correo esté configurado.
+  const maintenance = await runMaintenance().catch((err) => ({ error: String(err) }));
+  return Response.json({ ...result, maintenance }, { status: result.status === "skipped" ? 503 : 200 });
 }

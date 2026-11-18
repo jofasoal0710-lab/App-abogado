@@ -56,9 +56,12 @@ export async function setVisibilityAction(matterId: number, _prev: ActionState, 
     }
   }
 
-  await db.update(matters).set({ visibility: target }).where(eq(matters.id, matterId));
-  await logAccessChange(matterId, ctx.user.id, "visibilidad", `Visibilidad: ${describeVisibility(target)}`);
-  const moved = await reassignLostAccessEvents(matterId, ctx.user.id);
+  // Todo o nada: el cambio, su anotación en el historial y la reasignación de eventos.
+  const moved = await db.transaction(async (tx) => {
+    await tx.update(matters).set({ visibility: target }).where(eq(matters.id, matterId));
+    await logAccessChange(matterId, ctx.user.id, "visibilidad", `Visibilidad: ${describeVisibility(target)}`, tx);
+    return reassignLostAccessEvents(matterId, ctx.user.id, tx);
+  });
   refresh(matterId);
   return { ok: `El expediente ahora es ${target}.${moved ? ` ${moved} evento(s) pendiente(s) pasaron al responsable.` : ""}` };
 }
@@ -72,14 +75,16 @@ export async function addMemberAction(matterId: number, _prev: ActionState, form
   const [target] = await db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.id, userId), eq(users.active, true))).limit(1);
   if (!target) return { error: "Esa persona no existe o está inactiva." };
 
-  const inserted = await db
-    .insert(matterMembers)
-    .values({ matterId, userId, addedById: ctx.user.id })
-    .onConflictDoNothing()
-    .returning({ id: matterMembers.id });
-  if (inserted.length === 0) return { error: `${target.name} ya es miembro.` };
-
-  await logAccessChange(matterId, ctx.user.id, "miembro_alta", `Añadido/a: ${target.name}`);
+  const added = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(matterMembers)
+      .values({ matterId, userId, addedById: ctx.user.id })
+      .onConflictDoNothing()
+      .returning({ id: matterMembers.id });
+    if (inserted.length > 0) await logAccessChange(matterId, ctx.user.id, "miembro_alta", `Añadido/a: ${target.name}`, tx);
+    return inserted.length > 0;
+  });
+  if (!added) return { error: `${target.name} ya es miembro.` };
   refresh(matterId);
   return { ok: `${target.name} añadido/a.` };
 }
@@ -95,14 +100,18 @@ export async function removeMemberAction(matterId: number, userId: number) {
     if (remaining.length === 0) redirect(`/expedientes/${matterId}?tab=acceso&error=last_holder`);
   }
 
-  const [removed] = await db
-    .delete(matterMembers)
-    .where(and(eq(matterMembers.matterId, matterId), eq(matterMembers.userId, userId)))
-    .returning({ id: matterMembers.id });
+  const removed = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .delete(matterMembers)
+      .where(and(eq(matterMembers.matterId, matterId), eq(matterMembers.userId, userId)))
+      .returning({ id: matterMembers.id });
+    if (!row) return false;
+    const [target] = await tx.select({ name: users.name }).from(users).where(eq(users.id, userId));
+    await logAccessChange(matterId, ctx.user.id, "miembro_baja", `Quitado/a: ${target?.name ?? `usuario ${userId}`}`, tx);
+    await reassignLostAccessEvents(matterId, ctx.user.id, tx);
+    return true;
+  });
   if (!removed) return;
-  const [target] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
-  await logAccessChange(matterId, ctx.user.id, "miembro_baja", `Quitado/a: ${target?.name ?? `usuario ${userId}`}`);
-  await reassignLostAccessEvents(matterId, ctx.user.id);
   refresh(matterId);
   // Si quien actúa se ha quitado a sí mismo y ya no lo ve, no se le deja en una página 404.
   if (!(await getAccessibleMatter(ctx.user, matterId))) redirect("/expedientes");
@@ -122,8 +131,10 @@ export async function claimOrphanMatterAction(matterId: number, _prev: ActionSta
   const target = orphans.find((o) => o.id === matterId);
   if (!target) return { error: "Ese expediente no está huérfano: aún tiene alguna persona activa con acceso." };
 
-  await db.update(matters).set({ responsibleId: admin.id }).where(eq(matters.id, matterId));
-  await logAccessChange(matterId, admin.id, "reclamacion", `Acceso reclamado por ${admin.name} (expediente confidencial sin titular activo). Motivo: ${reason}`);
+  await db.transaction(async (tx) => {
+    await tx.update(matters).set({ responsibleId: admin.id }).where(eq(matters.id, matterId));
+    await logAccessChange(matterId, admin.id, "reclamacion", `Acceso reclamado por ${admin.name} (expediente confidencial sin titular activo). Motivo: ${reason}`, tx);
+  });
   revalidatePath("/equipo");
   revalidatePath("/expedientes");
   // La tarjeta desaparece de la lista (ya no está huérfano), así que se lleva al administrador al

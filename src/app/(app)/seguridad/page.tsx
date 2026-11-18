@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { headers } from "next/headers";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { securityEvents, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
+import { isClientIpTrusted } from "@/lib/client-ip";
 import { NOTABLE_EVENTS, SECURITY_EVENT_LABELS, type SecurityEventKind } from "@/lib/security-events";
 import { SECURITY_LOG_RETENTION_DAYS } from "@/lib/security-log";
 
 export const metadata: Metadata = { title: "Seguridad" };
 
 const LIMIT = 300;
+
+/** Cabeceras en las que distintas plataformas ponen la IP del visitante. */
+const IP_HEADERS = ["true-client-ip", "cf-connecting-ip", "x-real-ip", "x-forwarded-for", "x-nf-client-connection-ip", "fly-client-ip", "x-client-ip", "forwarded"];
 
 export default async function SecurityLogPage({ searchParams }: { searchParams: Promise<{ usuario?: string; tipo?: string }> }) {
   await requireAdmin();
@@ -44,6 +49,9 @@ export default async function SecurityLogPage({ searchParams }: { searchParams: 
     .orderBy(desc(securityEvents.at), desc(securityEvents.id))
     .limit(LIMIT);
   const people = await db.select({ id: users.id, name: users.name }).from(users).orderBy(asc(users.name));
+  const h = await headers();
+  const ipHeaders = IP_HEADERS.map((name) => [name, h.get(name)] as const).filter(([, v]) => v);
+  const configured = process.env.CLIENT_IP_HEADER?.trim().toLowerCase() || null;
 
   return (
     <>
@@ -51,6 +59,43 @@ export default async function SecurityLogPage({ searchParams }: { searchParams: 
         title="Registro de seguridad"
         subtitle={`Inicios de sesión, contraseñas y cambios en las cuentas. Se conservan ${SECURITY_LOG_RETENTION_DAYS} días; nunca incluye contraseñas.`}
       />
+
+      <details className="card mb-6 text-sm" open={!isClientIpTrusted()}>
+        <summary className="cursor-pointer px-5 py-3 font-medium text-ink-900">
+          Detección de la IP de origen:{" "}
+          {configured ? (
+            <span className="badge-green">cabecera «{configured}»</span>
+          ) : (
+            <span className="badge-amber">sin configurar</span>
+          )}
+        </summary>
+        <div className="space-y-3 border-t border-ink-100 px-5 py-4 text-ink-700">
+          <p>
+            {configured
+              ? "Las IP del registro y el límite de intentos por IP usan esa cabecera."
+              : "Sin CLIENT_IP_HEADER, la IP que se anota puede estar falseada y el límite de intentos por IP entre varias cuentas está desactivado (los límites por correo siguen activos)."}{" "}
+            Para elegirla: busca tu IP pública (por ejemplo, «cuál es mi IP» en un buscador) y mira abajo qué cabecera la contiene
+            <strong> sola</strong>. Esa es la que pone la plataforma: añádela en Render como <code>CLIENT_IP_HEADER</code>. Evita{" "}
+            <code>x-forwarded-for</code> si trae varias IP: la primera la puede escribir cualquiera.
+          </p>
+          <table className="text-xs">
+            <tbody>
+              {ipHeaders.length === 0 && (
+                <tr>
+                  <td className="text-ink-500">Esta petición no trae ninguna cabecera de IP conocida.</td>
+                </tr>
+              )}
+              {ipHeaders.map(([name, value]) => (
+                <tr key={name}>
+                  <td className="py-0.5 pr-4 font-mono">{name}</td>
+                  <td className="py-0.5 font-mono text-ink-900">{value}</td>
+                  <td className="py-0.5 pl-3">{name === configured && <span className="badge-green">en uso</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <form className="card card-pad mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
         <label className="flex flex-col gap-1">

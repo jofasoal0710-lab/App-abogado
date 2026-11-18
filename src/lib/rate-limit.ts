@@ -7,10 +7,13 @@ import { loginAttempts } from "@/db/schema";
 export const MAX_PER_IP_EMAIL = 5;
 /** Intentos fallidos contra un mismo correo desde cualquier IP (frena ataques que rotan de IP). */
 export const MAX_PER_EMAIL = 15;
+/** Intentos fallidos desde una misma IP contra CUALQUIER cuenta (frena probar una contraseña en muchas cuentas). Solo con IP fiable. */
+export const MAX_PER_IP = 30;
 export const WINDOW_MINUTES = 15;
 
 export const ipEmailKey = (ip: string, email: string) => `ip|${ip}|${email}`;
 export const emailKey = (email: string) => `email|${email}`;
+export const ipAnyKey = (ip: string) => `ipany|${ip}`;
 
 export async function isRateLimited(key: string, max: number): Promise<boolean> {
   const [row] = await db

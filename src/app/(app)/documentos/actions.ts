@@ -10,6 +10,7 @@ import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { ALLOWED_TYPES, formatBytes, mimeForFilename, sanitizeFilename } from "@/lib/file-types";
+import { isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { deleteFile, newStorageKey, objectSize, presignUpload, saveFile, storageDriver } from "@/lib/storage";
 import { signUploadToken, verifyUploadToken } from "@/lib/upload-token";
 
@@ -19,6 +20,11 @@ export async function uploadDocumentAction(
   formData: FormData,
 ): Promise<ActionState> {
   const user = await requireUser();
+  // Con S3 el disco de la app es efímero (y en Netlify las peticiones grandes ni llegan): solo vale la
+  // subida directa al bucket. Esta acción sigue existiendo para el modo «local», pero aquí se rechaza.
+  if (storageDriver() === "s3") {
+    return { error: "La subida por el servidor no está disponible en este despliegue: usa el formulario de subida." };
+  }
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "Selecciona un archivo." };
@@ -71,6 +77,12 @@ export async function deleteDocumentAction(documentId: number) {
 
 const UPLOAD_TOKEN_TTL_MS = 15 * 60 * 1000;
 
+/** Subidas que una persona puede preparar cada 15 minutos (cada una da una URL de subida al bucket). */
+function uploadPrepareMax(): number {
+  const n = Number(process.env.UPLOAD_PREPARE_MAX);
+  return Number.isInteger(n) && n > 0 ? n : 100;
+}
+
 function tokenSecret(): string {
   const s = process.env.AUTH_SECRET;
   if (!s || s.length < 16) throw new Error("AUTH_SECRET no está definido");
@@ -97,6 +109,13 @@ export async function prepareUploadAction(
   if (!mime) return { error: `Tipo de archivo no permitido. Formatos admitidos: ${Object.keys(ALLOWED_TYPES).join(", ")}.` };
   const category = typeof input?.category === "string" && input.category.trim() ? input.category.trim().slice(0, 100) : null;
   if (!(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
+
+  // Tope por persona: sin él, alguien con cuenta podría pedir URLs sin fin y llenar el bucket.
+  const capKey = `upload|${user.id}`;
+  if (await isRateLimited(capKey, uploadPrepareMax())) {
+    return { error: "Has preparado demasiadas subidas en poco tiempo. Espera 15 minutos." };
+  }
+  await registerFailure(capKey); // (el contador es el mismo mecanismo que el de los intentos de login)
 
   const key = newStorageKey(name);
   const url = await presignUpload(key);

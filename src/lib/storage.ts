@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "./config";
 
@@ -21,6 +21,11 @@ export function storageDriver(): StorageDriver {
 }
 
 const KEY_PATTERN = /^[0-9a-f-]{36}(\.[a-z0-9]{1,8})?$/;
+
+/** ¿Es una clave creada por esta aplicación? (lo demás que haya en el bucket no se toca nunca). */
+export function isAppKey(key: string): boolean {
+  return KEY_PATTERN.test(key);
+}
 
 function assertKey(key: string) {
   if (!KEY_PATTERN.test(key)) throw new Error("Clave de almacenamiento no válida");
@@ -114,6 +119,16 @@ export async function presignDownload(key: string, filename: string, mimeType: s
     }),
     { expiresIn: 60 },
   );
+}
+
+/** Recorre todos los objetos del bucket (paginado). */
+export async function* listStoredObjects(): AsyncGenerator<{ key: string; lastModified: Date }> {
+  let token: string | undefined;
+  do {
+    const page = await s3().send(new ListObjectsV2Command({ Bucket: bucket(), ContinuationToken: token }));
+    for (const o of page.Contents ?? []) if (o.Key) yield { key: o.Key, lastModified: o.LastModified ?? new Date(0) };
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
 }
 
 /** Borra sin fallar si el fichero ya no existe. */

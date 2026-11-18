@@ -27,4 +27,7 @@ const pool = globalForDb.__pgPool ?? createPool();
 if (process.env.NODE_ENV !== "production") globalForDb.__pgPool = pool;
 
 export const db = drizzle(pool, { schema });
+
+/** La conexión o una transacción en curso: para funciones que deben poder ejecutarse dentro de una. */
+export type Db = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 export { schema, pool };

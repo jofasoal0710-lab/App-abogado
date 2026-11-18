@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { str, type ActionState } from "@/lib/actions";
-import { MAX_PER_EMAIL, MAX_PER_IP_EMAIL, clearFailures, emailKey, ipEmailKey, isRateLimited, registerFailure } from "@/lib/rate-limit";
+import { isClientIpTrusted } from "@/lib/client-ip";
+import { MAX_PER_EMAIL, MAX_PER_IP, MAX_PER_IP_EMAIL, clearFailures, emailKey, ipAnyKey, ipEmailKey, isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { safeNext } from "@/lib/safe-redirect";
 import { loggedRecently, logSecurityEvent, requestMeta } from "@/lib/security-log";
 import { createSession, destroySession } from "@/lib/session";
@@ -29,9 +30,15 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   const { ip, userAgent } = await requestMeta();
   const byIp = ipEmailKey(ip, email);
   const byEmail = emailKey(email);
-  if ((await isRateLimited(byIp, MAX_PER_IP_EMAIL)) || (await isRateLimited(byEmail, MAX_PER_EMAIL))) {
-    // Una sola anotación por correo y ventana: un ataque no debe poder inundar el registro.
-    if (!(await loggedRecently("login_bloqueado", email, 15))) await logSecurityEvent("login_bloqueado", { email, ip });
+  // Límite por IP entre TODAS las cuentas (una contraseña probada contra muchos correos): solo si la IP es fiable.
+  const byIpAny = isClientIpTrusted() ? ipAnyKey(ip) : null;
+  const ipBlocked = !!byIpAny && (await isRateLimited(byIpAny, MAX_PER_IP));
+  if (ipBlocked || (await isRateLimited(byIp, MAX_PER_IP_EMAIL)) || (await isRateLimited(byEmail, MAX_PER_EMAIL))) {
+    // Una sola anotación por ventana (por IP si es la IP la bloqueada; si no, por correo): un ataque no
+    // debe poder inundar el registro.
+    if (!(await loggedRecently("login_bloqueado", ipBlocked ? { ip } : { email }, 15))) {
+      await logSecurityEvent("login_bloqueado", { email, ip, detail: ipBlocked ? "Demasiados fallos desde esta IP (varias cuentas)" : null });
+    }
     return { error: "Demasiados intentos fallidos. Inténtalo de nuevo en 15 minutos." };
   }
 
@@ -45,6 +52,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   if (!user || !user.active || !valid) {
     await registerFailure(byIp);
     await registerFailure(byEmail);
+    if (byIpAny) await registerFailure(byIpAny);
     await logSecurityEvent("login_fallido", {
       email,
       ip,

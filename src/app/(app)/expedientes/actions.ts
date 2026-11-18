@@ -102,13 +102,12 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     if (creatorNeedsMembership && result.data.responsibleId !== user.id) {
       await tx.insert(matterMembers).values({ matterId: created.id, userId: user.id, addedById: user.id });
     }
+    if (visibility !== "abierto") {
+      const why = visibility !== (result.data.visibility ?? "abierto") ? " (el cliente es confidencial)" : " (al crearlo)";
+      await logAccessChange(created.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(visibility)}${why}`, tx);
+    }
     return created;
   });
-
-  if (visibility !== "abierto") {
-    const why = visibility !== (result.data.visibility ?? "abierto") ? " (el cliente es confidencial)" : " (al crearlo)";
-    await logAccessChange(row.id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(visibility)}${why}`);
-  }
   revalidatePath("/expedientes");
   redirect(`/expedientes/${row.id}`);
 }
@@ -141,20 +140,22 @@ export async function updateMatterAction(
   if (data.clientId !== current.clientId) {
     const newClient = await getAccessibleClient(user, data.clientId);
     if (!newClient) return { error: CLIENT_ACCESS_DENIED };
-    const min = minimumMatterVisibility(newClient, current.visibility);
-    if (min !== current.visibility) {
-      visibility = min;
-      await logAccessChange(id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(min)} (el nuevo cliente es confidencial)`);
+    visibility = minimumMatterVisibility(newClient, current.visibility);
+  }
+  // Todo o nada: los datos, las anotaciones en el historial y la reasignación de eventos.
+  await db.transaction(async (tx) => {
+    await tx.update(matters).set({ ...data, visibility }).where(eq(matters.id, id));
+    if (visibility !== current.visibility) {
+      await logAccessChange(id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(visibility)} (el nuevo cliente es confidencial)`, tx);
     }
-  }
-  await db.update(matters).set({ ...data, visibility }).where(eq(matters.id, id));
-  if (canManage && data.responsibleId !== current.responsibleId) {
-    const names = await db.select({ id: users.id, name: users.name }).from(users);
-    const nameOf = (uid: number | null) => names.find((n) => n.id === uid)?.name ?? "sin asignar";
-    await logAccessChange(id, user.id, "responsable", `Responsable: ${nameOf(current.responsibleId)} → ${nameOf(data.responsibleId)}`);
-  }
-  // El responsable anterior puede haber perdido el acceso, y con él sus eventos pendientes.
-  await reassignLostAccessEvents(id, user.id);
+    if (canManage && data.responsibleId !== current.responsibleId) {
+      const names = await tx.select({ id: users.id, name: users.name }).from(users);
+      const nameOf = (uid: number | null) => names.find((n) => n.id === uid)?.name ?? "sin asignar";
+      await logAccessChange(id, user.id, "responsable", `Responsable: ${nameOf(current.responsibleId)} → ${nameOf(data.responsibleId)}`, tx);
+    }
+    // El responsable anterior puede haber perdido el acceso, y con él sus eventos pendientes.
+    await reassignLostAccessEvents(id, user.id, tx);
+  });
   revalidatePath("/expedientes");
   // Si quien edita ya no ve el expediente (se quitó como responsable), no se le deja en un 404.
   if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");

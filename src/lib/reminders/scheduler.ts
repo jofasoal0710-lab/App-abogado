@@ -1,4 +1,5 @@
 import { getReminderConfig } from "./config";
+import { runMaintenance } from "../maintenance";
 import { runReminders } from "./runner";
 
 const CHECK_EVERY_MS = 15 * 60 * 1000;
@@ -9,6 +10,11 @@ async function tick() {
   // Desde la hora configurada en adelante: si el servidor estuvo apagado a las 8:00,
   // el aviso se recupera en cuanto arranca. runReminders es idempotente.
   if (new Date().getHours() < hour) return;
+  try {
+    await runMaintenance(); // como mucho una vez por hora; ver lib/maintenance.ts
+  } catch (err) {
+    console.error("[mantenimiento] error:", err);
+  }
   try {
     const r = await runReminders();
     if (r.status === "skipped") return; // SMTP sin configurar: silencio, se ve en /recordatorios

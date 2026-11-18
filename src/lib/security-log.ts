@@ -38,15 +38,15 @@ export async function logSecurityEvent(kind: SecurityEventKind, data: EventData 
   }
 }
 
-/** ¿Hay ya un evento de este tipo para este correo en los últimos minutos? (evita inundar el registro). */
-export async function loggedRecently(kind: SecurityEventKind, email: string, minutes: number): Promise<boolean> {
+/** ¿Hay ya un evento de este tipo para este correo (o esta IP) en los últimos minutos? (evita inundar el registro). */
+export async function loggedRecently(kind: SecurityEventKind, by: { email: string } | { ip: string }, minutes: number): Promise<boolean> {
   const [row] = await db
     .select({ id: securityEvents.id })
     .from(securityEvents)
     .where(
       and(
         eq(securityEvents.kind, kind),
-        eq(securityEvents.email, email),
+        "email" in by ? eq(securityEvents.email, by.email) : eq(securityEvents.ip, by.ip),
         gt(securityEvents.at, sql`now() - make_interval(mins => ${minutes})`),
       ),
     )
