@@ -56,3 +56,21 @@ describe("URL pública de la aplicación", () => {
     expect(getReminderConfig().appUrl).toBe("http://localhost:3000");
   });
 });
+
+describe("SMTP: cifrado exigido por defecto (OWASP-A04-002)", () => {
+  const saved = process.env.SMTP_REQUIRE_TLS;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.SMTP_REQUIRE_TLS;
+    else process.env.SMTP_REQUIRE_TLS = saved;
+  });
+  it("sin la variable, STARTTLS es obligatorio", () => {
+    delete process.env.SMTP_REQUIRE_TLS;
+    expect(getReminderConfig().smtp.requireTls).toBe(true);
+  });
+  it("solo «false» lo hace opcional (cualquier otro valor lo deja obligatorio)", () => {
+    process.env.SMTP_REQUIRE_TLS = "false";
+    expect(getReminderConfig().smtp.requireTls).toBe(false);
+    process.env.SMTP_REQUIRE_TLS = "no";
+    expect(getReminderConfig().smtp.requireTls).toBe(true);
+  });
+});

@@ -17,6 +17,10 @@ export function getReminderConfig() {
       host: process.env.SMTP_HOST ?? "",
       port: Number.isInteger(port) && port > 0 ? port : 587,
       secure: process.env.SMTP_SECURE === "true",
+      // Con el puerto 587 (STARTTLS) el cifrado es OPCIONAL salvo que se exija: si alguien en la red
+      // elimina el anuncio de STARTTLS, la contraseña viajaría en claro. Se exige por defecto; solo un
+      // servidor interno de confianza sin TLS justifica SMTP_REQUIRE_TLS=false.
+      requireTls: process.env.SMTP_REQUIRE_TLS !== "false",
       user: process.env.SMTP_USER ?? "",
       password: process.env.SMTP_PASSWORD ?? "",
     },

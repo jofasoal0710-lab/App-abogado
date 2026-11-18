@@ -10,6 +10,8 @@ export function createTransport(c: ReminderConfig) {
     host: c.smtp.host,
     port: c.smtp.port,
     secure: c.smtp.secure,
+    // Sin TLS directo (465), exige STARTTLS: si el servidor no lo ofrece, no se envía nada (tampoco la contraseña).
+    requireTLS: !c.smtp.secure && c.smtp.requireTls,
     auth: c.smtp.user ? { user: c.smtp.user, pass: c.smtp.password } : undefined,
     // Un SMTP caído no debe dejar colgada la ejecución.
     connectionTimeout: 10_000,

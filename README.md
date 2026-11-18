@@ -59,7 +59,8 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
 | Ver expedientes **confidenciales** | solo si es responsable o miembro | ídem | ídem |
 | Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
-| Emitir facturas, registrar/borrar cobros | ✓ | ✓ | – |
+| Registrar cobros | ✓ | ✓ | ✓ |
+| Emitir facturas, borrar cobros | ✓ | ✓ | – |
 | Crear facturas rectificativas, exportar el libro de facturas (CSV) | ✓ | ✓ | – |
 | Descargar el PDF de una factura | ✓ (si ve el expediente/cliente) | ✓ (ídem) | ✓ (ídem) |
 
@@ -135,6 +136,8 @@ Cada persona recibe **un solo correo resumen** con los plazos, audiencias, reuni
 | Outlook / Microsoft 365 | `smtp.office365.com` | `587` | `false` | tu correo + contraseña (el administrador debe permitir *SMTP autenticado*) |
 | Servidor de tu dominio | el de tu hosting | `587` o `465` | según puerto | los que te dé el hosting |
 
+Con el puerto 587 la conexión se cifra con STARTTLS y es **obligatorio**: si el servidor no lo ofrece (o alguien lo suprime por el camino), no se envía nada, tampoco la contraseña. Solo para un servidor interno de confianza sin cifrado existe `SMTP_REQUIRE_TLS=false`.
+
 Además: `MAIL_FROM` (remitente), `APP_URL` (para los enlaces) y, opcionalmente, `REMINDER_DAYS` (por defecto `7,3,1,0,-1`: una semana, 3 días, 1 día y el mismo día antes, y un aviso de vencido un día después) y `REMINDER_HOUR`.
 
 **Cómo se envían** (elige uno):
@@ -156,7 +159,7 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - **Concurrencia**: la numeración de expedientes y facturas usa bloqueos consultivos de PostgreSQL dentro de la transacción; las horas se bloquean (`FOR UPDATE`) al facturar, así que dos facturas simultáneas no pueden cobrar las mismas horas.
 - **Numeración fiscal**: solo las facturas emitidas reciben número, correlativo por serie (`FAC`, `RECT`) y año; los borradores no consumen números.
 - **Redondeo**: IVA y retención se redondean «half away from zero» para que un abono sea exactamente el negativo de la factura original.
-- **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
+- **Seguridad**: sesión JWT firmada en cookie `httpOnly`; **cada página, ruta de descarga y Server Action comprueba por sí misma la sesión y el rol** (no hay middleware que sustituya esa comprobación); contraseñas con bcrypt; limitador de intentos de login; redirecciones solo a rutas internas (la ruta se interpreta como lo haría el navegador, que elimina tabuladores y saltos de línea y trata «\» como «/», y se exige que siga en el mismo origen); cabecera HSTS (solo HTTPS) y sin `X-Powered-By`; correo SMTP siempre cifrado; documentos fuera de `public/`, con nombre aleatorio, MIME deducido de la extensión y servidos siempre como descarga (con almacenamiento S3, mediante una URL firmada de 60 s emitida solo tras comprobar el acceso).
 - **Row Level Security en todas las tablas**, sin políticas: la app no se ve afectada (se conecta con el rol dueño de las tablas), pero cualquier otro rol queda sin acceso. En Supabase eso cierra su API REST automática. Las tablas nuevas deben llevar `.enableRLS()` en `src/db/schema.ts`.
 - **Conexión a la base de datos**: con `DATABASE_SSL_CA` (proveedores con autoridad propia, como Supabase) la conexión es siempre cifrada y verificada; el pool descarta las conexiones que el proveedor corta en vez de caerse.
 - **Zona horaria**: el proceso fija `APP_TIMEZONE` (por defecto `Europe/Madrid`) para que las horas de la agenda no dependan de dónde esté alojado el servidor.

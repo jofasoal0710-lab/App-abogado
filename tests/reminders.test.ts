@@ -170,6 +170,13 @@ describe("describeMailError", () => {
     expect(describeMailError(Object.assign(new Error("connect ECONNREFUSED 1.2.3.4:25"), { code: "ECONNREFUSED" }))).toBe("connect ECONNREFUSED 1.2.3.4:25");
     expect(describeMailError(Object.assign(new Error("Greeting never received"), { code: "ETIMEDOUT" }))).toBe("ETIMEDOUT: Greeting never received");
   });
+  it("sin cifrado (STARTTLS exigido y no disponible) explica qué hacer y conserva el detalle técnico", () => {
+    const err = Object.assign(new Error("Error upgrading connection with STARTTLS: 500 Error: command not recognized"), { code: "ETLS" });
+    const msg = describeMailError(err, "Clave");
+    expect(msg.startsWith("No se pudo cifrar la conexión")).toBe(true);
+    expect(msg).toContain("SMTP_SECURE=true");
+    expect(msg).toContain("ETLS: Error upgrading connection with STARTTLS");
+  });
   it("una sola línea y acotado", () => {
     const msg = describeMailError(new Error("a\nb\n" + "x".repeat(1000)));
     expect(msg).not.toContain("\n");

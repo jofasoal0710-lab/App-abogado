@@ -217,5 +217,12 @@ export function describeMailError(err: unknown, secret = ""): string {
   if (secret) msg = msg.split(secret).join("***");
   msg = msg.replace(/\s+/g, " ").trim().slice(0, 300);
   const generic = !code || code === "EMESSAGE" || code === "EENVELOPE";
-  return generic || msg.includes(code) ? msg : `${code}: ${msg}`;
+  const detail = generic || msg.includes(code) ? msg : `${code}: ${msg}`;
+  // El servidor no ofreció cifrado (o alguien lo suprimió por el camino): no se envió nada, tampoco la contraseña.
+  if (code === "ETLS") return `${TLS_HINT} Detalle: ${detail}`.slice(0, 500);
+  return detail;
 }
+
+export const TLS_HINT =
+  "No se pudo cifrar la conexión con el servidor de correo (STARTTLS) y no se ha enviado nada, tampoco la contraseña. " +
+  "Usa el puerto 465 con SMTP_SECURE=true, o SMTP_REQUIRE_TLS=false solo si es un servidor interno de confianza.";

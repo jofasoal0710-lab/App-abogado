@@ -68,7 +68,8 @@ export default async function RemindersPage() {
                 <>
                   <span className="badge-green">Configurado</span>{" "}
                   <span className="text-ink-600">
-                    {cfg.smtp.host}:{cfg.smtp.port} {cfg.smtp.secure ? "(TLS)" : "(STARTTLS)"}
+                    {cfg.smtp.host}:{cfg.smtp.port}{" "}
+                    {cfg.smtp.secure ? "(TLS)" : cfg.smtp.requireTls ? "(STARTTLS obligatorio)" : "(STARTTLS opcional: la contraseña podría viajar sin cifrar)"}
                   </span>
                 </>
               ) : (
