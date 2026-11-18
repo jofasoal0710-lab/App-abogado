@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { invoiceItems, invoices, matters, payments, timeEntries } from "@/db/schema";
+import { invoiceItems, invoices, matters, payments, timeEntries, type Invoice } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
 import { canAccessInvoice, getAccessibleClient, getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED, CLIENT_ACCESS_DENIED } from "@/lib/access-rules";
@@ -14,7 +14,7 @@ import { config } from "@/lib/config";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { invoiceTotals, parseDurationToMinutes, parseMoneyToCents, parseQuantityToHundredths } from "@/lib/money";
 import { BusinessError } from "@/lib/invoice-errors";
-import { loadAdjustments, netTotal, reconcileStatus } from "@/lib/invoice-queries";
+import { loadAdjustments, netTotal, reconcileStatus, type Db } from "@/lib/invoice-queries";
 import { INVOICE_PREFIX, RECTIFICATION_PREFIX, canRectify, exceedsOriginal, negateItems } from "@/lib/rectification";
 import { formatNumber, nextSequence } from "@/lib/numbering";
 
@@ -156,6 +156,27 @@ async function requireDraft(id: number, user: CurrentUser) {
   return inv;
 }
 
+/**
+ * Ejecuta una edición de borrador dentro de una transacción que primero BLOQUEA la fila de la factura y
+ * comprueba que SIGUE en borrador. La emisión bloquea la misma fila, así que una edición y una emisión
+ * simultáneas se ejecutan una detrás de otra: una edición nunca puede aplicarse a una factura ya emitida
+ * (ni borrarla, ni cambiar sus líneas o su IVA). `requireDraft` solo es la comprobación previa para la
+ * pantalla; esta es la que garantiza la integridad. Devuelve el error de negocio, si lo hay.
+ */
+async function editDraft(id: number, fn: (tx: Db, inv: Invoice) => Promise<unknown>): Promise<BusinessError | null> {
+  try {
+    await db.transaction(async (tx) => {
+      const [inv] = await tx.select().from(invoices).where(eq(invoices.id, id)).for("update");
+      if (!inv || inv.status !== "borrador") throw new BusinessError("not_draft");
+      await fn(tx, inv);
+    });
+    return null;
+  } catch (err) {
+    if (err instanceof BusinessError) return err;
+    throw err;
+  }
+}
+
 export async function updateInvoiceHeaderAction(
   id: number,
   _prev: ActionState,
@@ -165,7 +186,8 @@ export async function updateInvoiceHeaderAction(
   await requireDraft(id, user);
   const header = parseHeader(formData);
   if (!header.success) return { error: firstZodError(header.error) };
-  await db.update(invoices).set(header.data).where(eq(invoices.id, id));
+  const failed = await editDraft(id, (tx) => tx.update(invoices).set(header.data).where(eq(invoices.id, id)));
+  if (failed) return { error: failed.message };
   refresh(id);
   return { ok: "Datos de la factura guardados." };
 }
@@ -208,7 +230,9 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
   }
   if (draft.kind === "rectificativa" && parsed.data.unitPriceCents === 0) return { error: "El precio no puede ser cero." };
 
-  await db.insert(invoiceItems).values({ invoiceId, ...parsed.data });
+  // (El tipo de factura no cambia nunca, así que validar el signo con la lectura previa es seguro.)
+  const failed = await editDraft(invoiceId, (tx) => tx.insert(invoiceItems).values({ invoiceId, ...parsed.data }));
+  if (failed) return { error: failed.message };
   refresh(invoiceId);
   return { ok: "Línea añadida." };
 }
@@ -216,7 +240,7 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
 export async function deleteItemAction(invoiceId: number, itemId: number) {
   const user = await requireUser();
   await requireDraft(invoiceId, user);
-  await db.transaction(async (tx) => {
+  const failed = await editDraft(invoiceId, async (tx) => {
     const [item] = await tx
       .delete(invoiceItems)
       .where(and(eq(invoiceItems.id, itemId), eq(invoiceItems.invoiceId, invoiceId)))
@@ -226,13 +250,15 @@ export async function deleteItemAction(invoiceId: number, itemId: number) {
       await tx.update(timeEntries).set({ invoiceId: null }).where(eq(timeEntries.id, item.timeEntryId));
     }
   });
+  if (failed) redirect(`/facturas/${invoiceId}?error=${failed.code}`);
   refresh(invoiceId);
 }
 
 export async function deleteDraftAction(id: number) {
   const user = await requireUser();
   await requireDraft(id, user);
-  await db.delete(invoices).where(eq(invoices.id, id)); // time_entries.invoice_id → NULL por la FK
+  const failed = await editDraft(id, (tx) => tx.delete(invoices).where(eq(invoices.id, id))); // time_entries.invoice_id → NULL por la FK
+  if (failed) redirect(`/facturas/${id}?error=${failed.code}`);
   refresh();
   redirect("/facturas");
 }
