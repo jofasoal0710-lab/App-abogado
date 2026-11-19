@@ -83,7 +83,7 @@ describe("checkDeployConfig: almacenamiento", () => {
 describe("checkDeployConfig: primer administrador desde el panel", () => {
   it("es opcional; si se usa, hacen falta correo válido y contraseña de al menos 10 caracteres", () => {
     expect(problems({ SEED_ADMIN_EMAIL: "yo@despacho.es", SEED_ADMIN_PASSWORD: "una-clave-larga" })).toEqual([]);
-    expect(problems({ SEED_ADMIN_EMAIL: "yo@despacho.es" }).join(" ")).toMatch(/falta SEED_ADMIN_PASSWORD/);
+    expect(problems({ SEED_ADMIN_EMAIL: "yo@despacho.es" })).toEqual([]); // ya creado: contraseña provisional borrada
     expect(problems({ SEED_ADMIN_PASSWORD: "una-clave-larga" }).join(" ")).toMatch(/falta SEED_ADMIN_EMAIL/);
     expect(problems({ SEED_ADMIN_EMAIL: "yo@despacho.es", SEED_ADMIN_PASSWORD: "corta" }).join(" ")).toMatch(/al menos 10/);
     expect(problems({ SEED_ADMIN_EMAIL: "no-es-un-correo", SEED_ADMIN_PASSWORD: "una-clave-larga" }).join(" ")).toMatch(/correo válido/);

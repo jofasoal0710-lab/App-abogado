@@ -116,8 +116,9 @@ function checkFirstAdmin(env: Env): string[] {
   const p: string[] = [];
   if (!email) p.push("Para crear el primer administrador falta SEED_ADMIN_EMAIL (hay contraseña pero no correo).");
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) p.push(`SEED_ADMIN_EMAIL no parece un correo válido.`);
-  if (!pass) p.push("Para crear el primer administrador falta SEED_ADMIN_PASSWORD (hay correo pero no contraseña).");
-  else if (pass.length < MIN_PASSWORD) p.push(`SEED_ADMIN_PASSWORD debe tener al menos ${MIN_PASSWORD} caracteres.`);
+  // Solo correo, sin contraseña: es lo normal una vez creado el administrador (se borra la contraseña
+  // provisional tras el primer acceso). No se crea nadie y el despliegue sigue.
+  if (pass && pass.length < MIN_PASSWORD) p.push(`SEED_ADMIN_PASSWORD debe tener al menos ${MIN_PASSWORD} caracteres.`);
   return p;
 }
 
