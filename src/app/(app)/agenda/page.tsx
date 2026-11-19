@@ -123,7 +123,7 @@ export default async function AgendaPage({
                 <div key={day} className={`min-h-24 border-r border-ink-100 p-1.5 last:border-r-0 ${inMonth ? "" : "bg-ink-50/70"}`}>
                   <p
                     className={`mb-1 text-right text-xs ${
-                      day === today ? "ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 font-semibold text-white" : inMonth ? "text-ink-600" : "text-ink-300"
+                      day === today ? "ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 font-semibold text-white" : inMonth ? "text-ink-600" : "text-ink-400"
                     }`}
                   >
                     {Number(day.slice(8))}
@@ -133,7 +133,7 @@ export default async function AgendaPage({
                       <li key={e.id}>
                         <Link
                           href={`/agenda/${e.id}/editar?returnTo=${encodeURIComponent(returnTo)}`}
-                          className={`flex items-center gap-1 truncate rounded px-1 py-0.5 text-xs hover:bg-ink-100 ${e.completed ? "text-ink-400 line-through" : "text-ink-800"}`}
+                          className={`flex items-center gap-1 truncate rounded px-1 py-0.5 text-xs hover:bg-ink-100 ${e.completed ? "text-ink-500 line-through" : "text-ink-800"}`}
                           title={e.title}
                         >
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${kindDot[e.kind]}`} />

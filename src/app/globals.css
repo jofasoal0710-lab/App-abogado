@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-serif: var(--font-display), "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   /* Tinta: grises con un punto de azul, para que convivan con la marca. */
   --color-ink-50: #f3f6fb;
   --color-ink-100: #e8edf5;
@@ -32,7 +32,7 @@ html { color-scheme: light; }
 body { @apply bg-ink-50 text-ink-800 antialiased; }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @utility badge {
@@ -49,7 +49,7 @@ body { @apply bg-ink-50 text-ink-800 antialiased; }
   .btn-ghost { @apply btn text-ink-600 hover:bg-ink-100; }
   .btn-sm { @apply px-2.5 py-1.5 text-xs; }
 
-  .input { @apply block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-2 focus:outline-brand-500/30 disabled:bg-ink-100; }
+  .input { @apply block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-base text-ink-900 sm:text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-2 focus:outline-brand-500/30 disabled:bg-ink-100; }
   .label { @apply mb-1 block text-sm font-medium text-ink-700; }
   .hint { @apply mt-1 text-xs text-ink-500; }
 
@@ -66,6 +66,17 @@ body { @apply bg-ink-50 text-ink-800 antialiased; }
   .badge-red { @apply badge bg-red-50 text-red-700 ring-red-200; }
 
   .link { @apply font-medium text-brand-600 hover:text-brand-700 hover:underline; }
+}
+
+/* Pantallas táctiles: objetivos de al menos 44 px (botones y campos). */
+@media (pointer: coarse) {
+  .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .input { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+}
+
+/* Quien pide menos movimiento no ve transiciones. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 @media print {

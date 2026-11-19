@@ -165,7 +165,7 @@ export default async function MatterPage({
             key={key}
             href={key === "resumen" ? base : `${base}?tab=${key}`}
             aria-current={tab === key ? "page" : undefined}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
               tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-ink-500 hover:text-ink-800"
             }`}
           >

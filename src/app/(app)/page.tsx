@@ -197,18 +197,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
       </div>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-5">
+      <div className="mb-6 grid gap-6 lg:grid-cols-5 lg:items-start">
         <section className="card lg:col-span-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-5 py-3">
             <h2 className="font-serif text-lg font-semibold text-ink-900">Calendario · {monthLabel(month)}</h2>
             <div className="no-print flex items-center gap-1.5">
-              <Link className="btn-secondary btn-sm" href={`/${qs({ mes: shiftMonth(month, -1) })}`} aria-label="Mes anterior">
+              <Link className="btn-secondary btn-sm min-w-10" href={`/${qs({ mes: shiftMonth(month, -1) })}`} aria-label="Mes anterior">
                 ‹
               </Link>
               <Link className="btn-secondary btn-sm" href="/">
                 Hoy
               </Link>
-              <Link className="btn-secondary btn-sm" href={`/${qs({ mes: shiftMonth(month, 1) })}`} aria-label="Mes siguiente">
+              <Link className="btn-secondary btn-sm min-w-10" href={`/${qs({ mes: shiftMonth(month, 1) })}`} aria-label="Mes siguiente">
                 ›
               </Link>
             </div>
@@ -221,7 +221,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
               {weeks.flat().map((day) => {
                 const inMonth = day.startsWith(month);
                 const list = eventsByDay.get(day) ?? [];
@@ -233,8 +233,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     href={`/agenda${qs({ mes: day.slice(0, 7) })}`}
                     aria-label={label}
                     title={list.map((e) => `${eventKindLabels[e.kind]}: ${e.title}`).join("\n") || undefined}
-                    className={`flex min-h-12 flex-col items-center rounded-lg px-1 py-1.5 text-sm transition-colors hover:bg-brand-50 sm:min-h-16 ${
-                      inMonth ? "text-ink-800" : "text-ink-300"
+                    className={`flex min-h-11 flex-col items-center rounded-lg px-1 py-1 text-sm transition-colors hover:bg-brand-50 sm:min-h-14 ${
+                      inMonth ? "text-ink-800" : "text-ink-400"
                     } ${list.length && inMonth ? "bg-ink-50" : ""}`}
                   >
                     <span className={`flex h-7 w-7 items-center justify-center rounded-full tabular-nums ${isToday ? "bg-brand-600 font-semibold text-white" : ""}`}>

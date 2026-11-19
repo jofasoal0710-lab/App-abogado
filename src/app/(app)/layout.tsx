@@ -36,6 +36,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen lg:flex">
+      <a
+        href="#contenido"
+        className="sr-only z-50 rounded-md bg-white px-4 py-2 text-sm font-medium text-brand-700 shadow-lg focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+      >
+        Saltar al contenido
+      </a>
       <aside className="no-print flex shrink-0 flex-col bg-brand-700 pb-3 pt-4 lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:pb-5 lg:pt-6">
         <Link href="/" className="mx-3 mb-3 flex items-center gap-3 rounded-lg px-3 py-1 text-white focus-visible:outline-2 focus-visible:outline-white lg:mb-6">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-brand-700">
@@ -66,14 +72,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <div className="min-w-0 flex-1">
         <div className="no-print flex items-center justify-end gap-3 border-b border-ink-200 bg-white px-4 py-2 text-sm lg:hidden">
-          <Link href="/cuenta" className="text-ink-600 hover:underline">
+          <Link href="/cuenta" className="inline-flex min-h-11 items-center text-ink-600 hover:underline">
             {user.name}
           </Link>
           <form action={logoutAction}>
-            <button className="link">Cerrar sesión</button>
+            <button className="link inline-flex min-h-11 items-center">Cerrar sesión</button>
           </form>
         </div>
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 outline-none sm:px-8 sm:py-8">{children}</main>
       </div>
     </div>
   );

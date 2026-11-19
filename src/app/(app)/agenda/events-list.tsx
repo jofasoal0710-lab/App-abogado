@@ -42,7 +42,7 @@ export function EventsList({
               <button
                 aria-label={e.completed ? "Marcar como pendiente" : "Marcar como completado"}
                 title={e.completed ? "Marcar como pendiente" : "Marcar como completado"}
-                className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded border text-xs ${
+                className={`relative mt-0.5 flex h-5 w-5 items-center before:absolute before:-inset-3 before:content-[''] justify-center rounded border text-xs ${
                   e.completed ? "border-emerald-600 bg-emerald-600 text-white" : "border-ink-300 bg-white text-transparent hover:border-brand-500"
                 }`}
               >
@@ -50,7 +50,7 @@ export function EventsList({
               </button>
             </form>
             <div className="min-w-0 flex-1">
-              <p className={e.completed ? "text-ink-400 line-through" : "font-medium text-ink-900"}>{e.title}</p>
+              <p className={e.completed ? "text-ink-500 line-through" : "font-medium text-ink-900"}>{e.title}</p>
               <p className="mt-0.5 text-xs text-ink-500">
                 {formatDate(e.startsAt)} · {formatTime(e.startsAt)}
                 {e.endsAt && `–${formatTime(e.endsAt)}`}
