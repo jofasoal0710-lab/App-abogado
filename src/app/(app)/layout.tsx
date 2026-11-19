@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AssistantChat } from "@/components/assistant-chat";
 import { Icon } from "@/components/icons";
 import { Nav, type NavItem } from "@/components/nav";
 import { requireUser } from "@/lib/auth";
@@ -76,6 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
         <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 outline-none sm:px-8 sm:py-8">{children}</main>
+        <AssistantChat />
       </div>
     </div>
   );

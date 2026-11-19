@@ -5,18 +5,19 @@ import { and, asc, count, desc, eq, gte, inArray, isNull, lt, sql } from "drizzl
 import { BarList, Columns, Donut } from "@/components/charts";
 import { Badge, EmptyState, Stat } from "@/components/ui";
 import { db } from "@/db";
-import { clients, events, invoices, matters, payments, timeEntries, users } from "@/db/schema";
+import { clients, documents, events, invoices, matterNotes, matters, payments, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
 import { invoiceAccessSql, matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
-import { buildMonthGrid, currentMonth, dayKey, formatDate, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { buildMonthGrid, currentMonth, dayKey, formatDate, formatDateTime, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
 import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { areaLabels, eventKindLabels, matterStatusLabels } from "@/lib/labels";
 import { formatDuration, formatMoney } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { qs } from "@/lib/search";
-import { EventsList } from "./agenda/events-list";
+import { Icon } from "@/components/icons";
+import { formatTime } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -130,6 +131,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     eventsByDay.set(k, [...(eventsByDay.get(k) ?? []), e]);
   }
   const weeks = buildMonthGrid(month);
+  const activity = await recentActivity(user, seesBilling);
+  const todayEvents = upcoming.filter((e) => dayKey(e.startsAt) === today);
 
   const adjustments = await loadAdjustments(db, emitted.filter((i) => i.kind === "factura").map((i) => i.id));
   const summaries = emitted.map((inv) => ({ inv, s: summarizeInvoice(inv, today, adjustments.get(inv.id)) }));
@@ -142,22 +145,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-ink-900 sm:text-3xl">Hola, {user.name.split(" ")[0]}</h1>
-          <p className="mt-1 text-sm text-ink-500 first-letter:uppercase">
-            {new Date().toLocaleDateString(appLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
+      <section className="relative mb-6 overflow-hidden rounded-2xl bg-brand-800 px-6 py-7 text-white sm:px-8 sm:py-8">
+        <Icon name="balanza" className="pointer-events-none absolute -right-6 -top-8 h-56 w-56 text-white/[0.06]" />
+        <div className="relative flex flex-wrap items-end justify-between gap-5">
+          <div className="min-w-0">
+            <p className="text-sm text-brand-200 first-letter:uppercase">
+              {new Date().toLocaleDateString(appLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            </p>
+            <h1 className="mt-1 font-serif text-3xl font-semibold sm:text-4xl">Hola, {user.name.split(" ")[0]}</h1>
+            <p className="mt-2 max-w-xl text-brand-100">
+              {todayEvents.length > 0
+                ? `Hoy tienes ${todayEvents.length} ${todayEvents.length === 1 ? "evento" : "eventos"}: ${todayEvents[0].title}${todayEvents.length > 1 ? " y más" : ""}.`
+                : week.n > 0
+                  ? `Nada para hoy. ${week.n} ${week.n === 1 ? "plazo o evento" : "plazos o eventos"} en los próximos 7 días.`
+                  : "Sin plazos ni eventos en los próximos 7 días."}
+              {overdueEvents.n > 0 && ` Ojo: ${overdueEvents.n} ${overdueEvents.n === 1 ? "plazo vencido" : "plazos vencidos"} sin completar.`}
+            </p>
+          </div>
+          <div className="no-print flex flex-wrap gap-2">
+            <Link href="/agenda/nuevo" className="btn border border-white/30 text-white hover:bg-white/10">
+              Nuevo evento
+            </Link>
+            <Link href="/horas" className="btn border border-white/30 text-white hover:bg-white/10">
+              Registrar horas
+            </Link>
+            <Link href="/expedientes/nuevo" className="btn bg-white text-brand-800 hover:bg-brand-50">
+              Nuevo expediente
+            </Link>
+          </div>
         </div>
-        <div className="no-print flex flex-wrap gap-2">
-          <Link href="/agenda/nuevo" className="btn-secondary">
-            Nuevo evento
-          </Link>
-          <Link href="/expedientes/nuevo" className="btn-primary">
-            Nuevo expediente
-          </Link>
-        </div>
-      </div>
+      </section>
 
       {error === "forbidden" && (
         <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -181,7 +198,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             label="Pendiente de cobro"
           value={formatMoney(outstanding)}
           href="/facturas?estado=emitida"
-          icon="euro"
+          icon="cobro"
           tone={overdueInvoices.length ? "warn" : "default"}
           hint={overdueInvoices.length ? `${overdueInvoices.length} ${overdueInvoices.length === 1 ? "vencida" : "vencidas"} (${formatMoney(overdueAmount)})` : "Sin facturas vencidas"}
           />
@@ -275,16 +292,56 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <section className="card lg:col-span-2">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
-            <h2 className="font-serif text-lg font-semibold text-ink-900">Mi agenda, próximos 14 días</h2>
+            <h2 className="font-serif text-lg font-semibold text-ink-900">Mis próximos 14 días</h2>
             <Link href="/agenda?mios=1" className="link text-sm">
               Ver agenda
             </Link>
           </div>
-          <EventsList rows={upcoming} returnTo="/" empty="No tienes eventos ni plazos próximos" />
+          {upcoming.length === 0 ? (
+            <EmptyState title="Nada en tu agenda">
+              <Link href="/agenda/nuevo" className="link">
+                Añadir un evento o plazo
+              </Link>
+            </EmptyState>
+          ) : (
+            <ol className="space-y-1 p-3">
+              {upcoming.map((e) => {
+                const d = new Date(e.startsAt);
+                const isToday = dayKey(e.startsAt) === today;
+                return (
+                  <li key={e.id}>
+                    <Link
+                      href={e.matterId ? `/expedientes/${e.matterId}?tab=agenda` : "/agenda"}
+                      className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-ink-50"
+                    >
+                      <span
+                        className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl leading-none ${
+                          isToday ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-800"
+                        }`}
+                      >
+                        <span className="font-serif text-lg font-semibold tabular-nums">{d.getDate()}</span>
+                        <span className="text-[10px] font-medium">{d.toLocaleDateString(appLocale(), { month: "short" }).replace(".", "")}</span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${kindDot[e.kind]}`} aria-hidden="true" />
+                          <span className="truncate">{e.title}</span>
+                        </span>
+                        <span className="block truncate text-xs text-ink-500">
+                          {eventKindLabels[e.kind]} · {isToday ? "hoy" : d.toLocaleDateString(appLocale(), { weekday: "long" })} {formatTime(e.startsAt)}
+                          {e.matterNumber ? ` · ${e.matterNumber}` : ""}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </section>
       </div>
 
-      <div className={`grid gap-6 ${seesBilling ? "lg:grid-cols-2" : ""}`}>
+      <div className={`grid gap-6 ${seesBilling ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
         <section className="card">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
             <h2 className="font-serif text-lg font-semibold text-ink-900">Mis expedientes</h2>
@@ -318,10 +375,38 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
+        <section className="card">
+          <div className="flex items-center gap-2 border-b border-ink-100 px-5 py-3">
+            <Icon name="actividad" className="h-5 w-5 text-brand-600" />
+            <h2 className="font-serif text-lg font-semibold text-ink-900">Actividad reciente</h2>
+          </div>
+          {activity.length === 0 ? (
+            <EmptyState title="Todavía no hay actividad" />
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {activity.map((a) => (
+                <li key={a.key} className="flex gap-3 px-5 py-3">
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                    <Icon name={a.icon} className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 text-sm">
+                    <Link href={a.href} className="line-clamp-2 text-ink-800 hover:text-brand-700 hover:underline">
+                      {a.text}
+                    </Link>
+                    <p className="text-xs text-ink-500">
+                      {a.who} · {formatDateTime(a.at)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {seesBilling && (
-        <section className="card overflow-x-auto">
+        <section className="card">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
-            <h2 className="font-serif text-lg font-semibold text-ink-900">Facturas vencidas sin cobrar</h2>
+            <h2 className="font-serif text-lg font-semibold text-ink-900">Facturas vencidas</h2>
             <Link href="/facturas?estado=vencidas" className="link text-sm">
               Ver todas
             </Link>
@@ -329,26 +414,74 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {overdueInvoices.length === 0 ? (
             <EmptyState title="No hay facturas vencidas">Las facturas emitidas que pasen su vencimiento sin cobrarse aparecerán aquí.</EmptyState>
           ) : (
-            <table className="table">
-              <tbody>
-                {overdueInvoices.slice(0, 5).map(({ inv, s }) => (
-                  <tr key={inv.id}>
-                    <td>
-                      <Link className="link" href={`/facturas/${inv.id}`}>
-                        {inv.number}
-                      </Link>
-                    </td>
-                    <td>{inv.client.name}</td>
-                    <td className="text-ink-600">Venció el {formatDate(inv.dueDate)}</td>
-                    <td className="text-right font-medium tabular-nums">{formatMoney(s.outstandingCents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ul className="divide-y divide-ink-100">
+              {overdueInvoices.slice(0, 5).map(({ inv, s }) => (
+                <li key={inv.id} className="flex items-start justify-between gap-3 px-5 py-3 text-sm">
+                  <div className="min-w-0">
+                    <Link className="link" href={`/facturas/${inv.id}`}>
+                      {inv.number}
+                    </Link>
+                    <p className="truncate text-ink-700">{inv.client.name}</p>
+                    <p className="text-xs text-red-700">Venció el {formatDate(inv.dueDate)}</p>
+                  </div>
+                  <span className="shrink-0 font-medium tabular-nums text-ink-900">{formatMoney(s.outstandingCents)}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
         )}
       </div>
     </>
   );
+}
+
+type Activity = { key: string; at: Date; text: string; who: string; href: string; icon: "documentos" | "expedientes" | "horas" | "cobro" };
+
+/** Lo último que ha pasado en los expedientes que la persona ve: documentos, notas, horas y cobros. */
+async function recentActivity(user: Awaited<ReturnType<typeof requireUser>>, seesBilling: boolean): Promise<Activity[]> {
+  const LIMIT = 6;
+  const [docs, notes, hours, pays] = await Promise.all([
+    db
+      .select({ id: documents.id, at: documents.createdAt, name: documents.name, who: users.name, matterId: matters.id, number: matters.number })
+      .from(documents)
+      .innerJoin(matters, eq(matters.id, documents.matterId))
+      .leftJoin(users, eq(users.id, documents.uploadedById))
+      .where(matterAccessSql(user, matters.id))
+      .orderBy(desc(documents.createdAt))
+      .limit(LIMIT),
+    db
+      .select({ id: matterNotes.id, at: matterNotes.createdAt, body: matterNotes.body, who: users.name, matterId: matters.id, number: matters.number })
+      .from(matterNotes)
+      .innerJoin(matters, eq(matters.id, matterNotes.matterId))
+      .leftJoin(users, eq(users.id, matterNotes.authorId))
+      .where(matterAccessSql(user, matters.id))
+      .orderBy(desc(matterNotes.createdAt))
+      .limit(LIMIT),
+    db
+      .select({ id: timeEntries.id, at: timeEntries.createdAt, minutes: timeEntries.minutes, desc: timeEntries.description, who: users.name, matterId: matters.id, number: matters.number })
+      .from(timeEntries)
+      .innerJoin(matters, eq(matters.id, timeEntries.matterId))
+      .innerJoin(users, eq(users.id, timeEntries.userId))
+      .where(matterAccessSql(user, matters.id))
+      .orderBy(desc(timeEntries.createdAt))
+      .limit(LIMIT),
+    seesBilling
+      ? db
+          .select({ id: payments.id, at: payments.createdAt, cents: payments.amountCents, invoiceId: invoices.id, number: invoices.number, client: clients.name })
+          .from(payments)
+          .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+          .innerJoin(clients, eq(clients.id, invoices.clientId))
+          .where(invoiceAccessSql(user))
+          .orderBy(desc(payments.createdAt))
+          .limit(LIMIT)
+      : Promise.resolve([]),
+  ]);
+  const all: Activity[] = [
+    ...docs.map((d) => ({ key: `d${d.id}`, at: d.at, text: `Documento «${d.name}» en ${d.number}`, who: d.who ?? "—", href: `/expedientes/${d.matterId}?tab=documentos`, icon: "documentos" as const })),
+    ...notes.map((n) => ({ key: `n${n.id}`, at: n.at, text: `Nota en ${n.number}: ${n.body.slice(0, 90)}`, who: n.who ?? "—", href: `/expedientes/${n.matterId}?tab=notas`, icon: "expedientes" as const })),
+    ...hours.map((h) => ({ key: `h${h.id}`, at: h.at, text: `${formatDuration(h.minutes)} en ${h.number}: ${h.desc.slice(0, 70)}`, who: h.who, href: `/expedientes/${h.matterId}?tab=horas`, icon: "horas" as const })),
+    ...pays.map((p) => ({ key: `p${p.id}`, at: p.at, text: `Cobro de ${formatMoney(p.cents)} · ${p.number ?? "factura"} (${p.client})`, who: "Facturación", href: `/facturas/${p.invoiceId}`, icon: "cobro" as const })),
+  ];
+  return all.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 7);
 }
