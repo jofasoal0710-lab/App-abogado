@@ -4,14 +4,31 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { writings } from "@/db/schema";
+import { deedParties, deeds, notaryProfiles, writings } from "@/db/schema";
 import type { ActionState } from "@/lib/actions";
 import { getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
+import { todayISO } from "@/lib/dates";
 import { cleanValues, missingRequired } from "@/lib/forms/engine";
 import { getTemplate } from "@/lib/forms/templates";
 import { getAccessibleWriting } from "@/lib/writings";
+import { getNotaryProfile } from "@/lib/notary";
+import { can } from "@/lib/permissions";
+import type { Values } from "@/lib/forms/engine";
+
+/** Datos de protocolo de una escritura generada con formulario (número, tomo, folio, fecha, hora). */
+function deedData(v: Values) {
+  const number = Number((v.numero ?? "").replace(/\D/g, ""));
+  const folio = Number((v.folio ?? "").replace(/\D/g, ""));
+  return {
+    number: Number.isInteger(number) && number > 0 ? number : null,
+    volume: v.tomo?.trim() || null,
+    folioStart: Number.isInteger(folio) && folio > 0 ? folio : null,
+    grantedOn: /^\d{4}-\d{2}-\d{2}$/.test(v.fecha ?? "") ? v.fecha : todayISO(),
+    grantedAt: v.hora?.trim() || null,
+  };
+}
 
 function readValues(formData: FormData) {
   const raw: Record<string, unknown> = {};
@@ -32,7 +49,33 @@ export async function createWritingAction(templateKey: string, matterId: number 
   if (missing.length) return { error: `Falta: ${missing.join(", ")}.` };
 
   const title = String(formData.get("title") ?? "").trim().slice(0, 200) || tpl.title;
-  const [row] = await db.insert(writings).values({ matterId, templateKey: tpl.key, kind: tpl.kind, title, values, createdById: user.id }).returning({ id: writings.id });
+
+  // Una escritura de un notario con perfil se anota en su protocolo con el número indicado (que no puede repetirse).
+  const notary = tpl.kind === "escritura" && can(user, "notaria.usar") ? await getNotaryProfile(user.id) : null;
+  const dd = deedData(values);
+  if (notary) {
+    if (!dd.number) return { error: "Indica el número de escritura." };
+    const [dup] = await db.select({ id: deeds.id }).from(deeds).where(and(eq(deeds.notaryId, user.id), eq(deeds.number, dd.number)));
+    if (dup) return { error: `La escritura número ${dd.number} ya está en tu protocolo. Usa el siguiente número libre.` };
+  }
+
+  const row = await db.transaction(async (tx) => {
+    const [w] = await tx.insert(writings).values({ matterId, templateKey: tpl.key, kind: tpl.kind, title, values, createdById: user.id }).returning({ id: writings.id });
+    if (notary && dd.number) {
+      const [d] = await tx
+        .insert(deeds)
+        .values({ notaryId: user.id, number: dd.number, volume: dd.volume, folioStart: dd.folioStart, grantedOn: dd.grantedOn, grantedAt: dd.grantedAt, act: tpl.title, writingId: w.id })
+        .returning({ id: deeds.id });
+      const parties = [
+        { name: values.cliente, idNumber: values.cedula, role: tpl.key === "compraventa-vehiculo" ? "Vendedor(a)" : tpl.key.startsWith("poder") ? "Poderdante" : "Otorgante" },
+        ...(values.comprador?.trim() ? [{ name: values.comprador.split(/[,\n]/)[0], idNumber: "", role: "Comprador(a)" }] : []),
+        ...(values.apoderado?.trim() ? [{ name: values.apoderado.split(/[,\n]/)[0], idNumber: "", role: "Apoderado(a)" }] : []),
+      ].filter((p) => p.name?.trim());
+      if (parties.length) await tx.insert(deedParties).values(parties.map((p) => ({ deedId: d.id, name: p.name.trim().slice(0, 200), idNumber: p.idNumber?.trim() || null, role: p.role })));
+      if (dd.folioStart) await tx.update(notaryProfiles).set({ nextFolio: dd.folioStart + 1, currentVolume: dd.volume ?? undefined }).where(eq(notaryProfiles.userId, user.id));
+    }
+    return w;
+  });
   if (matterId !== null) revalidatePath(`/expedientes/${matterId}`);
   redirect(`/escritos/${row.id}?creado=1`);
 }
@@ -48,7 +91,14 @@ export async function updateWritingAction(id: number, _prev: ActionState, formDa
   const missing = missingRequired(tpl, values);
   if (missing.length) return { error: `Falta: ${missing.join(", ")}.` };
   const title = String(formData.get("title") ?? "").trim().slice(0, 200) || tpl.title;
+  const dd = deedData(values);
+  const [deed] = await db.select({ id: deeds.id, notaryId: deeds.notaryId }).from(deeds).where(eq(deeds.writingId, id));
+  if (deed && dd.number) {
+    const [dup] = await db.select({ id: deeds.id }).from(deeds).where(and(eq(deeds.notaryId, deed.notaryId), eq(deeds.number, dd.number)));
+    if (dup && dup.id !== deed.id) return { error: `El número ${dd.number} ya lo usa otra escritura del protocolo.` };
+  }
   await db.update(writings).set({ values, title, updatedAt: new Date() }).where(eq(writings.id, id));
+  if (deed && dd.number) await db.update(deeds).set({ number: dd.number, volume: dd.volume, folioStart: dd.folioStart, grantedOn: dd.grantedOn, grantedAt: dd.grantedAt }).where(eq(deeds.id, deed.id));
   if (w.matterId !== null) revalidatePath(`/expedientes/${w.matterId}`);
   redirect(`/escritos/${id}?guardado=1`);
 }

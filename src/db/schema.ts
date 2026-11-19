@@ -500,6 +500,77 @@ export const writings = pgTable(
   (t) => [index("writings_matter_idx").on(t.matterId)],
 ).enableRLS();
 
+/* ---------- Gestor notarial ---------- */
+
+/** Perfil del notario (uno por usuario): datos que salen en las escrituras y estado del protocolo. */
+export const notaryProfiles = pgTable("notary_profiles", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  fullName: text("full_name").notNull(),
+  idNumber: text("id_number"),
+  barNumber: text("bar_number"),
+  office: text(),
+  phone: text(),
+  email: text(),
+  /** Tomo del protocolo en uso y folio por el que va. */
+  currentVolume: text("current_volume"),
+  nextFolio: integer("next_folio").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+export const deedStatusEnum = pgEnum("deed_status", ["otorgada", "no_paso"]);
+
+/**
+ * Escrituras del protocolo de un notario. El número es correlativo por notario (único). La matriz es el
+ * escrito generado con un formulario notarial (opcional: puede llevarse fuera de la app).
+ */
+export const deeds = pgTable(
+  "deeds",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    notaryId: integer("notary_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    number: integer().notNull(),
+    volume: text(),
+    folioStart: integer("folio_start"),
+    folioEnd: integer("folio_end"),
+    grantedOn: date("granted_on").notNull(),
+    grantedAt: text("granted_at"),
+    act: text().notNull(),
+    status: deedStatusEnum().notNull().default("otorgada"),
+    notes: text(),
+    writingId: integer("writing_id").references(() => writings.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("deeds_notary_number_idx").on(t.notaryId, t.number), index("deeds_granted_idx").on(t.notaryId, t.grantedOn)],
+).enableRLS();
+
+/** Comparecientes de una escritura y si ya firmaron («datos y firmas»). */
+export const deedParties = pgTable("deed_parties", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  deedId: integer("deed_id")
+    .notNull()
+    .references(() => deeds.id, { onDelete: "cascade" }),
+  name: text().notNull(),
+  idNumber: text("id_number"),
+  role: text().notNull(),
+  signedOn: date("signed_on"),
+}).enableRLS();
+
+/** Testimonios expedidos de una escritura (primero, segundo…). */
+export const testimonies = pgTable("testimonies", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  deedId: integer("deed_id")
+    .notNull()
+    .references(() => deeds.id, { onDelete: "cascade" }),
+  ordinal: integer().notNull(),
+  issuedOn: date("issued_on").notNull(),
+  issuedTo: text("issued_to"),
+  notes: text(),
+}).enableRLS();
+
 export const usersRelations = relations(users, ({ one }) => ({
   role: one(roles, { fields: [users.roleId], references: [roles.id] }),
 }));

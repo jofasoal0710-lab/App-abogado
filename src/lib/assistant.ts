@@ -1,7 +1,11 @@
 import "server-only";
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, events, invoices, matters, timeEntries, users } from "@/db/schema";
+import { clients, deedParties, deeds, events, invoices, matters, testimonies, timeEntries, users, writings } from "@/db/schema";
+import { getTemplate, TEMPLATES } from "./forms/templates";
+import { getNotaryProfile, nextDeedNumber } from "./notary";
+import { quincenaOf } from "./notary-period";
+import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
 import { parseIntent, type Intent } from "./assistant-intent";
 import type { CurrentUser } from "./auth";
@@ -44,14 +48,22 @@ export async function answer(user: CurrentUser, question: string): Promise<Assis
       return activeMatters(user);
     case "buscar":
       return search(user, intent.query);
+    case "formularios":
+      return formsList();
+    case "generar":
+      return generateLink(user, intent.template, intent.ref);
+    case "escritos":
+      return matterWritings(user, intent.ref);
+    case "notaria":
+      return notaryInfo(user, intent.what);
   }
 }
 
 function help(): AssistantAnswer {
   return {
     text:
-      "Puedo darte información básica del despacho con lo que tienes permiso para ver. Prueba, por ejemplo: «estado del expediente EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «facturas vencidas» o «plazos de esta semana».",
-    suggestions: HELP_SUGGESTIONS,
+      "Puedo darte información del despacho con lo que tienes permiso para ver y llevarte a generar escritos. Prueba: «estado del expediente EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «genera una demanda laboral para EXP-2026-0001», «escritos del EXP-2026-0001» o «próxima escritura».",
+    suggestions: [...HELP_SUGGESTIONS, "Formularios"],
   };
 }
 
@@ -307,5 +319,87 @@ async function search(user: CurrentUser, query: string): Promise<AssistantAnswer
       ...cs.map((c) => ({ label: c.name, detail: "Cliente", href: `/clientes/${c.id}` })),
       ...ms.map((m) => ({ label: `${m.number} · ${m.title}`, detail: "Expediente", href: `/expedientes/${m.id}` })),
     ],
+  };
+}
+
+function formsList(): AssistantAnswer {
+  return {
+    text: "Formularios disponibles (escritos de abogado y escrituras notariales):",
+    items: TEMPLATES.map((t) => ({ label: t.title, detail: t.kind === "escrito" ? `Escrito · ${t.category}` : `Escritura · ${t.category}`, href: `/formularios/${t.key}` })),
+  };
+}
+
+/** Lleva al formulario pedido, ya enlazado al expediente si se indicó y la persona lo ve. */
+async function generateLink(user: CurrentUser, templateKey: string | null, ref: string | null): Promise<AssistantAnswer> {
+  const tpl = templateKey ? getTemplate(templateKey) : null;
+  let matter: { id: number; number: string; title: string } | undefined;
+  if (ref) {
+    [matter] = await db.select({ id: matters.id, number: matters.number, title: matters.title }).from(matters).where(and(eq(matters.number, ref), matterAccessSql(user, matters.id))).limit(1);
+    if (!matter) return { text: `No encuentro el expediente ${ref} (o no tienes acceso).`, suggestions: ["Expedientes activos"] };
+  }
+  if (!tpl) {
+    return { text: "¿Qué quieres generar? Elige un formulario:", items: TEMPLATES.map((t) => ({ label: t.title, href: `/formularios/${t.key}${matter ? `?expediente=${matter.id}` : ""}` })) };
+  }
+  if (tpl.kind === "escrito" && !matter) {
+    return { text: `Para generar «${tpl.title}» primero elige el expediente:`, items: [{ label: `Abrir «${tpl.title}» y elegir el expediente`, href: `/formularios/${tpl.key}` }], suggestions: ["Expedientes activos"] };
+  }
+  return {
+    text: matter ? `Listo: «${tpl.title}» para ${matter.number} · ${matter.title}. Los datos del expediente y del cliente ya vienen rellenos.` : `Listo: «${tpl.title}».`,
+    items: [{ label: tpl.kind === "escrito" ? "Generar escrito" : "Generar escritura", href: `/formularios/${tpl.key}${matter ? `?expediente=${matter.id}` : ""}` }],
+  };
+}
+
+async function matterWritings(user: CurrentUser, ref: string | null): Promise<AssistantAnswer> {
+  const rows = await db
+    .select({ id: writings.id, title: writings.title, kind: writings.kind, updatedAt: writings.updatedAt, number: matters.number })
+    .from(writings)
+    .leftJoin(matters, eq(matters.id, writings.matterId))
+    .where(and(writingAccessSql(user), ref ? eq(matters.number, ref) : undefined))
+    .orderBy(desc(writings.updatedAt))
+    .limit(10);
+  if (rows.length === 0) return { text: ref ? `${ref} no tiene escritos (o no tienes acceso).` : "Aún no hay escritos.", suggestions: ["Formularios"] };
+  return {
+    text: ref ? `Escritos de ${ref}:` : "Últimos escritos:",
+    items: rows.map((w) => ({ label: w.title, detail: `${w.kind === "escritura" ? "Escritura" : "Escrito"}${w.number ? ` · ${w.number}` : ""} · ${formatDateTime(w.updatedAt)}`, href: `/escritos/${w.id}` })),
+  };
+}
+
+/** Datos del protocolo PROPIO (nunca el de otro notario). */
+async function notaryInfo(user: CurrentUser, what: "proxima" | "ultimas" | "indice" | "testimonios"): Promise<AssistantAnswer> {
+  if (!can(user, "notaria.usar")) return { text: "No tienes acceso al gestor notarial." };
+  const profile = await getNotaryProfile(user.id);
+  if (!profile) return { text: "Aún no has configurado tu perfil de notario.", items: [{ label: "Completar perfil de notario", href: "/notaria/perfil" }] };
+  if (what === "proxima") {
+    return {
+      text: `Tu próxima escritura es la número ${await nextDeedNumber(user.id)}.`,
+      items: [{ label: "Tomo en uso", detail: profile.currentVolume ?? "Sin indicar" }, { label: "Folio por el que vas", detail: String(profile.nextFolio) }, { label: "Registrar escritura", href: "/notaria/escrituras/nueva" }],
+    };
+  }
+  if (what === "indice") {
+    const q = quincenaOf(todayISO());
+    const [r] = await db.select({ n: count() }).from(deeds).where(and(eq(deeds.notaryId, user.id), gte(deeds.grantedOn, q.start), sql`${deeds.grantedOn} <= ${q.end}`));
+    return { text: `Índice de la quincena (${q.label}): ${r.n} ${r.n === 1 ? "escritura" : "escrituras"}.`, items: [{ label: "Ver e imprimir el índice", href: `/notaria/indice?q=${q.key}` }] };
+  }
+  if (what === "testimonios") {
+    const rows = await db
+      .select({ ordinal: testimonies.ordinal, issuedOn: testimonies.issuedOn, deedId: deeds.id, number: deeds.number })
+      .from(testimonies)
+      .innerJoin(deeds, eq(deeds.id, testimonies.deedId))
+      .where(eq(deeds.notaryId, user.id))
+      .orderBy(desc(testimonies.issuedOn))
+      .limit(8);
+    if (!rows.length) return { text: "Aún no has registrado testimonios." };
+    return { text: "Últimos testimonios expedidos:", items: rows.map((t) => ({ label: `${t.ordinal}.º testimonio · escritura ${t.number}`, detail: formatDate(t.issuedOn), href: `/notaria/escrituras/${t.deedId}` })) };
+  }
+  const rows = await db.select().from(deeds).where(eq(deeds.notaryId, user.id)).orderBy(desc(deeds.number)).limit(8);
+  if (!rows.length) return { text: "Tu protocolo aún no tiene escrituras.", items: [{ label: "Registrar escritura", href: "/notaria/escrituras/nueva" }] };
+  const pend = await db.select({ deedId: deedParties.deedId }).from(deedParties).where(and(inArray(deedParties.deedId, rows.map((d) => d.id)), isNull(deedParties.signedOn)));
+  return {
+    text: "Últimas escrituras de tu protocolo:",
+    items: rows.map((d) => ({
+      label: `N.º ${d.number} · ${d.act}`,
+      detail: `${formatDate(d.grantedOn)}${d.status === "no_paso" ? " · no pasó" : ""}${pend.some((p) => p.deedId === d.id) ? " · faltan firmas" : ""}`,
+      href: `/notaria/escrituras/${d.id}`,
+    })),
   };
 }

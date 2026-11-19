@@ -6,7 +6,8 @@ import { ConfirmButton } from "@/components/form";
 import { LegalDocument } from "@/components/legal-document";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
-import { matters } from "@/db/schema";
+import { deeds, matters } from "@/db/schema";
+import { and } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { formatDateTime } from "@/lib/dates";
 import { getTemplate } from "@/lib/forms/templates";
@@ -26,6 +27,7 @@ export default async function WritingPage({ params, searchParams }: { params: Pr
   const tpl = getTemplate(w.templateKey);
   const sp = await searchParams;
   const [matter] = w.matterId ? await db.select({ id: matters.id, number: matters.number }).from(matters).where(eq(matters.id, w.matterId)) : [];
+  const [deed] = await db.select({ id: deeds.id, number: deeds.number }).from(deeds).where(and(eq(deeds.writingId, w.id), eq(deeds.notaryId, user.id)));
   if (w.matterId) await logRead(user, { matterId: w.matterId, kind: "documento", detail: `Escrito: ${w.title}` });
 
   return (
@@ -48,6 +50,11 @@ export default async function WritingPage({ params, searchParams }: { params: Pr
         }
         actions={
           <>
+            {deed && (
+              <Link href={`/notaria/escrituras/${deed.id}`} className="btn-secondary">
+                Protocolo · N.º {deed.number}
+              </Link>
+            )}
             <Link href={`/escritos/${w.id}/editar`} className="btn-secondary">
               Corregir
             </Link>

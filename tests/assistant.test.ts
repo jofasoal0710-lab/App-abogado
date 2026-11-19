@@ -34,3 +34,19 @@ describe("asistente: qué se pregunta", () => {
     expect(parseIntent("Villalobos")).toEqual({ kind: "buscar", query: "villalobos" });
   });
 });
+
+describe("asistente: formularios y notariado", () => {
+  it("generar un escrito para un expediente", () => {
+    expect(parseIntent("genera una demanda laboral para el EXP-2026-0001")).toEqual({ kind: "generar", template: "demanda-laboral", ref: "EXP-2026-0001" });
+    expect(parseIntent("redactar poder especial")).toEqual({ kind: "generar", template: "poder-especial", ref: null });
+    expect(parseIntent("quiero hacer un recurso de apelación")).toMatchObject({ kind: "generar", template: "recurso-revocatoria-apelacion" });
+    expect(parseIntent("crear escrito")).toEqual({ kind: "generar", template: null, ref: null });
+  });
+  it("escritos, formularios y notariado", () => {
+    expect(parseIntent("escritos del expediente EXP-2026-0002")).toEqual({ kind: "escritos", ref: "EXP-2026-0002" });
+    expect(parseIntent("¿qué formularios hay?")).toEqual({ kind: "formularios" });
+    expect(parseIntent("¿cuál es la próxima escritura?")).toEqual({ kind: "notaria", what: "proxima" });
+    expect(parseIntent("índice de la quincena")).toEqual({ kind: "notaria", what: "indice" });
+    expect(parseIntent("últimas escrituras del protocolo")).toEqual({ kind: "notaria", what: "ultimas" });
+  });
+});

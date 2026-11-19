@@ -196,11 +196,11 @@ const desistimiento: FormTemplate = {
 // ---------- Escrituras notariales (con datos de protocolo) ----------
 
 const N = {
-  numero: { name: "numero", label: "Número de escritura", type: "text", required: true } as Field,
-  tomo: { name: "tomo", label: "Tomo del protocolo", type: "text" } as Field,
-  folio: { name: "folio", label: "Folio", type: "text" } as Field,
-  notario: { name: "notario", label: "Notario(a) público(a)", type: "text", auto: "abogado.nombre", required: true } as Field,
-  oficina: { name: "oficina", label: "Oficina del notario (lugar)", type: "text" } as Field,
+  numero: { name: "numero", label: "Número de escritura", type: "text", auto: "notario.numero", required: true, hint: "El siguiente de tu protocolo; se anota allí al generar." } as Field,
+  tomo: { name: "tomo", label: "Tomo del protocolo", type: "text", auto: "notario.tomo" } as Field,
+  folio: { name: "folio", label: "Folio", type: "text", auto: "notario.folio" } as Field,
+  notario: { name: "notario", label: "Notario(a) público(a)", type: "text", auto: "notario.nombre", required: true } as Field,
+  oficina: { name: "oficina", label: "Oficina del notario (lugar)", type: "text", auto: "notario.oficina" } as Field,
   hora: { name: "hora", label: "Hora de otorgamiento", type: "text", hint: "Por ejemplo: diez horas" } as Field,
 };
 

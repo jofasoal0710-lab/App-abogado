@@ -20,7 +20,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader title="Formularios" subtitle="Modelos base de Costa Rica: revísalos y adáptalos a cada caso antes de presentarlos." />
       {groups.map((g) => (
-        <section key={g.kind} className="mb-8">
+        <section key={g.kind} id={g.kind === "escritura" ? "escrituras" : "escritos"} className="mb-8">
           <div className="mb-3 flex items-center gap-2">
             <Icon name={g.icon} className="h-5 w-5 text-brand-600" />
             <h2 className="font-serif text-xl font-semibold text-ink-900">{g.title}</h2>

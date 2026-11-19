@@ -12,7 +12,36 @@ export type Intent =
   | { kind: "facturas_vencidas" }
   | { kind: "plazos"; days: number }
   | { kind: "expedientes_activos" }
-  | { kind: "buscar"; query: string };
+  | { kind: "buscar"; query: string }
+  | { kind: "formularios" }
+  | { kind: "generar"; template: string | null; ref: string | null }
+  | { kind: "escritos"; ref: string | null }
+  | { kind: "notaria"; what: "proxima" | "ultimas" | "indice" | "testimonios" };
+
+/** Palabras que identifican cada formulario (de lo más concreto a lo más general). */
+const TEMPLATE_WORDS: [RegExp, string][] = [
+  [/demanda laboral|laboral/, "demanda-laboral"],
+  [/contestacion|contestar/, "contestacion-demanda"],
+  [/revocatoria|apelacion|recurso/, "recurso-revocatoria-apelacion"],
+  [/medida cautelar|cautelar|embargo|anotacion de demanda/, "medida-cautelar"],
+  [/desistimiento|desistir/, "desistimiento"],
+  [/medio para notificaciones|senalamiento|notificaciones/, "senalamiento-medio"],
+  [/generalisimo/, "poder-generalisimo"],
+  [/poder especial|poder/, "poder-especial"],
+  [/compraventa|traspaso|vehiculo|carro/, "compraventa-vehiculo"],
+  [/declaracion jurada|declaracion/, "declaracion-jurada"],
+  [/demanda/, "demanda-ordinaria-civil"],
+];
+
+export function matchTemplate(n: string): string | null {
+  for (const [re, key] of TEMPLATE_WORDS) if (re.test(n)) return key;
+  return null;
+}
+
+function expRef(n: string): string | null {
+  const exp = /\bexp(?:ediente)?[\s-]*(\d{4})[\s-]*(\d{1,4})\b/.exec(n) ?? /\b(20\d{2})-(\d{1,4})\b/.exec(n);
+  return exp ? `EXP-${exp[1]}-${exp[2].padStart(4, "0")}` : null;
+}
 
 /** Minúsculas y sin tildes, para comparar sin depender de cómo se escriba. */
 export function normalize(text: string): string {
@@ -44,6 +73,18 @@ export function parseIntent(raw: string): Intent {
   const text = raw.slice(0, 300);
   const n = normalize(text);
   if (!n || /^(hola|buenas|ayuda|help|que puedes hacer|que sabes hacer|menu|opciones)\b/.test(n)) return { kind: "ayuda" };
+
+  // Generar o redactar un escrito o escritura («genera una demanda laboral para EXP-2026-0001»)
+  if (/\b(genera|generar|genere|redacta|redactar|redacte|prepara|preparar|hacer|haz|crea|crear|nuevo|nueva)\b/.test(n) && (matchTemplate(n) || /\b(escrito|escritura|formulario)\b/.test(n))) {
+    return { kind: "generar", template: matchTemplate(n), ref: expRef(n) };
+  }
+  if (/\b(formularios|machotes|plantillas|modelos)\b/.test(n)) return { kind: "formularios" };
+  if (/\bescritos\b/.test(n)) return { kind: "escritos", ref: expRef(n) };
+  // Notariado
+  if (/\b(proxima|siguiente) escritura\b|\btomo\b|\bfolio\b/.test(n)) return { kind: "notaria", what: "proxima" };
+  if (/\bindice\b|\bquincena\b/.test(n)) return { kind: "notaria", what: "indice" };
+  if (/\btestimonios?\b/.test(n)) return { kind: "notaria", what: "testimonios" };
+  if (/\b(escrituras|protocolo|ultima escritura)\b/.test(n)) return { kind: "notaria", what: "ultimas" };
 
   // Número de expediente (EXP-2026-0001, exp 2026-1, 2026-0001)
   const exp = /\bexp(?:ediente)?[\s-]*(\d{4})[\s-]*(\d{1,4})\b/.exec(n) ?? /\b(20\d{2})-(\d{1,4})\b/.exec(n);

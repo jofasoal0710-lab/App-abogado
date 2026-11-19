@@ -7,6 +7,7 @@ import type { CurrentUser } from "./auth";
 import { formatId, MARITAL_STATUS, type MaritalStatus } from "./cr-id";
 import { todayISO } from "./dates";
 import type { AutoKey } from "./forms/engine";
+import { getNotaryProfile, nextDeedNumber } from "./notary";
 
 /**
  * Quién ve un escrito: si es de un expediente, quien ve el expediente (mismas reglas, también las de los
@@ -33,6 +34,18 @@ export async function autoValues(user: CurrentUser, matterId: number | null): Pr
     "abogado.carne": me?.barNumber ?? "",
     fecha: todayISO(),
   };
+  const notary = await getNotaryProfile(user.id);
+  if (notary) {
+    Object.assign(out, {
+      "notario.nombre": notary.fullName,
+      "notario.oficina": notary.office ?? "",
+      "notario.numero": String(await nextDeedNumber(user.id)),
+      "notario.tomo": notary.currentVolume ?? "",
+      "notario.folio": String(notary.nextFolio),
+    });
+  } else {
+    out["notario.nombre"] = user.name;
+  }
   if (matterId === null) return out;
   const matter = await getAccessibleMatter(user, matterId);
   if (!matter) return out;

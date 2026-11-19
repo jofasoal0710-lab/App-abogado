@@ -18,6 +18,11 @@ export type AutoKey =
   | "abogado.nombre"
   | "abogado.carne"
   | "abogado.correo"
+  | "notario.nombre"
+  | "notario.oficina"
+  | "notario.numero"
+  | "notario.tomo"
+  | "notario.folio"
   | "fecha";
 
 export type Field = {

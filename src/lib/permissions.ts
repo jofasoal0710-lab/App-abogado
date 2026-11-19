@@ -40,6 +40,11 @@ export const PERMISSIONS = {
     hint: "Emitir, crear rectificativas y borrar cobros. Incluye «Ver facturas y cobros».",
   },
   "facturacion.exportar": { group: "Facturación", label: "Exportar el libro de facturas (CSV)", hint: "Incluye «Ver facturas y cobros»." },
+  "notaria.usar": {
+    group: "Notariado",
+    label: "Usar el gestor notarial",
+    hint: "Su propio protocolo, índice, testimonios y perfil de notario. Nadie ve el protocolo de otro notario.",
+  },
   "equipo.gestionar": {
     group: "Administración",
     label: "Gestionar el equipo y los roles",
@@ -81,7 +86,7 @@ export const SYSTEM_ROLES = {
   abogado: {
     name: "Abogado/a",
     description: "Lleva expedientes y factura.",
-    permissions: normalizePermissions(["clientes.gestionar", "documentos.borrar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar"]),
+    permissions: normalizePermissions(["clientes.gestionar", "documentos.borrar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar", "notaria.usar"]),
   },
   asistente: {
     name: "Asistente",
