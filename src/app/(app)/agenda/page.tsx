@@ -11,7 +11,7 @@ import { buildMonthGrid, currentMonth, dayKey, monthLabel, monthRange, shiftMont
 import { qs } from "@/lib/search";
 import { EventsList } from "./events-list";
 
-export const metadata: Metadata = { title: "Agenda y plazos" };
+export const metadata: Metadata = { title: "Control de plazos" };
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const kindDot: Record<string, string> = {
@@ -71,7 +71,7 @@ export default async function AgendaPage({
   return (
     <>
       <PageHeader
-        title="Agenda y plazos"
+        title="Control de plazos"
         subtitle={monthLabel(month)}
         actions={
           <Link href="/agenda/nuevo" className="btn-primary">

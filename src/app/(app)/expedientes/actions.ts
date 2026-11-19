@@ -110,7 +110,7 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     return created;
   });
   revalidatePath("/expedientes");
-  redirect(`/expedientes/${row.id}`);
+  redirect(`/expedientes/${row.id}?tab=escritos&nuevo=1`);
 }
 
 export async function updateMatterAction(

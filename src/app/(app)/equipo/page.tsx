@@ -277,7 +277,10 @@ function UserForm({
             ))}
           </select>
         </Field>
-        <Field label="Tarifa por hora (€)">
+        <Field label="Carné del Colegio de Abogados" hint="Sale en la firma de los escritos.">
+          <input className="input" name="barNumber" defaultValue={user?.barNumber ?? ""} maxLength={40} />
+        </Field>
+        <Field label="Tarifa por hora">
           <input
             className="input"
             name="hourlyRate"

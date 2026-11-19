@@ -26,6 +26,7 @@ const baseSchema = z.object({
   email: z.email("El correo electrónico no es válido").max(200),
   roleId: z.number({ error: "Elige un rol" }).int().positive("Elige un rol"),
   hourlyRateCents: z.number({ error: "La tarifa por hora no es válida" }).int().nonnegative(),
+  barNumber: z.string().max(40).nullable(),
 });
 
 function parseBase(formData: FormData) {
@@ -36,6 +37,7 @@ function parseBase(formData: FormData) {
     email: str(formData, "email").toLowerCase(),
     roleId: Number(str(formData, "roleId")) || undefined,
     hourlyRateCents: rate ?? undefined,
+    barNumber: str(formData, "barNumber") || null,
   });
 }
 

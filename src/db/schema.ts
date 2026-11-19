@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -110,6 +111,8 @@ export const users = pgTable(
      */
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+    /** Carné del Colegio de Abogados (sale en la firma de los escritos). */
+    barNumber: text("bar_number"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
@@ -475,6 +478,27 @@ export const securityEvents = pgTable(
 ).enableRLS();
 
 /* ---------- Relaciones ---------- */
+
+/**
+ * Escritos y escrituras generados con los formularios (lib/forms). Se guardan los valores de los campos
+ * (no el texto), así «Corregir» vuelve a los campos y el documento se redacta de nuevo al verlo.
+ */
+export const writings = pgTable(
+  "writings",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** Expediente al que pertenece (las escrituras notariales pueden no tener expediente). */
+    matterId: integer("matter_id").references(() => matters.id, { onDelete: "cascade" }),
+    templateKey: text("template_key").notNull(),
+    kind: text().notNull(),
+    title: text().notNull(),
+    values: jsonb().$type<Record<string, string>>().notNull(),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("writings_matter_idx").on(t.matterId)],
+).enableRLS();
 
 export const usersRelations = relations(users, ({ one }) => ({
   role: one(roles, { fields: [users.roleId], references: [roles.id] }),

@@ -10,7 +10,7 @@ import { requireUser } from "@/lib/auth";
 import { clientTypeLabels } from "@/lib/labels";
 import { likePattern, pageParam, qs } from "@/lib/search";
 
-export const metadata: Metadata = { title: "Clientes" };
+export const metadata: Metadata = { title: "Mis clientes" };
 const PAGE_SIZE = 20;
 
 export default async function ClientsPage({
@@ -45,7 +45,7 @@ export default async function ClientsPage({
   return (
     <>
       <PageHeader
-        title="Clientes"
+        title="Mis clientes"
         subtitle={`${total} ${total === 1 ? "cliente" : "clientes"}`}
         actions={
           <Link href="/clientes/nuevo" className="btn-primary">

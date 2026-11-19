@@ -108,6 +108,19 @@ const paths = {
       <path d="M3 12h4l3-8 4 16 3-8h4" />
     </>
   ),
+  formularios: (
+    <>
+      <path d="M8 3h8l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+      <path d="M16 3v4h4M9.5 12h7M9.5 15.5h7M9.5 8.5h3" />
+      <path d="M3.5 7v12a2 2 0 0 0 2 2" />
+    </>
+  ),
+  notario: (
+    <>
+      <path d="M12 3 3 8h18Z" />
+      <path d="M5 8v9M9.5 8v9M14.5 8v9M19 8v9M3 20h18" />
+    </>
+  ),
   alerta: (
     <>
       <path d="M12 3 2 20h20Z" />

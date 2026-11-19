@@ -13,8 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items: NavItem[] = [
     { href: "/", label: "Panel", icon: "panel" },
     { href: "/expedientes", label: "Expedientes", icon: "expedientes" },
-    { href: "/clientes", label: "Clientes", icon: "clientes" },
-    { href: "/agenda", label: "Agenda y plazos", icon: "agenda" },
+    { href: "/clientes", label: "Mis clientes", icon: "clientes" },
+    { href: "/agenda", label: "Control de plazos", icon: "agenda" },
+    { href: "/formularios", label: "Formularios", icon: "formularios", also: ["/escritos"] },
     { href: "/documentos", label: "Documentos", icon: "documentos" },
     { href: "/horas", label: "Horas", icon: "horas" },
     ...(can(user, "facturacion.ver") ? [{ href: "/facturas", label: "Facturas", icon: "facturas" } satisfies NavItem] : []),

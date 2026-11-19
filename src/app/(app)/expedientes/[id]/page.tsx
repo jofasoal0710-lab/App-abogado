@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { listMatterWritings } from "@/lib/writings";
 import { can } from "@/lib/permissions";
 import Link from "next/link";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
@@ -30,6 +31,7 @@ export const metadata: Metadata = { title: "Expediente" };
 const TABS = [
   ["resumen", "Resumen"],
   ["notas", "Notas"],
+  ["escritos", "Escritos"],
   ["documentos", "Documentos"],
   ["horas", "Horas"],
   ["agenda", "Agenda"],
@@ -43,7 +45,7 @@ export default async function MatterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; error?: string }>;
+  searchParams: Promise<{ tab?: string; error?: string; nuevo?: string }>;
 }) {
   const user = await requireUser();
   const id = Number((await params).id);
@@ -204,6 +206,8 @@ export default async function MatterPage({
       )}
 
       {tab === "notas" && <NotesTab matterId={id} userId={user.id} canDeleteAll={can(user, "notas.borrar_todas")} />}
+
+      {tab === "escritos" && <WritingsTab matterId={id} justCreated={sp.nuevo === "1"} />}
 
       {tab === "documentos" && <DocumentsTab matterId={id} user={user} />}
 
@@ -565,6 +569,59 @@ async function AccessTab({
           </p>
         </section>
       )}
+    </div>
+  );
+}
+
+async function WritingsTab({ matterId, justCreated }: { matterId: number; justCreated: boolean }) {
+  const rows = await listMatterWritings(matterId);
+  return (
+    <div className="space-y-4">
+      {justCreated && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-5 py-4">
+          <div>
+            <p className="font-medium text-brand-900">Expediente creado.</p>
+            <p className="text-sm text-brand-800">¿Generas ahora su primer escrito? Los datos del cliente y del expediente se rellenan solos.</p>
+          </div>
+          <Link href={`/formularios?expediente=${matterId}`} className="btn-primary">
+            Generar escrito
+          </Link>
+        </div>
+      )}
+      <section className="card">
+        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
+          <h2 className="font-serif text-lg font-semibold">Escritos del expediente</h2>
+          <Link href={`/formularios?expediente=${matterId}`} className="btn-primary btn-sm">
+            Generar escrito
+          </Link>
+        </div>
+        {rows.length === 0 ? (
+          <EmptyState title="Aún no hay escritos">Genera uno desde los formularios: demanda, contestación, recursos…</EmptyState>
+        ) : (
+          <ul className="divide-y divide-ink-100">
+            {rows.map((w) => (
+              <li key={w.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <Link href={`/escritos/${w.id}`} className="link">
+                    {w.title}
+                  </Link>
+                  <p className="text-xs text-ink-500">
+                    {w.kind === "escritura" ? "Escritura notarial" : "Escrito"} · {w.author ?? "—"} · {formatDateTime(w.updatedAt)}
+                  </p>
+                </div>
+                <span className="flex gap-1">
+                  <Link href={`/escritos/${w.id}/editar`} className="btn-ghost btn-sm">
+                    Corregir
+                  </Link>
+                  <a href={`/api/escritos/${w.id}/doc`} className="btn-ghost btn-sm">
+                    Word
+                  </a>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
 
-export type NavItem = { href: string; label: string; icon: IconName };
+export type NavItem = { href: string; label: string; icon: IconName; /** Otras rutas que cuentan como esta sección. */ also?: string[] };
 
 export function Nav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 px-3 lg:block lg:space-y-1" aria-label="Principal">
       {items.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        const active = item.href === "/" ? pathname === "/" : [item.href, ...(item.also ?? [])].some((h) => pathname.startsWith(h));
         return (
           <Link
             key={item.href}
