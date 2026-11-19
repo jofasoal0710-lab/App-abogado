@@ -63,7 +63,7 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
   const invoiceClient = await getAccessibleClient(user, clientId);
   if (!invoiceClient) return { error: CLIENT_ACCESS_DENIED };
   if (matterId && !(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
-  // La retención de IRPF solo se propone a empresas (a un particular no se le practica); se puede cambiar.
+  // La retención solo se propone a empresas (a un particular no se le practica); se puede cambiar.
   const header = parseHeader(formData, invoiceClient.type === "empresa" ? config.defaultWithholdingRate : 0);
   if (!header.success) return { error: firstZodError(header.error) };
 

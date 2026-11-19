@@ -1,6 +1,8 @@
 "use server";
 
 import { and, count, eq } from "drizzle-orm";
+import { ID_TYPES, MARITAL_STATUS, validateId, type IdType, type MaritalStatus } from "@/lib/cr-id";
+import { todayISO } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -17,7 +19,10 @@ import { can } from "@/lib/permissions";
 const clientSchema = z.object({
   type: z.enum(["persona", "empresa"]),
   name: z.string().min(2, "El nombre es obligatorio (mínimo 2 caracteres)").max(200),
+  idType: z.enum(Object.keys(ID_TYPES) as [IdType, ...IdType[]]).nullable(),
   taxId: z.string().max(40).nullable(),
+  birthDate: z.iso.date("La fecha de nacimiento no es válida").nullable(),
+  maritalStatus: z.enum(Object.keys(MARITAL_STATUS) as [MaritalStatus, ...MaritalStatus[]]).nullable(),
   email: z.union([z.literal(null), z.email("El correo electrónico no es válido")]),
   phone: z.string().max(40).nullable(),
   address: z.string().max(500).nullable(),
@@ -25,15 +30,31 @@ const clientSchema = z.object({
 });
 
 function parseClient(formData: FormData) {
-  return clientSchema.safeParse({
-    type: str(formData, "type"),
+  const type = str(formData, "type");
+  const persona = type === "persona";
+  const parsed = clientSchema.safeParse({
+    type,
     name: str(formData, "name"),
+    idType: optStr(formData, "idType"),
     taxId: optStr(formData, "taxId"),
+    // Fecha de nacimiento y estado civil solo tienen sentido en personas físicas.
+    birthDate: persona ? optStr(formData, "birthDate") : null,
+    maritalStatus: persona ? optStr(formData, "maritalStatus") : null,
     email: optStr(formData, "email"),
     phone: optStr(formData, "phone"),
     address: optStr(formData, "address"),
     notes: optStr(formData, "notes"),
   });
+  if (!parsed.success) return parsed;
+  const d = parsed.data;
+  if (d.birthDate && d.birthDate > todayISO()) return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["birthDate"], message: "La fecha de nacimiento no puede ser futura.", input: d.birthDate }]) };
+  if (d.taxId) {
+    const check = validateId(d.idType ?? "pasaporte", d.taxId);
+    if (!check.ok) return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["taxId"], message: check.error, input: d.taxId }]) };
+    d.taxId = check.value;
+  }
+  if (!d.taxId) d.idType = null;
+  return { success: true as const, data: d };
 }
 
 export async function createClientAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

@@ -78,6 +78,13 @@
       "when": 1795108562777,
       "tag": "0010_roles_required",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795110931709,
+      "tag": "0011_client_cr",
+      "breakpoints": true
     }
   ]
 }

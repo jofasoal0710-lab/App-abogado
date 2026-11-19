@@ -1,3 +1,5 @@
+import { appCurrency, appLocale } from "./locale";
+
 /**
  * Todo el dinero se maneja como enteros en céntimos para evitar errores de coma flotante.
  */
@@ -10,9 +12,9 @@ export type LineItem = {
   unitPriceCents: number;
 };
 
-export function formatMoney(cents: number, currency = "EUR", locale = "es-ES"): string {
-  // useGrouping "always": en es-ES los números de 4 cifras no llevan separador de miles por
-  // defecto ("1500,00 €"); en documentos contables preferimos importes homogéneos ("1.500,00 €").
+export function formatMoney(cents: number, currency = appCurrency(), locale = appLocale()): string {
+  // useGrouping "always": en español los números de 4 cifras no llevan separador de miles por
+  // defecto ("1500,00"); en documentos contables preferimos importes homogéneos ("1 500,00").
   return new Intl.NumberFormat(locale, { style: "currency", currency, useGrouping: "always" }).format(cents / 100);
 }
 
@@ -21,7 +23,7 @@ export function formatMoney(cents: number, currency = "EUR", locale = "es-ES"): 
  * Devuelve null si no es un importe válido.
  */
 export function parseMoneyToCents(input: string): number | null {
-  let s = input.trim().replace(/[\s€$]/g, "");
+  let s = input.trim().replace(/[\s€$₡¢]/g, "");
   if (!s) return null;
   let negative = false;
   if (s.startsWith("-")) {

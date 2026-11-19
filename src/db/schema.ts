@@ -121,8 +121,13 @@ export const clients = pgTable(
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     type: clientTypeEnum().notNull().default("persona"),
     name: text().notNull(),
-    /** NIF / DNI / CIF / pasaporte. */
+    /** Tipo de identificación (ver lib/cr-id.ts): cedula_fisica, cedula_juridica, dimex, nite, pasaporte. */
+    idType: text("id_type"),
+    /** Número de identificación (solo dígitos, salvo pasaporte). */
     taxId: text("tax_id"),
+    /** Solo personas físicas: fecha de nacimiento (la edad se calcula al mostrarla) y estado civil. */
+    birthDate: date("birth_date"),
+    maritalStatus: text("marital_status"),
     email: text(),
     phone: text(),
     address: text(),

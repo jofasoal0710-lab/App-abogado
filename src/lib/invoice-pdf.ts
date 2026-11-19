@@ -32,7 +32,8 @@ const GRAY = rgb(0.4, 0.43, 0.5);
 const LINE = rgb(0.82, 0.85, 0.9);
 const COLS = { concept: M, qty: 330, price: 410, amount: A4[0] - M }; // qty/price/amount alineados a la derecha
 
-const money = (cents: number) => formatMoney(cents).replace(/[  ]/g, " ");
+// «₡» no está en las fuentes estándar del PDF (WinAnsi): se escribe «¢», como es habitual en Costa Rica.
+const money = (cents: number) => formatMoney(cents).replace(/[  ]/g, " ").replace(/₡/g, "¢");
 
 /** Genera el PDF de una factura (o rectificativa, o borrador con marca de agua). */
 export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
@@ -74,7 +75,7 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   text(firm.name, M, 15, bold);
   const headerTop = y;
   y -= 15;
-  if (firm.taxId) { text(`NIF ${firm.taxId}`, M, 9, regular, GRAY); y -= 12; }
+  if (firm.taxId) { text(`Céd. jurídica ${firm.taxId}`, M, 9, regular, GRAY); y -= 12; }
   for (const ln of wrapText(t(firm.address), regular, 9, 250)) { if (ln) { text(ln, M, 9, regular, GRAY); y -= 12; } }
   const leftBottom = y;
   y = headerTop;
@@ -89,7 +90,7 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   // ---- Cliente
   text("CLIENTE", M, 8, bold, GRAY); y -= 14;
   text(client.name, M, 11, bold); y -= 13;
-  if (client.taxId) { text(`NIF/CIF ${client.taxId}`, M, 9, regular, GRAY); y -= 12; }
+  if (client.taxId) { text(`Identificación ${client.taxId}`, M, 9, regular, GRAY); y -= 12; }
   for (const ln of wrapText(t(client.address ?? ""), regular, 9, 330)) { if (ln) { text(ln, M, 9, regular, GRAY); y -= 12; } }
   if (matter) { text(`Expediente: ${matter.number} · ${matter.title}`.slice(0, 110), M, 9, regular, GRAY); y -= 12; }
   y -= 8;
@@ -153,7 +154,7 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   };
   row("Base imponible", money(totals.subtotalCents));
   row(`IVA (${inv.taxRate} %)`, money(totals.taxCents));
-  if (inv.withholdingRate > 0) row(`Retención IRPF (${inv.withholdingRate} %)`, money(-totals.withholdingCents));
+  if (inv.withholdingRate > 0) row(`Retención (${inv.withholdingRate} %)`, money(-totals.withholdingCents));
   page.drawLine({ start: { x: labelX, y: y + 10 }, end: { x: A4[0] - M, y: y + 10 }, thickness: 0.8, color: INK });
   y -= 4;
   row(isRect ? "TOTAL RECTIFICACIÓN" : "TOTAL", money(totals.totalCents), true);

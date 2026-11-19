@@ -44,7 +44,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 - **Agenda y plazos**: calendario mensual, audiencias/plazos/reuniones/tareas, alerta de plazos vencidos sin completar.
 - **Documentos**: subida por expediente (máx. 25 MB, lista de extensiones permitida), descarga autenticada.
 - **Horas**: registro con tarifa congelada por entrada; las facturadas quedan bloqueadas.
-- **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada; cobros parciales, IVA y **retención IRPF** configurables, **facturas rectificativas** (serie `RECT-2026-0001`), **PDF** de cada factura y **exportación CSV** del libro de facturas (ver «Facturación» abajo).
+- **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada; cobros parciales, IVA (13 % por defecto) y **retención** configurables, importes en **colones**, **facturas rectificativas** (serie `RECT-2026-0001`), **PDF** de cada factura y **exportación CSV** del libro de facturas (ver «Facturación» abajo).
 - **Permisos y confidencialidad**: expedientes abiertos, restringidos o confidenciales (ni los administradores), clientes confidenciales y registro de lecturas (ver abajo).
 - **Recordatorios** (con el permiso correspondiente; por defecto, administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
 - **Equipo** (con «gestionar el equipo»): altas, roles personalizables con sus permisos, tarifa horaria, desactivación y si recibe avisos por correo.
@@ -77,6 +77,15 @@ Salvaguardas:
 - Sin «ver facturas y cobros» desaparecen el menú Facturas, los importes del panel y la pestaña Facturas de los expedientes, y las rutas y el PDF responden 403.
 - **Ningún permiso abre los confidenciales**: solo los ven su responsable y sus miembros.
 - Quien puede gestionar el equipo puede darse cualquier permiso: dáselo solo a quien administre la aplicación.
+
+## País: Costa Rica
+
+La aplicación está configurada para Costa Rica: **colones** (₡; en el PDF se escribe «¢» porque sus fuentes estándar no tienen «₡»), formato `es-CR`, **IVA 13 %**, sin retención por defecto y zona horaria `America/Costa_Rica`. Se puede cambiar con `CURRENCY`, `APP_LOCALE`, `DEFAULT_TAX_RATE`, `DEFAULT_WITHHOLDING_RATE` y `APP_TIMEZONE`.
+
+**Clientes**:
+- **Tipo de identificación**: cédula física (9 dígitos), cédula jurídica (10, empieza por 3), DIMEX (11-12), NITE (10) o pasaporte. Se valida el número, se guarda solo con dígitos y se muestra con guiones (`1-1234-0567`, `3-101-123456`). Al escribirlo se propone el tipo.
+- **«Buscar en Hacienda»** trae el nombre (o la razón social) del servicio público de contribuyentes del Ministerio de Hacienda (`api.hacienda.go.cr/fe/ae`). Solo responde por quien está **inscrito como contribuyente**. La consulta la hace el servidor, exige sesión, tiene un límite de 20 por minuto y persona y no guarda nada: el nombre se rellena en el formulario y la persona decide si lo guarda.
+- Personas físicas: **fecha de nacimiento** (la **edad** se calcula al momento) y **estado civil**. No hay una fuente oficial pública que los devuelva: se escriben a mano. El TSE no ofrece un servicio público para esto; si el despacho consigue un convenio, se puede conectar.
 
 ## Permisos y confidencialidad
 
@@ -128,7 +137,7 @@ Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo el res
 - Si la factura tenía horas vinculadas, al emitir una rectificativa total se puede elegir **liberar esas horas** para volver a facturarlas.
 - Los importes de un abono son **exactamente** el negativo de los de la original (redondeo simétrico «half away from zero»; hay una prueba de propiedad con 500 casos aleatorios).
 
-**PDF**: `/api/facturas/<id>/pdf` (botón «Descargar PDF» en la ficha). Se genera en el servidor con `pdf-lib` (sin navegador ni servicios externos): despacho, cliente con NIF, líneas, base, IVA, retención, total, referencia a la original en las rectificativas, paginación y marca de agua «BORRADOR» en borradores. La ruta exige sesión y respeta el acceso al expediente/cliente (404 si no se ve); la descarga de una factura de un expediente confidencial **queda en el registro de lecturas**. Las fuentes estándar del PDF solo cubren el alfabeto latino occidental: los caracteres fuera de él (p. ej. emojis) se sustituyen por «?».
+**PDF**: `/api/facturas/<id>/pdf` (botón «Descargar PDF» en la ficha). Se genera en el servidor con `pdf-lib` (sin navegador ni servicios externos): despacho, cliente con su identificación, líneas, base, IVA, retención, total, referencia a la original en las rectificativas, paginación y marca de agua «BORRADOR» en borradores. La ruta exige sesión y respeta el acceso al expediente/cliente (404 si no se ve); la descarga de una factura de un expediente confidencial **queda en el registro de lecturas**. Las fuentes estándar del PDF solo cubren el alfabeto latino occidental: los caracteres fuera de él (p. ej. emojis) se sustituyen por «?».
 
 **Exportación CSV** (`/facturas/exportar`, solo administradores y abogados): libro de facturas **emitidas** (no borradores) por rango de fechas, con accesos rápidos por trimestre y resumen de totales netos (base, IVA, retención). Formato para Excel en español (`;` como separador, coma decimal, BOM UTF-8, fechas `dd/mm/aaaa`), importes en negativo para las rectificativas y columnas «Rectifica a» y «Motivo». Solo incluye lo que el usuario puede ver (las facturas de un expediente confidencial no salen en el CSV de quien no tiene acceso), con un máximo de 20.000 filas, y neutraliza la **inyección de fórmulas** (un nombre de cliente como `=HIPERVINCULO(...)` sale como texto).
 
@@ -191,7 +200,7 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 - Define `AUTH_SECRET` y `DATABASE_URL` reales, sirve la app tras HTTPS y haz copias de seguridad de la base de datos **y** de `UPLOAD_DIR`.
 - Los documentos usan disco local por defecto (`STORAGE_DRIVER=local`, para un servidor propio con disco persistente) o almacenamiento compatible con S3 (`STORAGE_DRIVER=s3`, obligatorio en Netlify; ver [DEPLOY.md](DEPLOY.md)).
 - El limitador de intentos de login vive en la base de datos (5 fallos por IP+correo y 15 por correo, cada 15 min; con `CLIENT_IP_HEADER` configurada, además 30 por IP entre todas las cuentas): sirve con varias instancias. Un atacante podría bloquear temporalmente a un usuario concreto con 15 intentos.
-- Sin facturación electrónica oficial (Verifactu/FacturaE), ni suplidos, ni varios tipos de IVA por factura (ver «Facturación»).
+- Sin **comprobantes electrónicos de Hacienda** (factura electrónica v4.4 de Costa Rica): las facturas de la app son internas y no sustituyen a la factura electrónica oficial; ni suplidos, ni varios tipos de IVA por factura (ver «Facturación»).
 - El PDF se genera en el servidor: en **Netlify** una respuesta de función no puede superar ~6 MB (una factura normal pesa unas decenas de KB, pero una con cientos de líneas puede acercarse); la exportación CSV se limita a 20.000 filas por la misma razón.
 - Sin firma electrónica ni portal de clientes.
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appLocale } from "@/lib/locale";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
@@ -73,7 +74,7 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
           </h2>
           {result.truncated ? (
             <p role="alert" className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Hay más de {REGISTER_MAX_ROWS.toLocaleString("es-ES")} facturas en el rango: acórtalo para poder exportarlo.
+              Hay más de {REGISTER_MAX_ROWS.toLocaleString(appLocale())} facturas en el rango: acórtalo para poder exportarlo.
             </p>
           ) : null}
           <dl className="grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
@@ -81,7 +82,7 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
             <Item label="Rectificativas" value={String(result.totals.rectifications)} />
             <Item label="Base imponible" value={formatMoney(result.totals.subtotalCents)} />
             <Item label="IVA" value={formatMoney(result.totals.taxCents)} />
-            <Item label="Retención IRPF" value={formatMoney(result.totals.withholdingCents)} />
+            <Item label="Retención" value={formatMoney(result.totals.withholdingCents)} />
             <Item label="Total" value={formatMoney(result.totals.totalCents)} />
           </dl>
           <p className="mt-3 text-xs text-ink-500">

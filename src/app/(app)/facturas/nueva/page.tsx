@@ -127,7 +127,7 @@ export default async function NewInvoicePage({
               <input className="input" name="taxRate" inputMode="numeric" defaultValue={config.defaultTaxRate} required />
             </Field>
             <Field
-              label="Retención IRPF (%)"
+              label="Retención (%)"
               hint={client.type === "empresa" ? "Se propone a empresas; ponla a 0 si no procede (p. ej. cliente extranjero)" : "A un particular no se le practica retención"}
             >
               <input className="input" name="withholdingRate" inputMode="numeric" defaultValue={client.type === "empresa" ? config.defaultWithholdingRate : 0} required />

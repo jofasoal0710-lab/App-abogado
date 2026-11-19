@@ -2,7 +2,9 @@ import { ActionForm, SubmitButton } from "@/components/form";
 import { Field } from "@/components/ui";
 import type { Client } from "@/db/schema";
 import type { ActionState } from "@/lib/actions";
-import { clientTypeLabels, entries } from "@/lib/labels";
+import { formatId } from "@/lib/cr-id";
+import { todayISO } from "@/lib/dates";
+import { IdentityFields } from "./identity-fields";
 import Link from "next/link";
 
 export function ClientForm({
@@ -20,21 +22,17 @@ export function ClientForm({
   return (
     <ActionForm action={action} className="card card-pad space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Tipo">
-          <select className="input" name="type" defaultValue={client?.type ?? "persona"}>
-            {entries(clientTypeLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Nombre o razón social" className="sm:col-span-2">
-          <input className="input" name="name" defaultValue={client?.name} required maxLength={200} />
-        </Field>
-        <Field label="NIF / DNI / CIF">
-          <input className="input" name="taxId" defaultValue={client?.taxId ?? ""} maxLength={40} />
-        </Field>
+        <IdentityFields
+          today={todayISO()}
+          initial={{
+            type: client?.type ?? "persona",
+            name: client?.name ?? "",
+            idType: client?.idType ?? null,
+            taxId: client ? formatId(client.idType, client.taxId) : "",
+            birthDate: client?.birthDate ?? "",
+            maritalStatus: client?.maritalStatus ?? null,
+          }}
+        />
         <Field label="Correo electrónico">
           <input className="input" type="email" name="email" defaultValue={client?.email ?? ""} />
         </Field>

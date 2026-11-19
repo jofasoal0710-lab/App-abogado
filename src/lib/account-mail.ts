@@ -1,4 +1,5 @@
 import "server-only";
+import { appLocale } from "./locale";
 import { getReminderConfig, isSmtpConfigured } from "./reminders/config";
 import { escapeHtml } from "./reminders/logic";
 import { describeMailError, sendMail } from "./reminders/mailer";
@@ -15,7 +16,7 @@ export async function notifyPasswordChanged(
 ): Promise<boolean> {
   const c = getReminderConfig();
   if (!isSmtpConfigured(c)) return false;
-  const date = when.toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" });
+  const date = when.toLocaleString(appLocale(), { dateStyle: "long", timeStyle: "short" });
   const how = admin
     ? `por un administrador (${admin.name}). La próxima vez que entres tendrás que elegir una contraseña nueva.`
     : "desde tu propia cuenta.";

@@ -125,7 +125,7 @@ export default async function InvoicePage({
         <div className="flex flex-wrap justify-between gap-6 border-b border-ink-100 pb-5">
           <div>
             <p className="font-serif text-xl font-semibold text-ink-900">{config.firmName}</p>
-            {config.firmTaxId && <p className="text-sm text-ink-600">NIF {config.firmTaxId}</p>}
+            {config.firmTaxId && <p className="text-sm text-ink-600">Céd. jurídica {config.firmTaxId}</p>}
             {config.firmAddress && <p className="text-sm text-ink-600">{config.firmAddress}</p>}
           </div>
           <div className="text-right text-sm">
@@ -139,7 +139,7 @@ export default async function InvoicePage({
         <div className="border-b border-ink-100 py-5 text-sm">
           <p className="label">Cliente</p>
           <p className="font-medium text-ink-900">{inv.client.name}</p>
-          {inv.client.taxId && <p className="text-ink-600">NIF/CIF {inv.client.taxId}</p>}
+          {inv.client.taxId && <p className="text-ink-600">Identificación {inv.client.taxId}</p>}
           {inv.client.address && <p className="text-ink-600">{inv.client.address}</p>}
           {inv.matter && <p className="mt-2 text-ink-600">Expediente: {inv.matter.number} · {inv.matter.title}</p>}
         </div>
@@ -218,7 +218,7 @@ export default async function InvoicePage({
           </div>
           {inv.withholdingRate > 0 && (
             <div className="flex justify-between">
-              <dt className="text-ink-600">Retención IRPF ({inv.withholdingRate} %)</dt>
+              <dt className="text-ink-600">Retención ({inv.withholdingRate} %)</dt>
               <dd className="tabular-nums">{formatMoney(-s.withholdingCents)}</dd>
             </div>
           )}
@@ -293,7 +293,7 @@ export default async function InvoicePage({
               <Field label="IVA (%)">
                 <input className="input" name="taxRate" inputMode="numeric" defaultValue={inv.taxRate} required />
               </Field>
-              <Field label="Retención IRPF (%)">
+              <Field label="Retención (%)">
                 <input className="input" name="withholdingRate" inputMode="numeric" defaultValue={inv.withholdingRate} required />
               </Field>
               <Field label="Notas" className="sm:col-span-3">

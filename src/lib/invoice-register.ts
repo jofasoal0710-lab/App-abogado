@@ -90,8 +90,8 @@ export async function loadRegister(user: CurrentUser, from: string, to: string, 
 export function registerToCsv(rows: RegisterRow[]): string {
   return toCsv(
     [
-      "Número", "Tipo", "Fecha", "Vencimiento", "Cliente", "NIF/CIF", "Expediente", "Base imponible", "% IVA", "Cuota IVA",
-      "% Retención IRPF", "Retención IRPF (importe retenido)", "Total", "Estado", "Cobrado", "Pendiente de cobro", "Rectifica a", "Motivo de la rectificación",
+      "Número", "Tipo", "Fecha", "Vencimiento", "Cliente", "Identificación", "Expediente", "Base imponible", "% IVA", "Cuota IVA",
+      "% Retención", "Retención (importe retenido)", "Total", "Estado", "Cobrado", "Pendiente de cobro", "Rectifica a", "Motivo de la rectificación",
     ],
     rows.map((r) => [
       csvText(r.number),

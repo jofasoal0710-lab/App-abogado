@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appLocale } from "@/lib/locale";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { PageHeader } from "@/components/ui";
@@ -11,7 +12,7 @@ import { PasswordForm } from "./password-form";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 
-const when = (d: Date | null) => (d ? d.toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—");
+const when = (d: Date | null) => (d ? d.toLocaleString(appLocale(), { dateStyle: "medium", timeStyle: "short" }) : "—");
 
 /** Resumen legible del navegador a partir del User-Agent. */
 function browserOf(ua: string | null): string {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ageOn, formatId, ID_TYPES, MARITAL_STATUS, type IdType, type MaritalStatus } from "@/lib/cr-id";
 import { can } from "@/lib/permissions";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
@@ -10,7 +11,7 @@ import { db } from "@/db";
 import { clientAccessLog, invoices, matters, readAudit, users } from "@/db/schema";
 import { invoiceAccessSql, matterAccessSql, requireClientPage } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
-import { formatDate, formatDateTime } from "@/lib/dates";
+import { formatDate, todayISO, formatDateTime } from "@/lib/dates";
 import { areaLabels, clientTypeLabels, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
 import { formatMoney, invoiceTotals } from "@/lib/money";
 import { READ_VERBS } from "@/lib/read-audit";
@@ -73,7 +74,7 @@ export default async function ClientPage({
         subtitle={
           <>
             {clientTypeLabels[client.type]}
-            {client.taxId ? ` · ${client.taxId}` : ""}
+            {client.taxId ? ` · ${formatId(client.idType, client.taxId)}` : ""}
             {client.visibility === "confidencial" && <span className="badge-amber ml-2">Confidencial</span>}
           </>
         }
@@ -109,8 +110,21 @@ export default async function ClientPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="card card-pad lg:col-span-1">
-          <h2 className="mb-3 font-serif text-lg font-semibold">Datos de contacto</h2>
+          <h2 className="mb-3 font-serif text-lg font-semibold">Datos del cliente</h2>
           <dl className="space-y-3 text-sm">
+            <Row
+              label={client.idType ? ID_TYPES[client.idType as IdType] ?? "Identificación" : "Identificación"}
+              value={client.taxId ? formatId(client.idType, client.taxId) : null}
+            />
+            {client.type === "persona" && (
+              <>
+                <Row
+                  label="Fecha de nacimiento"
+                  value={client.birthDate ? `${formatDate(client.birthDate)} (${ageOn(client.birthDate, todayISO()) ?? "?"} años)` : null}
+                />
+                <Row label="Estado civil" value={client.maritalStatus ? MARITAL_STATUS[client.maritalStatus as MaritalStatus] : null} />
+              </>
+            )}
             <Row label="Correo" value={client.email && <a className="link" href={`mailto:${client.email}`}>{client.email}</a>} />
             <Row label="Teléfono" value={client.phone} />
             <Row label="Dirección" value={client.address} />

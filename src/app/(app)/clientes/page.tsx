@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { formatId } from "@/lib/cr-id";
 import Link from "next/link";
 import { and, count, desc, ilike, or } from "drizzle-orm";
 import { EmptyState, PageHeader, Pagination } from "@/components/ui";
@@ -58,7 +59,7 @@ export default async function ClientsPage({
           type="search"
           name="q"
           defaultValue={q}
-          placeholder="Buscar por nombre, NIF, correo o teléfono"
+          placeholder="Buscar por nombre, cédula, correo o teléfono"
         />
         <button className="btn-secondary">Buscar</button>
         {q && (
@@ -78,7 +79,7 @@ export default async function ClientsPage({
               <tr>
                 <th>Nombre</th>
                 <th>Tipo</th>
-                <th>NIF / CIF</th>
+                <th>Identificación</th>
                 <th>Contacto</th>
               </tr>
             </thead>
@@ -91,7 +92,7 @@ export default async function ClientsPage({
                     </Link>
                   </td>
                   <td>{clientTypeLabels[c.type]}</td>
-                  <td>{c.taxId ?? "—"}</td>
+                  <td className="tabular-nums">{c.taxId ? formatId(c.idType, c.taxId) : "—"}</td>
                   <td className="text-ink-600">
                     {c.email ?? "—"}
                     {c.phone && <span className="block text-xs">{c.phone}</span>}

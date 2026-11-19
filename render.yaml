@@ -56,17 +56,17 @@ services:
 
       # --- Despacho y facturación (edítalos en el panel de Render cuando quieras) ---
       - key: APP_TIMEZONE
-        value: Europe/Madrid
+        value: America/Costa_Rica
       - key: FIRM_NAME
         value: Bufete Ejemplo & Asociados
       - key: FIRM_TAX_ID
-        value: B00000000
+        value: 3-101-000000
       - key: FIRM_ADDRESS
-        value: Calle Mayor 1, 28001 Madrid
+        value: San José, Costa Rica
       - key: CURRENCY
-        value: EUR
+        value: CRC
       - key: DEFAULT_TAX_RATE
-        value: "21"
+        value: "13"
 
       # --- Recordatorios: planificador interno (Render es un servidor permanente) ---
       # Con el plan gratuito el servicio se duerme tras 15 min sin visitas y el planificador se duerme con él;

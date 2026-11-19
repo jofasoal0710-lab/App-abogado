@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appLocale } from "@/lib/locale";
 import Link from "next/link";
 import { and, asc, count, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { BarList, Columns, Donut } from "@/components/charts";
@@ -145,7 +146,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div>
           <h1 className="font-serif text-2xl font-semibold text-ink-900 sm:text-3xl">Hola, {user.name.split(" ")[0]}</h1>
           <p className="mt-1 text-sm text-ink-500 first-letter:uppercase">
-            {new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {new Date().toLocaleDateString(appLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
         <div className="no-print flex flex-wrap gap-2">

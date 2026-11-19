@@ -1,4 +1,5 @@
-const LOCALE = "es-ES";
+import { appLocale } from "./locale";
+
 
 /** Fecha 'YYYY-MM-DD' (columna date) → '14/11/2026'. Sin conversiones de zona horaria. */
 export function formatDate(value: string | Date | null | undefined): string {
@@ -7,11 +8,11 @@ export function formatDate(value: string | Date | null | undefined): string {
     const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return `${m[3]}/${m[2]}/${m[1]}`;
   }
-  return new Date(value).toLocaleDateString(LOCALE);
+  return new Date(value).toLocaleDateString(appLocale());
 }
 
 export function formatDateTime(value: Date | string): string {
-  return new Date(value).toLocaleString(LOCALE, {
+  return new Date(value).toLocaleString(appLocale(), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -21,7 +22,7 @@ export function formatDateTime(value: Date | string): string {
 }
 
 export function formatTime(value: Date | string): string {
-  return new Date(value).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  return new Date(value).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 /** Hoy en formato YYYY-MM-DD (hora local del servidor). */
@@ -67,7 +68,7 @@ export function monthRange(month: string): { start: Date; end: Date } {
 
 export function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString(LOCALE, { month: "long", year: "numeric" });
+  const label = new Date(y, m - 1, 1).toLocaleDateString(appLocale(), { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

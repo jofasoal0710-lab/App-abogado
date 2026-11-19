@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appLocale } from "@/lib/locale";
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
@@ -141,7 +142,7 @@ export default async function SecurityLogPage({ searchParams }: { searchParams: 
               return (
                 <tr key={r.id} className={NOTABLE_EVENTS.has(kind) ? "bg-amber-50/40" : undefined}>
                   <td className="whitespace-nowrap px-4 py-2 text-ink-600">
-                    {r.at.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" })}
+                    {r.at.toLocaleString(appLocale(), { dateStyle: "short", timeStyle: "medium" })}
                   </td>
                   <td className="px-4 py-2">
                     {NOTABLE_EVENTS.has(kind) ? (

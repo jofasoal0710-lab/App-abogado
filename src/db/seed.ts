@@ -98,9 +98,9 @@ async function main() {
   const [c1, c2, c3] = await db
     .insert(clients)
     .values([
-      { type: "empresa", name: "Construcciones Ribera S.L.", taxId: "B12345678", email: "administracion@ribera.example", phone: "910 000 111", address: "Pol. Ind. Norte, nave 4, Alcobendas" },
-      { type: "persona", name: "Elena Marín Soto", taxId: "12345678Z", email: "elena.marin@example.com", phone: "600 123 456", address: "C/ Alcalá 120, 4ºB, Madrid" },
-      { type: "persona", name: "Javier Prieto Luna", taxId: "87654321X", email: "jprieto@example.com", phone: "611 222 333" },
+      { type: "empresa", name: "Construcciones Ribera S.A.", idType: "cedula_juridica", taxId: "3101123456", email: "administracion@ribera.example", phone: "910 000 111", address: "Pol. Ind. Norte, nave 4, Alcobendas" },
+      { type: "persona", name: "Elena Marín Soto", idType: "cedula_fisica", taxId: "112340567", birthDate: "1984-03-12", maritalStatus: "casado", email: "elena.marin@example.com", phone: "600 123 456", address: "C/ Alcalá 120, 4ºB, Madrid" },
+      { type: "persona", name: "Javier Prieto Luna", idType: "cedula_fisica", taxId: "204560789", birthDate: "1979-09-30", maritalStatus: "soltero", email: "jprieto@example.com", phone: "611 222 333" },
     ])
     .returning({ id: clients.id });
 
