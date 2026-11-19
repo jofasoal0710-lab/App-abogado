@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RegistryPanel } from "../../registros/registry-panel";
 import { ageOn, formatId, ID_TYPES, MARITAL_STATUS, type IdType, type MaritalStatus } from "@/lib/cr-id";
 import { can } from "@/lib/permissions";
 import Link from "next/link";
@@ -195,6 +196,16 @@ export default async function ClientPage({
             )}
           </section>
           )}
+        </div>
+
+        <div className="lg:col-span-3">
+          <RegistryPanel
+            target={{ clientId: client.id }}
+            defaultReference={client.taxId ? formatId(client.idType, client.taxId) : ""}
+            defaultKind={client.idType === "cedula_juridica" ? "sociedad" : "cedula"}
+            userId={user.id}
+            isPerson={client.type === "persona"}
+          />
         </div>
 
         {canManageClient && (

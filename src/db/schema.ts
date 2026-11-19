@@ -571,6 +571,31 @@ export const testimonies = pgTable("testimonies", {
   notes: text(),
 }).enableRLS();
 
+/**
+ * Consultas a registros públicos (TSE, Registro Nacional) que alguien hizo y anotó: fuente, qué se
+ * consultó, la referencia (cédula, finca, placa, cédula jurídica) y el resultado. Ligadas a un cliente o
+ * a un expediente. Los datos verificados en el TSE se pueden aplicar a la ficha del cliente.
+ */
+export const registryChecks = pgTable(
+  "registry_checks",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    clientId: integer("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    matterId: integer("matter_id").references(() => matters.id, { onDelete: "cascade" }),
+    source: text().notNull(),
+    kind: text().notNull(),
+    reference: text().notNull(),
+    result: text(),
+    /** Datos verificados en el TSE (opcionales). */
+    birthDate: date("birth_date"),
+    maritalStatus: text("marital_status"),
+    deceased: boolean(),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("registry_checks_client_idx").on(t.clientId), index("registry_checks_matter_idx").on(t.matterId)],
+).enableRLS();
+
 export const usersRelations = relations(users, ({ one }) => ({
   role: one(roles, { fields: [users.roleId], references: [roles.id] }),
 }));

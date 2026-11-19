@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RegistryPanel } from "../../registros/registry-panel";
 import { listMatterWritings } from "@/lib/writings";
 import { can } from "@/lib/permissions";
 import Link from "next/link";
@@ -33,6 +34,7 @@ const TABS = [
   ["notas", "Notas"],
   ["escritos", "Escritos"],
   ["documentos", "Documentos"],
+  ["registros", "Registros"],
   ["horas", "Horas"],
   ["agenda", "Agenda"],
   ["facturas", "Facturas"],
@@ -210,6 +212,8 @@ export default async function MatterPage({
       {tab === "escritos" && <WritingsTab matterId={id} justCreated={sp.nuevo === "1"} />}
 
       {tab === "documentos" && <DocumentsTab matterId={id} user={user} />}
+
+      {tab === "registros" && <RegistryPanel target={{ matterId: id }} defaultReference="" defaultKind="finca" userId={user.id} />}
 
       {tab === "horas" && <HoursTab matterId={id} user={user} />}
 
