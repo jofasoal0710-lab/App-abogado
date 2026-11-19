@@ -1,4 +1,5 @@
-import { getCurrentUser, canManageInvoices } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { ISO, loadRegister, registerToCsv } from "@/lib/invoice-register";
 import { todayISO } from "@/lib/dates";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("No autorizado", { status: 401 });
-  if (!canManageInvoices(user)) return new Response("No tienes permiso para exportar facturas.", { status: 403 });
+  if (!can(user, "facturacion.exportar")) return new Response("No tienes permiso para exportar facturas.", { status: 403 });
 
   const today = todayISO();
   const sp = new URL(request.url).searchParams;

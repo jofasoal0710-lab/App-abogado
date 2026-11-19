@@ -6,7 +6,7 @@ import { EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters, timeEntries, users } from "@/db/schema";
 import { clientAccessSql, getAccessibleClient, getAccessibleMatter, matterAccessSql } from "@/lib/access";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, formatDate, todayISO } from "@/lib/dates";
 import { formatDuration, formatMoney, timeAmountCents } from "@/lib/money";
@@ -19,7 +19,7 @@ export default async function NewInvoicePage({
 }: {
   searchParams: Promise<{ expediente?: string; cliente?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   const sp = await searchParams;
   const matterId = Number(sp.expediente) || null;
   const clientParam = Number(sp.cliente) || null;

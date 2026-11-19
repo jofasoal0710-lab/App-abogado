@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { config } from "@/lib/config";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { logRead } from "@/lib/read-audit";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return new Response("No autorizado", { status: 401 });
+  if (!can(user, "facturacion.ver")) return new Response("No tienes permiso para ver facturas.", { status: 403 });
 
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return new Response("No encontrado", { status: 404 });

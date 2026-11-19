@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
-import { canManageInvoices, requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
 import { ISO, REGISTER_MAX_ROWS, loadRegister } from "@/lib/invoice-register";
 import { formatMoney } from "@/lib/money";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Exportar facturas" };
 
@@ -16,7 +17,7 @@ function quarters(year: number) {
 
 export default async function ExportPage({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
   const user = await requireUser();
-  if (!canManageInvoices(user)) redirect("/facturas");
+  if (!can(user, "facturacion.exportar")) redirect("/facturas");
 
   const today = todayISO();
   const sp = await searchParams;

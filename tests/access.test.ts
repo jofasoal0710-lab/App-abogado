@@ -8,11 +8,12 @@ import {
   usersWithoutAccess,
   type AccessUser,
 } from "../src/lib/access-rules";
+import { SYSTEM_ROLES } from "../src/lib/permissions";
 
-const admin: AccessUser = { id: 1, role: "admin" };
-const lucia: AccessUser = { id: 2, role: "abogado" };
-const marcos: AccessUser = { id: 3, role: "asistente" };
-const pablo: AccessUser = { id: 4, role: "abogado" };
+const admin: AccessUser = { id: 1, permissions: SYSTEM_ROLES.admin.permissions };
+const lucia: AccessUser = { id: 2, permissions: SYSTEM_ROLES.abogado.permissions };
+const marcos: AccessUser = { id: 3, permissions: SYSTEM_ROLES.asistente.permissions };
+const pablo: AccessUser = { id: 4, permissions: SYSTEM_ROLES.abogado.permissions };
 
 const open = { visibility: "abierto" as const, responsibleId: 2 };
 const restricted = { visibility: "restringido" as const, responsibleId: 2 };

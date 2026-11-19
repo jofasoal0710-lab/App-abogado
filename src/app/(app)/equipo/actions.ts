@@ -1,20 +1,20 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { roles, users } from "@/db/schema";
 import { firstZodError, str, type ActionState } from "@/lib/actions";
 import { countSoleHolderConfidential } from "@/lib/access";
 import { notifyPasswordChanged } from "@/lib/account-mail";
-import { requireAdmin } from "@/lib/auth";
-import { roleLabels } from "@/lib/labels";
+import { requirePermission } from "@/lib/auth";
 import { parseMoneyToCents } from "@/lib/money";
 import { PASSWORD_MAX, PASSWORD_MIN } from "@/lib/passwords";
 import { logSecurityEvent, requestMeta } from "@/lib/security-log";
 import { revokeSessions } from "@/lib/session";
+import { countOtherActiveManagers, getRole, roleManagesTeam } from "@/lib/roles";
 
 const passwordSchema = z
   .string()
@@ -24,7 +24,7 @@ const passwordSchema = z
 const baseSchema = z.object({
   name: z.string().min(2, "El nombre es obligatorio").max(150),
   email: z.email("El correo electrónico no es válido").max(200),
-  role: z.enum(["admin", "abogado", "asistente"]),
+  roleId: z.number({ error: "Elige un rol" }).int().positive("Elige un rol"),
   hourlyRateCents: z.number({ error: "La tarifa por hora no es válida" }).int().nonnegative(),
 });
 
@@ -34,7 +34,7 @@ function parseBase(formData: FormData) {
   return baseSchema.safeParse({
     name: str(formData, "name"),
     email: str(formData, "email").toLowerCase(),
-    role: str(formData, "role"),
+    roleId: Number(str(formData, "roleId")) || undefined,
     hourlyRateCents: rate ?? undefined,
   });
 }
@@ -49,12 +49,14 @@ async function emailTaken(email: string, exceptId?: number) {
 }
 
 export async function createUserAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("equipo.gestionar");
   const parsed = parseBase(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const password = passwordSchema.safeParse(String(formData.get("password") ?? ""));
   if (!password.success) return { error: firstZodError(password.error) };
   if (await emailTaken(parsed.data.email)) return { error: "Ya existe un usuario con ese correo." };
+  const role = await getRole(parsed.data.roleId);
+  if (!role) return { error: "Ese rol no existe." };
 
   const [created] = await db
     .insert(users)
@@ -72,14 +74,14 @@ export async function createUserAction(_prev: ActionState, formData: FormData): 
     targetId: created.id,
     email: parsed.data.email,
     ip,
-    detail: `Rol: ${roleLabels[parsed.data.role]}`,
+    detail: `Rol: ${role.name}`,
   });
   revalidatePath("/equipo");
   return { ok: `Usuario ${parsed.data.name} creado. Al entrar por primera vez tendrá que elegir su propia contraseña.` };
 }
 
 export async function updateUserAction(id: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("equipo.gestionar");
   const parsed = parseBase(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const active = formData.get("active") === "on";
@@ -89,22 +91,20 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
   if (newPassword && id === admin.id) return { error: "Para cambiar tu propia contraseña usa «Mi cuenta»." };
   if (await emailTaken(parsed.data.email, id)) return { error: "Ya existe otro usuario con ese correo." };
   const [before] = await db
-    .select({ name: users.name, email: users.email, role: users.role, active: users.active })
+    .select({ name: users.name, email: users.email, roleId: users.roleId, roleName: roles.name, active: users.active })
     .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
     .where(eq(users.id, id));
   if (!before) return { error: "Ese usuario no existe." };
+  const newRole = await getRole(parsed.data.roleId);
+  if (!newRole) return { error: "Ese rol no existe." };
 
-  // Evita quedarse sin administradores (ni auto-bloquearse).
-  const losesAdmin = parsed.data.role !== "admin" || !active;
-  if (losesAdmin) {
-    if (id === admin.id) return { error: "No puedes quitarte a ti mismo el rol de administrador ni desactivarte." };
-    const [{ n }] = await db
-      .select({ n: count() })
-      .from(users)
-      .where(and(eq(users.role, "admin"), eq(users.active, true), ne(users.id, id)));
-    const [target] = await db.select({ role: users.role, active: users.active }).from(users).where(eq(users.id, id));
-    if (target?.role === "admin" && target.active && n === 0) {
-      return { error: "Debe quedar al menos un administrador activo." };
+  // Nunca puede quedarse la aplicación sin nadie que gestione el equipo (ni auto-bloquearse).
+  const keepsManaging = active && roleManagesTeam(newRole);
+  if (!keepsManaging) {
+    if (id === admin.id) return { error: "No puedes quitarte a ti mismo el permiso de gestionar el equipo ni desactivarte." };
+    if ((await countOtherActiveManagers({ exceptUserId: id })) === 0) {
+      return { error: "Debe quedar al menos una persona activa que pueda gestionar el equipo." };
     }
   }
 
@@ -143,8 +143,8 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
     const sent = await notifyPasswordChanged({ name: before.name, email: before.email }, { name: admin.name });
     notes.push(`deberá elegir una contraseña nueva al entrar${closed ? ` (se cerraron ${closed} sesión(es))` : ""}${sent ? "; se le ha avisado por correo" : ""}`);
   }
-  if (before.role !== parsed.data.role) {
-    await logSecurityEvent("rol_cambiado", { ...base, detail: `${roleLabels[before.role]} → ${roleLabels[parsed.data.role]}` });
+  if (before.roleId !== parsed.data.roleId) {
+    await logSecurityEvent("rol_cambiado", { ...base, detail: `${before.roleName} → ${newRole.name}` });
   }
   if (before.email.toLowerCase() !== parsed.data.email) {
     await logSecurityEvent("correo_cambiado", { ...base, detail: `${before.email} → ${parsed.data.email}` });
@@ -162,7 +162,7 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
 
 /** Cierra todas las sesiones abiertas de una persona (p. ej. si ha perdido el portátil). */
 export async function revokeUserSessionsAction(id: number, _prev: ActionState): Promise<ActionState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("equipo.gestionar");
   const closed = await revokeSessions(id);
   const { ip } = await requestMeta();
   await logSecurityEvent("sesiones_cerradas", { actorId: admin.id, targetId: id, ip, detail: `${closed} sesión(es) cerrada(s) por un administrador` });

@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { securityEvents, users } from "@/db/schema";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { isClientIpTrusted } from "@/lib/client-ip";
 import { NOTABLE_EVENTS, SECURITY_EVENT_LABELS, type SecurityEventKind } from "@/lib/security-events";
 import { SECURITY_LOG_RETENTION_DAYS } from "@/lib/security-log";
@@ -18,7 +18,7 @@ const LIMIT = 300;
 const IP_HEADERS = ["true-client-ip", "cf-connecting-ip", "x-real-ip", "x-forwarded-for", "x-nf-client-connection-ip", "fly-client-ip", "x-client-ip", "forwarded"];
 
 export default async function SecurityLogPage({ searchParams }: { searchParams: Promise<{ usuario?: string; tipo?: string }> }) {
-  await requireAdmin();
+  await requirePermission("seguridad.ver");
   const sp = await searchParams;
   const userId = Number(sp.usuario);
   const onlyNotable = sp.tipo === "importantes";

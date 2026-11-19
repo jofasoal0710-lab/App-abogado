@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import type { ActionState } from "@/lib/actions";
 import { escapeHtml } from "@/lib/reminders/logic";
 import { getReminderConfig, isSmtpConfigured } from "@/lib/reminders/config";
@@ -10,7 +10,7 @@ import { runReminders } from "@/lib/reminders/runner";
 
 /** Envía un correo de prueba al propio administrador (nunca a una dirección arbitraria). */
 export async function sendTestEmailAction(): Promise<ActionState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("recordatorios.gestionar");
   const cfg = getReminderConfig();
   if (!isSmtpConfigured(cfg)) return { error: "Configura SMTP_HOST y MAIL_FROM en el .env y reinicia la aplicación." };
   try {
@@ -27,7 +27,7 @@ export async function sendTestEmailAction(): Promise<ActionState> {
 }
 
 export async function runRemindersNowAction(): Promise<ActionState> {
-  await requireAdmin();
+  await requirePermission("recordatorios.gestionar");
   const r = await runReminders();
   revalidatePath("/recordatorios");
   if (r.status === "skipped") return { error: r.reason };

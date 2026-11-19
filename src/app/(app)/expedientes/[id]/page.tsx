@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { can } from "@/lib/permissions";
 import Link from "next/link";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -7,11 +8,11 @@ import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form";
 import { ReadBeacon } from "@/components/read-beacon";
 import { Badge, EmptyState, Field, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/db";
-import { documents, events, invoices, matterAccessLog, matterMembers, readAudit, matterNotes, matters, clients, timeEntries, users } from "@/db/schema";
+import { documents, events, invoices, matterAccessLog, matterMembers, readAudit, matterNotes, matters, clients, roles, timeEntries, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
 import { listAddableUsers, matterAccessSql } from "@/lib/access";
 import { canManageMatterAccess } from "@/lib/access-rules";
-import { canManageInvoices, requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { areaLabels, billingTypeLabels, entries, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
 import { formatDuration, formatMoney, invoiceTotals } from "@/lib/money";
@@ -22,7 +23,6 @@ import { TimeEntriesTable } from "../../horas/time-entries-table";
 import { TimeEntryForm } from "../../horas/time-entry-form";
 import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction } from "../actions";
 import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
-import { roleLabels } from "@/lib/labels";
 import { READ_VERBS } from "@/lib/read-audit";
 
 export const metadata: Metadata = { title: "Expediente" };
@@ -50,6 +50,7 @@ export default async function MatterPage({
   if (!Number.isInteger(id)) notFound();
   const sp = await searchParams;
   const tab: Tab = TABS.some(([t]) => t === sp.tab) ? (sp.tab as Tab) : "resumen";
+  const seesBilling = can(user, "facturacion.ver");
 
   const [row] = await db
     .select({ matter: matters, client: clients, responsible: users.name })
@@ -106,7 +107,7 @@ export default async function MatterPage({
             <Link href={`${base}/editar`} className="btn-secondary">
               Editar
             </Link>
-            {user.role === "admin" && (
+            {can(user, "expedientes.borrar") && (
               <form action={deleteMatterAction.bind(null, id)}>
                 <ConfirmButton message="¿Eliminar el expediente con sus notas, horas, eventos y documentos? No se puede deshacer.">
                   Eliminar
@@ -150,17 +151,21 @@ export default async function MatterPage({
           value={formatMoney(toInvoiceCents)}
           hint={matter.billingType === "tarifa_fija" ? "Honorarios fijos aún no facturados" : `${formatDuration(pending.minutes)} facturables`}
         />
-        <Stat label="Facturado (total a pagar)" value={formatMoney(invoicedCents)} hint={`${active.length} ${active.length === 1 ? "factura" : "facturas"}`} />
-        <Stat
-          label="Pendiente de cobro"
-          value={formatMoney(Math.max(0, invoicedCents - paidCents))}
-          tone={invoicedCents - paidCents > 0 ? "warn" : "default"}
-          hint={`Cobrado: ${formatMoney(paidCents)}`}
-        />
+        {seesBilling && (
+          <>
+            <Stat label="Facturado (total a pagar)" value={formatMoney(invoicedCents)} hint={`${active.length} ${active.length === 1 ? "factura" : "facturas"}`} />
+            <Stat
+              label="Pendiente de cobro"
+              value={formatMoney(Math.max(0, invoicedCents - paidCents))}
+              tone={invoicedCents - paidCents > 0 ? "warn" : "default"}
+              hint={`Cobrado: ${formatMoney(paidCents)}`}
+            />
+          </>
+        )}
       </div>
 
       <nav className="no-print mb-5 flex gap-1 overflow-x-auto border-b border-ink-200" aria-label="Secciones del expediente">
-        {TABS.map(([key, label]) => (
+        {TABS.filter(([key]) => key !== "facturas" || seesBilling).map(([key, label]) => (
           <Link
             key={key}
             href={key === "resumen" ? base : `${base}?tab=${key}`}
@@ -198,7 +203,7 @@ export default async function MatterPage({
         </section>
       )}
 
-      {tab === "notas" && <NotesTab matterId={id} userId={user.id} isAdmin={user.role === "admin"} />}
+      {tab === "notas" && <NotesTab matterId={id} userId={user.id} canDeleteAll={can(user, "notas.borrar_todas")} />}
 
       {tab === "documentos" && <DocumentsTab matterId={id} user={user} />}
 
@@ -208,11 +213,11 @@ export default async function MatterPage({
 
       {tab === "acceso" && <AccessTab matter={matter} responsibleName={row.responsible} canManage={canManage} />}
 
-      {tab === "facturas" && (
+      {tab === "facturas" && seesBilling && (
         <section className="card overflow-x-auto">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
             <h2 className="font-serif text-lg font-semibold">Facturas del expediente</h2>
-            {canManageInvoices(user) && (
+            {can(user, "facturacion.emitir") && (
               <Link href={`/facturas/nueva?expediente=${id}`} className="btn-primary btn-sm">
                 Nueva factura
               </Link>
@@ -255,7 +260,7 @@ function Item({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-async function NotesTab({ matterId, userId, isAdmin }: { matterId: number; userId: number; isAdmin: boolean }) {
+async function NotesTab({ matterId, userId, canDeleteAll }: { matterId: number; userId: number; canDeleteAll: boolean }) {
   const notes = await db
     .select({ id: matterNotes.id, body: matterNotes.body, createdAt: matterNotes.createdAt, authorId: matterNotes.authorId, author: users.name })
     .from(matterNotes)
@@ -285,7 +290,7 @@ async function NotesTab({ matterId, userId, isAdmin }: { matterId: number; userI
                   <span>
                     <strong className="text-ink-700">{n.author ?? "Usuario eliminado"}</strong> · {formatDateTime(n.createdAt)}
                   </span>
-                  {(isAdmin || n.authorId === userId) && (
+                  {(canDeleteAll || n.authorId === userId) && (
                     <form action={deleteNoteAction.bind(null, n.id, matterId)}>
                       <ConfirmButton message="¿Eliminar esta nota?" className="btn-ghost btn-sm text-red-700">
                         Borrar
@@ -399,9 +404,10 @@ async function AccessTab({
   const addedBy = alias(users, "added_by");
   const [members, addable, log, reads] = await Promise.all([
     db
-      .select({ userId: matterMembers.userId, name: users.name, role: users.role, createdAt: matterMembers.createdAt, addedBy: addedBy.name })
+      .select({ userId: matterMembers.userId, name: users.name, roleName: roles.name, createdAt: matterMembers.createdAt, addedBy: addedBy.name })
       .from(matterMembers)
       .innerJoin(users, eq(users.id, matterMembers.userId))
+      .innerJoin(roles, eq(roles.id, users.roleId))
       .leftJoin(addedBy, eq(addedBy.id, matterMembers.addedById))
       .where(eq(matterMembers.matterId, matter.id))
       .orderBy(asc(users.name)),
@@ -477,7 +483,7 @@ async function AccessTab({
               <span>
                 <strong className="text-ink-900">{m.name}</strong>
                 <span className="ml-2 text-ink-500">
-                  {roleLabels[m.role]} · miembro desde {formatDate(m.createdAt)}
+                  {m.roleName} · miembro desde {formatDate(m.createdAt)}
                   {m.addedBy && ` · añadido/a por ${m.addedBy}`}
                 </span>
               </span>
@@ -502,7 +508,7 @@ async function AccessTab({
                   </option>
                   {addable.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({roleLabels[u.role]})
+                      {u.name} ({u.roleName})
                     </option>
                   ))}
                 </select>

@@ -13,6 +13,9 @@ export const SECURITY_EVENT_LABELS = {
   usuario_desactivado: "Cuenta desactivada",
   usuario_reactivado: "Cuenta reactivada",
   sesiones_cerradas: "Sesiones cerradas",
+  rol_creado: "Rol creado",
+  rol_modificado: "Permisos de un rol modificados",
+  rol_eliminado: "Rol eliminado",
 } as const;
 
 export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
@@ -25,4 +28,6 @@ export const NOTABLE_EVENTS: ReadonlySet<SecurityEventKind> = new Set([
   "rol_cambiado",
   "correo_cambiado",
   "usuario_desactivado",
+  "rol_modificado",
+  "rol_eliminado",
 ]);

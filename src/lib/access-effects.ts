@@ -1,7 +1,8 @@
 import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db, type Db } from "@/db";
-import { events, matterMembers, matters, users } from "@/db/schema";
+import { events, matterMembers, matters, roles, users } from "@/db/schema";
+import { rolePermissionColumns, withPermissions } from "./access";
 import { logAccessChange } from "./access-log";
 import { hasMatterAccess } from "./access-rules";
 
@@ -16,12 +17,13 @@ export async function reassignLostAccessEvents(matterId: number, actorId: number
   const memberIds = (await dbx.select({ id: matterMembers.userId }).from(matterMembers).where(eq(matterMembers.matterId, matterId))).map((m) => m.id);
 
   const pending = await db
-    .select({ id: events.id, assignedId: events.assignedId, role: users.role, name: users.name })
+    .select({ id: events.id, assignedId: events.assignedId, name: users.name, ...rolePermissionColumns })
     .from(events)
     .innerJoin(users, eq(users.id, events.assignedId))
+    .innerJoin(roles, eq(roles.id, users.roleId))
     .where(and(eq(events.matterId, matterId), eq(events.completed, false), isNotNull(events.assignedId)));
 
-  const lost = pending.filter((e) => !hasMatterAccess({ id: e.assignedId!, role: e.role }, matter, memberIds));
+  const lost = pending.filter((e) => !hasMatterAccess({ ...withPermissions(e), id: e.assignedId! }, matter, memberIds));
   if (lost.length === 0) return 0;
 
   await dbx.update(events).set({ assignedId: matter.responsibleId }).where(inArray(events.id, lost.map((e) => e.id)));

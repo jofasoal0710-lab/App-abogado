@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { roleLabels } from "@/lib/labels";
 import { hashSessionId, readSessionCookie } from "@/lib/session";
 import { closeOtherSessionsAction } from "./actions";
 import { PasswordForm } from "./password-form";
@@ -35,7 +34,7 @@ export default async function AccountPage() {
 
   return (
     <>
-      <PageHeader title="Mi cuenta" subtitle={`${user.name} · ${user.email} · ${roleLabels[user.role]}`} />
+      <PageHeader title="Mi cuenta" subtitle={`${user.name} · ${user.email} · ${user.roleName}`} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card card-pad">

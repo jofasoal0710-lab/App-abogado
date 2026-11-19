@@ -14,7 +14,6 @@ import {
 
 /* ---------- Enums ---------- */
 
-export const roleEnum = pgEnum("role", ["admin", "abogado", "asistente"]);
 export const clientTypeEnum = pgEnum("client_type", ["persona", "empresa"]);
 export const matterAreaEnum = pgEnum("matter_area", [
   "civil",
@@ -76,6 +75,20 @@ export const paymentMethodEnum = pgEnum("payment_method", [
 // sin acceso; en Supabase eso cierra su API REST automática (roles «anon» y «authenticated»), que si
 // no publicaría estas tablas. Las tablas NUEVAS también deben llevar .enableRLS().
 
+/**
+ * Roles con sus permisos (ver lib/permissions.ts). Los tres de sistema (admin, abogado, asistente)
+ * nacen con la aplicación; el de administrador tiene todos los permisos y no se puede tocar.
+ */
+export const roles = pgTable("roles", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull().unique(),
+  description: text(),
+  /** «admin», «abogado» o «asistente» en los roles de sistema; null en los creados por el despacho. */
+  systemKey: text("system_key").unique(),
+  permissions: text().array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
 export const users = pgTable(
   "users",
   {
@@ -83,7 +96,9 @@ export const users = pgTable(
     name: text().notNull(),
     email: text().notNull(),
     passwordHash: text("password_hash").notNull(),
-    role: roleEnum().notNull().default("abogado"),
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "restrict" }),
     /** Tarifa horaria por defecto, en céntimos. */
     hourlyRateCents: integer("hourly_rate_cents").notNull().default(0),
     active: boolean().notNull().default(true),
@@ -456,6 +471,10 @@ export const securityEvents = pgTable(
 
 /* ---------- Relaciones ---------- */
 
+export const usersRelations = relations(users, ({ one }) => ({
+  role: one(roles, { fields: [users.roleId], references: [roles.id] }),
+}));
+
 export const clientsRelations = relations(clients, ({ many }) => ({
   matters: many(matters),
   invoices: many(invoices),
@@ -520,6 +539,7 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 /* ---------- Tipos ---------- */
 
 export type User = typeof users.$inferSelect;
+export type Role = typeof roles.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Matter = typeof matters.$inferSelect;
 export type CalendarEvent = typeof events.$inferSelect;

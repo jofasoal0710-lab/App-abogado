@@ -2,18 +2,19 @@ import "server-only";
 import { and, asc, eq, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { clients, documents, events, invoices, matterMembers, matterNotes, matters, timeEntries, users, type Client, type Matter } from "@/db/schema";
+import { clients, documents, events, invoices, matterMembers, matterNotes, matters, roles, timeEntries, users, type Client, type Matter } from "@/db/schema";
+import { can, effectivePermissions } from "./permissions";
 import type { AccessUser } from "./access-rules";
 
 /**
  * Fragmento SQL "el usuario puede ver el expediente cuyo id está en `matterIdCol`".
- * Es la traducción exacta de hasMatterAccess(). Los administradores ya NO están exentos:
- * ven los abiertos y restringidos, no los confidenciales (salvo que sean responsable o miembro).
+ * Es la traducción exacta de hasMatterAccess(). Nadie está exento: quien puede «ver restringidos» ve
+ * los abiertos y restringidos, no los confidenciales (salvo que sea responsable o miembro).
  *
  * `orNone: true` deja pasar también las filas sin expediente (eventos sueltos).
  */
 export function matterAccessSql(user: AccessUser, matterIdCol: SQLWrapper, opts: { orNone?: boolean } = {}): SQL {
-  const adminSees = user.role === "admin" ? sql`or m_acc."visibility" = 'restringido'` : sql``;
+  const adminSees = can(user, "expedientes.ver_restringidos") ? sql`or m_acc."visibility" = 'restringido'` : sql``;
   const allowed = sql`exists (
     select 1 from "matters" as m_acc
     where m_acc."id" = ${matterIdCol}
@@ -68,10 +69,24 @@ export async function requireMatterPage(user: AccessUser, matterId: number): Pro
   return m;
 }
 
+/** Columnas para calcular los permisos de otro usuario (ver withPermissions). */
+export const rolePermissionColumns = { roleSystemKey: roles.systemKey, rolePermissions: roles.permissions } as const;
+
+/** Convierte una fila con rolePermissionColumns en un usuario con sus permisos efectivos. */
+export function withPermissions<T extends { roleSystemKey: string | null; rolePermissions: string[] }>(row: T) {
+  const { roleSystemKey, rolePermissions, ...rest } = row;
+  return { ...rest, permissions: effectivePermissions({ systemKey: roleSystemKey, permissions: rolePermissions }) };
+}
+
 /** ¿Tiene acceso al expediente el usuario con este id? (p. ej. la persona a la que se asigna un evento). */
 export async function canUserIdAccessMatter(userId: number, matterId: number): Promise<boolean> {
-  const [u] = await db.select({ id: users.id, role: users.role }).from(users).where(and(eq(users.id, userId), eq(users.active, true))).limit(1);
-  return u ? (await getAccessibleMatter(u, matterId)) !== null : false;
+  const [row] = await db
+    .select({ id: users.id, ...rolePermissionColumns })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(and(eq(users.id, userId), eq(users.active, true)))
+    .limit(1);
+  return row ? (await getAccessibleMatter(withPermissions(row), matterId)) !== null : false;
 }
 
 /** Acceso a un expediente que puede ser null (evento o factura sin expediente → siempre permitido). */
@@ -126,11 +141,16 @@ export async function requireClientPage(user: AccessUser, clientId: number): Pro
   return c;
 }
 
-/** Personas que se pueden añadir a un expediente: activas y que no sean ya responsable ni miembros (los administradores también: en un confidencial no tienen acceso por rol). */
+/** Personas que se pueden añadir a un expediente: activas y que no sean ya responsable ni miembros (también quien tiene permisos amplios: en un confidencial nadie tiene acceso por rol). */
 export async function listAddableUsers(matterId: number, responsibleId: number | null) {
   const members = await db.select({ userId: matterMembers.userId }).from(matterMembers).where(eq(matterMembers.matterId, matterId));
   const taken = new Set([...members.map((m) => m.userId), ...(responsibleId ? [responsibleId] : [])]);
-  const all = await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.active, true)).orderBy(asc(users.name));
+  const all = await db
+    .select({ id: users.id, name: users.name, roleName: roles.name })
+    .from(users)
+    .innerJoin(roles, eq(roles.id, users.roleId))
+    .where(eq(users.active, true))
+    .orderBy(asc(users.name));
   return all.filter((u) => !taken.has(u.id));
 }
 

@@ -3,10 +3,15 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/db";
-import { sessions, users, type User } from "@/db/schema";
+import { roles, sessions, users, type User } from "@/db/schema";
+import { can, effectivePermissions, type Permission } from "./permissions";
 import { hashSessionId, readSessionCookie } from "./session";
 
-export type CurrentUser = Pick<User, "id" | "name" | "email" | "role" | "hourlyRateCents" | "mustChangePassword">;
+export type CurrentUser = Pick<User, "id" | "name" | "email" | "hourlyRateCents" | "mustChangePassword" | "roleId"> & {
+  roleName: string;
+  /** Permisos efectivos de su rol (ver lib/permissions.ts). */
+  permissions: Permission[];
+};
 
 /**
  * Usuario de la sesión actual. La sesión tiene que existir en la base de datos y no haber caducado
@@ -21,13 +26,17 @@ export const getSessionUser = cache(async (): Promise<CurrentUser | null> => {
       id: users.id,
       name: users.name,
       email: users.email,
-      role: users.role,
+      roleId: users.roleId,
+      roleName: roles.name,
+      roleSystemKey: roles.systemKey,
+      rolePermissions: roles.permissions,
       hourlyRateCents: users.hourlyRateCents,
       mustChangePassword: users.mustChangePassword,
       active: users.active,
     })
     .from(users)
     .innerJoin(sessions, eq(sessions.userId, users.id))
+    .innerJoin(roles, eq(roles.id, users.roleId))
     .where(
       and(
         eq(users.id, session.userId),
@@ -37,8 +46,8 @@ export const getSessionUser = cache(async (): Promise<CurrentUser | null> => {
     )
     .limit(1);
   if (!row || !row.active) return null;
-  const { active: _active, ...current } = row;
-  return current;
+  const { active: _active, roleSystemKey, rolePermissions, ...current } = row;
+  return { ...current, permissions: effectivePermissions({ systemKey: roleSystemKey, permissions: rolePermissions }) };
 });
 
 /**
@@ -58,14 +67,9 @@ export async function requireUser(): Promise<CurrentUser> {
   return user;
 }
 
-/** Para páginas y acciones reservadas a administradores. */
-export async function requireAdmin(): Promise<CurrentUser> {
+/** Para páginas y acciones que exigen un permiso: sin él, al panel con un aviso. */
+export async function requirePermission(permission: Permission): Promise<CurrentUser> {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/?error=forbidden");
+  if (!can(user, permission)) redirect("/?error=forbidden");
   return user;
-}
-
-/** Los asistentes no pueden emitir ni anular facturas. */
-export function canManageInvoices(user: CurrentUser) {
-  return user.role === "admin" || user.role === "abogado";
 }

@@ -2,7 +2,8 @@ import "server-only";
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "@/db";
-import { events, matterMembers, matters, reminderLog, users } from "@/db/schema";
+import { events, matterMembers, matters, reminderLog, roles, users } from "@/db/schema";
+import { effectivePermissions } from "../permissions";
 import { matterAccessSql } from "../access";
 import type { AccessUser } from "../access-rules";
 import { hasMatterAccess } from "../access-rules";
@@ -87,6 +88,8 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
 
   const assigned = alias(users, "assigned");
   const responsible = alias(users, "responsible");
+  const assignedRole = alias(roles, "assigned_role");
+  const responsibleRole = alias(roles, "responsible_role");
   const rows = await db
     .select({
       id: events.id,
@@ -100,13 +103,15 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
       matterVisibility: matters.visibility,
       matterResponsibleId: matters.responsibleId,
       assignedId: assigned.id,
-      assignedRole: assigned.role,
+      assignedRoleKey: assignedRole.systemKey,
+      assignedPerms: assignedRole.permissions,
       assignedName: assigned.name,
       assignedEmail: assigned.email,
       assignedActive: assigned.active,
       assignedOptIn: assigned.emailReminders,
       responsibleId: responsible.id,
-      responsibleRole: responsible.role,
+      responsibleRoleKey: responsibleRole.systemKey,
+      responsiblePerms: responsibleRole.permissions,
       responsibleName: responsible.name,
       responsibleEmail: responsible.email,
       responsibleActive: responsible.active,
@@ -116,6 +121,8 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
     .leftJoin(matters, eq(matters.id, events.matterId))
     .leftJoin(assigned, eq(assigned.id, events.assignedId))
     .leftJoin(responsible, eq(responsible.id, matters.responsibleId))
+    .leftJoin(assignedRole, eq(assignedRole.id, assigned.roleId))
+    .leftJoin(responsibleRole, eq(responsibleRole.id, responsible.roleId))
     .where(and(eq(events.completed, false), gte(events.startsAt, windowStart), lt(events.startsAt, windowEnd)));
 
   const due: { recipient: Recipient; item: DueItem }[] = [];
@@ -152,15 +159,15 @@ export async function collectDue(cfg: ReminderConfig, now: Date) {
     // Destinatario: la persona asignada; si no hay, el responsable del expediente.
     const candidate =
       r.assignedId !== null
-        ? { id: r.assignedId, role: r.assignedRole!, name: r.assignedName!, email: r.assignedEmail!, active: r.assignedActive!, optIn: r.assignedOptIn! }
+        ? { id: r.assignedId, permissions: effectivePermissions({ systemKey: r.assignedRoleKey, permissions: r.assignedPerms ?? [] }), name: r.assignedName!, email: r.assignedEmail!, active: r.assignedActive!, optIn: r.assignedOptIn! }
         : r.responsibleId !== null
-          ? { id: r.responsibleId, role: r.responsibleRole!, name: r.responsibleName!, email: r.responsibleEmail!, active: r.responsibleActive!, optIn: r.responsibleOptIn! }
+          ? { id: r.responsibleId, permissions: effectivePermissions({ systemKey: r.responsibleRoleKey, permissions: r.responsiblePerms ?? [] }), name: r.responsibleName!, email: r.responsibleEmail!, active: r.responsibleActive!, optIn: r.responsibleOptIn! }
           : null;
     const allowed =
       !candidate ||
       r.matterId === null ||
       hasMatterAccess(
-        { id: candidate.id, role: candidate.role },
+        { id: candidate.id, permissions: candidate.permissions },
         { visibility: r.matterVisibility!, responsibleId: r.matterResponsibleId },
         members.filter((m) => m.matterId === r.matterId).map((m) => m.userId),
       );

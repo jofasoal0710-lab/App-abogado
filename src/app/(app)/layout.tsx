@@ -3,7 +3,7 @@ import { Icon } from "@/components/icons";
 import { Nav, type NavItem } from "@/components/nav";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
-import { roleLabels } from "@/lib/labels";
+import { can } from "@/lib/permissions";
 import { logoutAction } from "../login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,14 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/agenda", label: "Agenda y plazos", icon: "agenda" },
     { href: "/documentos", label: "Documentos", icon: "documentos" },
     { href: "/horas", label: "Horas", icon: "horas" },
-    { href: "/facturas", label: "Facturas", icon: "facturas" },
-    ...(user.role === "admin"
-      ? ([
-          { href: "/recordatorios", label: "Recordatorios", icon: "recordatorios" },
-          { href: "/equipo", label: "Equipo", icon: "equipo" },
-          { href: "/seguridad", label: "Seguridad", icon: "seguridad" },
-        ] satisfies NavItem[])
-      : []),
+    ...(can(user, "facturacion.ver") ? [{ href: "/facturas", label: "Facturas", icon: "facturas" } satisfies NavItem] : []),
+    ...(can(user, "recordatorios.gestionar") ? [{ href: "/recordatorios", label: "Recordatorios", icon: "recordatorios" } satisfies NavItem] : []),
+    ...(can(user, "equipo.gestionar") ? [{ href: "/equipo", label: "Equipo", icon: "equipo" } satisfies NavItem] : []),
+    ...(can(user, "seguridad.ver") ? [{ href: "/seguridad", label: "Seguridad", icon: "seguridad" } satisfies NavItem] : []),
     { href: "/cuenta", label: "Mi cuenta", icon: "cuenta" },
   ];
 
@@ -60,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/cuenta" className="block truncate text-sm font-medium text-white hover:underline">
               {user.name}
             </Link>
-            <p className="text-xs text-brand-200">{roleLabels[user.role]}</p>
+            <p className="text-xs text-brand-200">{user.roleName}</p>
           </div>
           <form action={logoutAction}>
             <button className="rounded-md p-1.5 text-brand-200 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white" title="Cerrar sesión">

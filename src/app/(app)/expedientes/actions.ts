@@ -11,11 +11,12 @@ import { canAccessNote, getAccessibleClient, getAccessibleMatter, getHolders } f
 import { reassignLostAccessEvents } from "@/lib/access-effects";
 import { logAccessChange } from "@/lib/access-log";
 import { ACCESS_DENIED, CLIENT_ACCESS_DENIED, activeHolderIds, canManageMatterAccess, describeVisibility, minimumMatterVisibility } from "@/lib/access-rules";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requirePermission, requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
 import { formatNumber, nextSequence } from "@/lib/numbering";
 import { deleteFile } from "@/lib/storage";
+import { can } from "@/lib/permissions";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha no es válida");
 
@@ -98,7 +99,7 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     // acceso a lo que acaba de crear: se le añade como miembro. (Un administrador ya ve los restringidos,
     // pero no los confidenciales.)
     const creatorNeedsMembership =
-      (visibility === "restringido" && user.role !== "admin") || visibility === "confidencial";
+      (visibility === "restringido" && !can(user, "expedientes.ver_restringidos")) || visibility === "confidencial";
     if (creatorNeedsMembership && result.data.responsibleId !== user.id) {
       await tx.insert(matterMembers).values({ matterId: created.id, userId: user.id, addedById: user.id });
     }
@@ -199,9 +200,9 @@ export async function addNoteAction(
 export async function deleteNoteAction(noteId: number, matterId: number) {
   const user = await requireUser();
   if (!(await canAccessNote(user, noteId))) return;
-  // Solo el autor o un administrador pueden borrar una nota.
+  // Solo el autor, o quien tenga «borrar notas de otras personas», puede borrar una nota.
   const condition =
-    user.role === "admin"
+    can(user, "notas.borrar_todas")
       ? eq(matterNotes.id, noteId)
       : and(eq(matterNotes.id, noteId), eq(matterNotes.authorId, user.id));
   await db.delete(matterNotes).where(condition);
@@ -209,8 +210,8 @@ export async function deleteNoteAction(noteId: number, matterId: number) {
 }
 
 export async function deleteMatterAction(id: number) {
-  const user = await requireAdmin();
-  // Ser administrador no basta: sin acceso (p. ej. un confidencial) tampoco se puede borrar.
+  const user = await requirePermission("expedientes.borrar");
+  // Tener el permiso no basta: sin acceso (p. ej. un confidencial) tampoco se puede borrar.
   if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");
 
   const [{ n }] = await db.select({ n: count() }).from(invoices).where(eq(invoices.matterId, id));

@@ -8,7 +8,7 @@
  */
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
-import { count, sql } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
@@ -31,6 +31,13 @@ function isoDaysFromNow(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** id del rol de sistema (creado por la migración 0009). */
+async function systemRoleId(key: "admin" | "abogado" | "asistente"): Promise<number> {
+  const [r] = await db.select({ id: schema.roles.id }).from(schema.roles).where(eq(schema.roles.systemKey, key));
+  if (!r) throw new Error(`Falta el rol de sistema «${key}»: aplica antes las migraciones (npm run db:migrate).`);
+  return r.id;
 }
 
 async function main() {
@@ -56,7 +63,7 @@ async function main() {
         name: process.env.SEED_ADMIN_NAME ?? "Administrador",
         email: adminEmail,
         passwordHash: hash,
-        role: "admin",
+        roleId: await systemRoleId("admin"),
         hourlyRateCents: 15000,
         // En producción la contraseña inicial es provisional (está en una variable de entorno o se imprime):
         // al entrar por primera vez hay que elegir otra. Con --demo no, para poder probar sin más pasos.
@@ -82,8 +89,8 @@ async function main() {
   const [lucia, marcos] = await db
     .insert(users)
     .values([
-      { name: "Lucía Fernández", email: "lucia@bufete.local", passwordHash: demoHash, role: "abogado", hourlyRateCents: 18000 },
-      { name: "Marcos Ortega", email: "marcos@bufete.local", passwordHash: demoHash, role: "asistente", hourlyRateCents: 6000 },
+      { name: "Lucía Fernández", email: "lucia@bufete.local", passwordHash: demoHash, roleId: await systemRoleId("abogado"), hourlyRateCents: 18000 },
+      { name: "Marcos Ortega", email: "marcos@bufete.local", passwordHash: demoHash, roleId: await systemRoleId("asistente"), hourlyRateCents: 6000 },
     ])
     .returning({ id: users.id });
   console.log(`Usuarios de demo: lucia@bufete.local, marcos@bufete.local (contraseña: ${demoPassword})`);

@@ -13,6 +13,7 @@ import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { areaLabels, eventKindLabels, matterStatusLabels } from "@/lib/labels";
 import { formatDuration, formatMoney } from "@/lib/money";
+import { can } from "@/lib/permissions";
 import { qs } from "@/lib/search";
 import { EventsList } from "./agenda/events-list";
 
@@ -20,6 +21,7 @@ export const metadata: Metadata = { title: "Panel" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; mes?: string }> }) {
   const user = await requireUser();
+  const seesBilling = can(user, "facturacion.ver");
   const { error, mes } = await searchParams;
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mes ?? "") ? mes! : currentMonth();
   const { start: monthStart, end: monthEnd } = monthRange(month);
@@ -72,11 +74,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .where(and(eq(matters.responsibleId, user.id), inArray(matters.status, ["abierto", "en_curso", "en_espera"]), matterAccessSql(user, matters.id)))
       .orderBy(desc(matters.openedAt), desc(matters.id))
       .limit(6),
-    db.query.invoices.findMany({
-      where: and(eq(invoices.status, "emitida"), invoiceAccessSql(user)),
-      with: { items: true, payments: true, client: true },
-      orderBy: asc(invoices.dueDate),
-    }),
+    seesBilling
+      ? db.query.invoices.findMany({
+          where: and(eq(invoices.status, "emitida"), invoiceAccessSql(user)),
+          with: { items: true, payments: true, client: true },
+          orderBy: asc(invoices.dueDate),
+        })
+      : Promise.resolve([]),
   ]);
 
   const ACTIVE = ["abierto", "en_curso", "en_espera"] as const;
@@ -87,12 +91,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       .where(and(inArray(matters.status, [...ACTIVE]), matterAccessSql(user, matters.id)))
       .groupBy(matters.area),
     db.select({ status: matters.status, n: count() }).from(matters).where(matterAccessSql(user, matters.id)).groupBy(matters.status),
-    db
-      .select({ month: sql<string>`to_char(${payments.paidAt}, 'YYYY-MM')`, cents: sql<number>`sum(${payments.amountCents})::int` })
-      .from(payments)
-      .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
-      .where(and(gte(payments.paidAt, `${chartMonths[0]}-01`), invoiceAccessSql(user)))
-      .groupBy(sql`1`),
+    seesBilling
+      ? db
+          .select({ month: sql<string>`to_char(${payments.paidAt}, 'YYYY-MM')`, cents: sql<number>`sum(${payments.amountCents})::int` })
+          .from(payments)
+          .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+          .where(and(gte(payments.paidAt, `${chartMonths[0]}-01`), invoiceAccessSql(user)))
+          .groupBy(sql`1`)
+      : Promise.resolve([] as { month: string; cents: number }[]),
     db
       .select({ id: events.id, kind: events.kind, title: events.title, startsAt: events.startsAt, completed: events.completed })
       .from(events)
@@ -169,17 +175,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           hint={overdueEvents.n > 0 ? `${overdueEvents.n} ${overdueEvents.n === 1 ? "vencido" : "vencidos"} sin completar` : "Todo al día"}
         />
         <Stat label="Horas sin facturar" value={formatMoney(unbilled.cents)} href="/horas?todos=1" icon="horas" hint={formatDuration(unbilled.minutes)} />
-        <Stat
-          label="Pendiente de cobro"
+        {seesBilling && (
+          <Stat
+            label="Pendiente de cobro"
           value={formatMoney(outstanding)}
           href="/facturas?estado=emitida"
           icon="euro"
           tone={overdueInvoices.length ? "warn" : "default"}
           hint={overdueInvoices.length ? `${overdueInvoices.length} ${overdueInvoices.length === 1 ? "vencida" : "vencidas"} (${formatMoney(overdueAmount)})` : "Sin facturas vencidas"}
-        />
+          />
+        )}
       </div>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-3">
+      <div className={`mb-6 grid gap-6 ${seesBilling ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
         <section className="card card-pad">
           <h2 className="mb-4 font-serif text-lg font-semibold text-ink-900">Expedientes activos por área</h2>
           <Donut data={areaData} centerLabel="activos" emptyText="Aún no hay expedientes activos" />
@@ -188,6 +196,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h2 className="mb-4 font-serif text-lg font-semibold text-ink-900">Estado de los expedientes</h2>
           <BarList data={statusData} emptyText="Aún no hay expedientes" />
         </section>
+        {seesBilling && (
         <section className="card card-pad">
           <div className="mb-4 flex items-baseline justify-between gap-2">
             <h2 className="font-serif text-lg font-semibold text-ink-900">Cobros por mes</h2>
@@ -195,6 +204,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
           <Columns data={paidData} format={(c) => formatMoney(c).replace(/,\d\d\s/, " ")} emptyText="Sin cobros registrados en estos meses" />
         </section>
+        )}
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-5 lg:items-start">
@@ -273,7 +283,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={`grid gap-6 ${seesBilling ? "lg:grid-cols-2" : ""}`}>
         <section className="card">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
             <h2 className="font-serif text-lg font-semibold text-ink-900">Mis expedientes</h2>
@@ -307,6 +317,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </section>
 
+        {seesBilling && (
         <section className="card overflow-x-auto">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
             <h2 className="font-serif text-lg font-semibold text-ink-900">Facturas vencidas sin cobrar</h2>
@@ -335,6 +346,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </table>
           )}
         </section>
+        )}
       </div>
     </>
   );

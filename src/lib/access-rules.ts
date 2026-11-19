@@ -2,7 +2,9 @@
  * Reglas de acceso (puras, sin base de datos).
  * Las versiones SQL equivalentes están en access.ts (matterAccessSql / clientAccessSql): deben decir siempre lo mismo.
  */
-export type AccessUser = { id: number; role: "admin" | "abogado" | "asistente" };
+import { can, type PermissionHolder } from "./permissions";
+
+export type AccessUser = { id: number } & PermissionHolder;
 export type MatterVisibility = "abierto" | "restringido" | "confidencial";
 export type ClientVisibility = "abierto" | "confidencial";
 export type AccessMatter = { visibility: MatterVisibility; responsibleId: number | null };
@@ -13,22 +15,22 @@ export const CLIENT_ACCESS_DENIED = "No tienes acceso a este cliente.";
 /**
  * ¿Puede este usuario ver el expediente y todo lo que cuelga de él?
  *  - abierto: todo el mundo.
- *  - restringido: administradores, responsable y miembros.
- *  - confidencial: solo responsable y miembros (los administradores NO tienen atajo).
+ *  - restringido: responsable, miembros y quien tenga el permiso «ver restringidos».
+ *  - confidencial: solo responsable y miembros (ningún permiso da atajo).
  */
 export function hasMatterAccess(user: AccessUser, matter: AccessMatter, memberIds: readonly number[]): boolean {
   if (matter.visibility === "abierto") return true;
-  if (matter.visibility === "restringido" && user.role === "admin") return true;
+  if (matter.visibility === "restringido" && can(user, "expedientes.ver_restringidos")) return true;
   return matter.responsibleId === user.id || memberIds.includes(user.id);
 }
 
 /**
- * ¿Puede cambiar la visibilidad, el responsable y los miembros? Solo administradores y el responsable.
- * Se evalúa siempre DESPUÉS de comprobar el acceso: un administrador sin acceso a un expediente
- * confidencial ni siquiera llega a esta pregunta.
+ * ¿Puede cambiar la visibilidad, el responsable y los miembros? El responsable, o quien tenga el
+ * permiso «gestionar el acceso de cualquier expediente». Se evalúa siempre DESPUÉS de comprobar el
+ * acceso: sin acceso a un expediente confidencial ni siquiera se llega a esta pregunta.
  */
 export function canManageMatterAccess(user: AccessUser, matter: Pick<AccessMatter, "responsibleId">): boolean {
-  return user.role === "admin" || matter.responsibleId === user.id;
+  return can(user, "expedientes.gestionar_acceso") || matter.responsibleId === user.id;
 }
 
 /**
@@ -77,6 +79,6 @@ export const VISIBILITY_LABELS: Record<MatterVisibility, string> = {
 /** Texto del historial de acceso. */
 export function describeVisibility(v: MatterVisibility): string {
   if (v === "confidencial") return "confidencial (solo responsable y miembros; ni los administradores)";
-  if (v === "restringido") return "restringido (solo responsable, miembros y administradores)";
+  if (v === "restringido") return "restringido (solo responsable, miembros y quien pueda ver los restringidos)";
   return "abierto (todo el equipo)";
 }

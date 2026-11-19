@@ -5,6 +5,7 @@ import type { CurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatDuration, formatMoney, timeAmountCents } from "@/lib/money";
 import { deleteTimeEntryAction } from "./actions";
+import { can } from "@/lib/permissions";
 
 export type TimeRow = {
   id: number;
@@ -49,7 +50,7 @@ export function TimeEntriesTable({
         </thead>
         <tbody>
           {rows.map((r) => {
-            const canDelete = r.invoiceId === null && (user.role === "admin" || r.userId === user.id);
+            const canDelete = r.invoiceId === null && (can(user, "horas.borrar_todas") || r.userId === user.id);
             return (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">{formatDate(r.workedOn)}</td>

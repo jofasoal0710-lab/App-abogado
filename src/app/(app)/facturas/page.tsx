@@ -5,13 +5,14 @@ import { Badge, EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { clients, invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
-import { canManageInvoices, requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
 import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { entries, invoiceStatusLabels } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
 import { likePattern, pageParam, qs } from "@/lib/search";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Facturas" };
 const PAGE_SIZE = 20;
@@ -21,7 +22,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ q?: string; estado?: string; page?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const estado = sp.estado ?? "";
@@ -73,7 +74,7 @@ export default async function InvoicesPage({
         subtitle={`${total} ${total === 1 ? "factura" : "facturas"}`}
         actions={
           <>
-            {canManageInvoices(user) && (
+            {can(user, "facturacion.emitir") && (
               <Link href="/facturas/exportar" className="btn-secondary">
                 Exportar CSV
               </Link>

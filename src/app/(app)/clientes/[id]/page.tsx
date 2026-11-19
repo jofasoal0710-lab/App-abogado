@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { can } from "@/lib/permissions";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -30,7 +31,7 @@ export default async function ClientPage({
   const { error } = await searchParams;
 
   const client = await requireClientPage(user, id); // 404 si no existe o es un cliente confidencial que no ves
-  const canManageClient = user.role === "admin" || (user.role !== "asistente" && client.createdById === user.id);
+  const canManageClient = can(user, "clientes.gestionar_todos") || (can(user, "clientes.gestionar") && client.createdById === user.id);
   const accessLog = canManageClient
     ? await db
         .select({ id: clientAccessLog.id, detail: clientAccessLog.detail, createdAt: clientAccessLog.createdAt, actor: users.name })
@@ -84,7 +85,7 @@ export default async function ClientPage({
             <Link href={`/clientes/${client.id}/editar`} className="btn-secondary">
               Editar
             </Link>
-            {user.role !== "asistente" && (
+            {can(user, "clientes.gestionar") && (
               <form action={deleteClientAction.bind(null, client.id)}>
                 <ConfirmButton message="¿Eliminar este cliente? Esta acción no se puede deshacer.">
                   Eliminar
@@ -150,6 +151,7 @@ export default async function ClientPage({
             )}
           </section>
 
+          {can(user, "facturacion.ver") && (
           <section className="card overflow-x-auto">
             <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Facturas</h2>
             {clientInvoices.length === 0 ? (
@@ -178,6 +180,7 @@ export default async function ClientPage({
               </table>
             )}
           </section>
+          )}
         </div>
 
         {canManageClient && (

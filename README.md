@@ -46,25 +46,37 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 - **Horas**: registro con tarifa congelada por entrada; las facturadas quedan bloqueadas.
 - **Facturación**: borrador → emitida (número correlativo `FAC-2026-0001`) → pagada; cobros parciales, IVA y **retención IRPF** configurables, **facturas rectificativas** (serie `RECT-2026-0001`), **PDF** de cada factura y **exportación CSV** del libro de facturas (ver «Facturación» abajo).
 - **Permisos y confidencialidad**: expedientes abiertos, restringidos o confidenciales (ni los administradores), clientes confidenciales y registro de lecturas (ver abajo).
-- **Recordatorios** (solo administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
-- **Equipo** (solo administradores): altas, roles, tarifa horaria, desactivación y si recibe avisos por correo.
+- **Recordatorios** (con el permiso correspondiente; por defecto, administradores): avisos por correo de plazos, audiencias y tareas (ver abajo).
+- **Equipo** (con «gestionar el equipo»): altas, roles personalizables con sus permisos, tarifa horaria, desactivación y si recibe avisos por correo.
 
-### Roles
+### Roles y permisos
 
-| | Administrador | Abogado | Asistente |
+Cada persona tiene un **rol** y el rol decide lo que puede hacer. Los roles se gestionan en **Equipo → Roles y permisos**: se pueden crear roles propios (Socio, Contable, Becario…) marcando sus permisos con casillas. Los cambios se aplican al instante, sin volver a iniciar sesión, y quedan en el registro de seguridad.
+
+La aplicación nace con tres roles, con los mismos permisos que tenían los antiguos roles fijos:
+
+| Permiso | Administrador | Abogado/a | Asistente |
 |---|:-:|:-:|:-:|
-| Clientes, expedientes, horas, agenda, documentos (subir) | ✓ | ✓ | ✓ |
-| Eliminar clientes / documentos | ✓ | ✓ | – |
-| Eliminar expedientes, gestionar equipo | ✓ | – | – |
-| Ver expedientes **restringidos** | todos | solo si es responsable o miembro | solo si es miembro |
-| Ver expedientes **confidenciales** | solo si es responsable o miembro | ídem | ídem |
-| Cambiar visibilidad, responsable y miembros de un expediente | ✓ | solo si es su responsable | – |
-| Cambiar su propia contraseña y ver sus sesiones («Mi cuenta») | ✓ | ✓ | ✓ |
-| Restablecer contraseñas de otros, cerrar sus sesiones, ver el registro de seguridad | ✓ | – | – |
+| Ver todos los expedientes restringidos | ✓ | – | – |
+| Gestionar el acceso de cualquier expediente (sin él: solo de los que es responsable) | ✓ | – | – |
+| Eliminar expedientes · borrar notas y horas de otras personas | ✓ | – | – |
+| Gestionar clientes (alta de confidenciales, eliminar, confidencialidad de los suyos) | ✓ | ✓ | – |
+| Cambiar la confidencialidad de cualquier cliente | ✓ | – | – |
+| Eliminar documentos | ✓ | ✓ | – |
+| Ver facturas y cobros | ✓ | ✓ | ✓ |
 | Registrar cobros | ✓ | ✓ | ✓ |
-| Emitir facturas, borrar cobros | ✓ | ✓ | – |
-| Crear facturas rectificativas, exportar el libro de facturas (CSV) | ✓ | ✓ | – |
-| Descargar el PDF de una factura | ✓ (si ve el expediente/cliente) | ✓ (ídem) | ✓ (ídem) |
+| Emitir facturas, rectificativas y borrar cobros · exportar el libro (CSV) | ✓ | ✓ | – |
+| Gestionar el equipo y los roles · ver el registro de seguridad · recordatorios | ✓ | – | – |
+
+Todo el mundo puede, sea cual sea su rol: clientes, expedientes, horas, agenda y subir documentos (en lo que ve), y cambiar su propia contraseña y ver sus sesiones en «Mi cuenta».
+
+Salvaguardas:
+- El rol **Administrador** tiene siempre todos los permisos (también los que se añadan en el futuro) y no se puede modificar ni eliminar.
+- Siempre queda al menos una persona activa que puede gestionar el equipo: nadie puede quitarse ese permiso a sí mismo ni dejar a la aplicación sin gestores.
+- Un rol solo se elimina si nadie lo tiene asignado; los tres de sistema no se eliminan.
+- Sin «ver facturas y cobros» desaparecen el menú Facturas, los importes del panel y la pestaña Facturas de los expedientes, y las rutas y el PDF responden 403.
+- **Ningún permiso abre los confidenciales**: solo los ven su responsable y sus miembros.
+- Quien puede gestionar el equipo puede darse cualquier permiso: dáselo solo a quien administre la aplicación.
 
 ## Permisos y confidencialidad
 
@@ -73,7 +85,7 @@ Variables del administrador inicial: `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, 
 | Nivel | Quién lo ve |
 |---|---|
 | **Abierto** (por defecto) | Todo el equipo |
-| **Restringido** | Responsable, miembros añadidos y administradores |
+| **Restringido** | Responsable, miembros añadidos y quien tenga «ver todos los expedientes restringidos» (por defecto, administradores) |
 | **Confidencial** | Solo responsable y miembros. **Ni los administradores** (muralla china) |
 
 Se elige al crear el expediente y se cambia en la pestaña *Acceso* (solo el responsable y los administradores *con acceso*). Esa pestaña muestra quién tiene acceso, un **historial** de cambios (visibilidad, miembros, responsable, reasignaciones, reclamaciones) y las **lecturas recientes**.

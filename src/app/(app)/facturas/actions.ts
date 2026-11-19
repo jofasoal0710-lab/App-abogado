@@ -9,7 +9,7 @@ import { invoiceItems, invoices, matters, payments, timeEntries, type Invoice } 
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
 import { canAccessInvoice, getAccessibleClient, getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED, CLIENT_ACCESS_DENIED } from "@/lib/access-rules";
-import { canManageInvoices, requireUser, type CurrentUser } from "@/lib/auth";
+import { requirePermission, type CurrentUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { addDaysISO, todayISO } from "@/lib/dates";
 import { invoiceTotals, parseDurationToMinutes, parseMoneyToCents, parseQuantityToHundredths } from "@/lib/money";
@@ -17,6 +17,7 @@ import { BusinessError } from "@/lib/invoice-errors";
 import { loadAdjustments, netTotal, reconcileStatus, type Db } from "@/lib/invoice-queries";
 import { INVOICE_PREFIX, RECTIFICATION_PREFIX, canRectify, exceedsOriginal, negateItems } from "@/lib/rectification";
 import { formatNumber, nextSequence } from "@/lib/numbering";
+import { can } from "@/lib/permissions";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha no es válida");
 const headerSchema = z
@@ -54,7 +55,7 @@ function refresh(id?: number) {
 /* ---------- Crear factura (borrador) ---------- */
 
 export async function createInvoiceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
 
   const clientId = intOrNull(formData, "clientId");
   const matterId = intOrNull(formData, "matterId");
@@ -182,7 +183,7 @@ export async function updateInvoiceHeaderAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   await requireDraft(id, user);
   const header = parseHeader(formData);
   if (!header.success) return { error: firstZodError(header.error) };
@@ -201,7 +202,7 @@ const itemSchema = z.object({
 });
 
 export async function addItemAction(invoiceId: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   const draft = await requireDraft(invoiceId, user);
 
   const unit = str(formData, "unit") === "horas" ? "horas" : "unidades";
@@ -238,7 +239,7 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
 }
 
 export async function deleteItemAction(invoiceId: number, itemId: number) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   await requireDraft(invoiceId, user);
   const failed = await editDraft(invoiceId, async (tx) => {
     const [item] = await tx
@@ -255,7 +256,7 @@ export async function deleteItemAction(invoiceId: number, itemId: number) {
 }
 
 export async function deleteDraftAction(id: number) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   await requireDraft(id, user);
   const failed = await editDraft(id, (tx) => tx.delete(invoices).where(eq(invoices.id, id))); // time_entries.invoice_id → NULL por la FK
   if (failed) redirect(`/facturas/${id}?error=${failed.code}`);
@@ -266,9 +267,9 @@ export async function deleteDraftAction(id: number) {
 /* ---------- Emisión, cobros y anulación ---------- */
 
 export async function emitInvoiceAction(id: number) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   if (!(await canAccessInvoice(user, id))) redirect("/facturas");
-  if (!canManageInvoices(user)) redirect(`/facturas/${id}?error=forbidden`);
+  if (!can(user, "facturacion.emitir")) redirect(`/facturas/${id}?error=forbidden`);
 
   let error: string | null = null;
   try {
@@ -340,7 +341,7 @@ export async function registerPaymentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.cobros");
   if (!(await canAccessInvoice(user, invoiceId))) return { error: ACCESS_DENIED };
   const amount = parseMoneyToCents(str(formData, "amount"));
   const parsed = paymentSchema.safeParse({
@@ -380,9 +381,9 @@ export async function registerPaymentAction(
 }
 
 export async function deletePaymentAction(invoiceId: number, paymentId: number) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   if (!(await canAccessInvoice(user, invoiceId))) redirect("/facturas");
-  if (!canManageInvoices(user)) redirect(`/facturas/${invoiceId}?error=forbidden`);
+  if (!can(user, "facturacion.emitir")) redirect(`/facturas/${invoiceId}?error=forbidden`);
   await db.transaction(async (tx) => {
     await tx.delete(payments).where(and(eq(payments.id, paymentId), eq(payments.invoiceId, invoiceId)));
     await reconcileStatus(tx, invoiceId);
@@ -398,8 +399,8 @@ export async function deletePaymentAction(invoiceId: number, paymentId: number) 
  * indica el motivo. Con «total» las líneas son las de la original con el signo cambiado (un abono).
  */
 export async function createRectificationAction(invoiceId: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
-  if (!canManageInvoices(user)) return { error: "No tienes permiso para realizar esta acción." };
+  const user = await requirePermission("facturacion.ver");
+  if (!can(user, "facturacion.emitir")) return { error: "No tienes permiso para realizar esta acción." };
   if (!(await canAccessInvoice(user, invoiceId))) return { error: ACCESS_DENIED };
 
   const reason = str(formData, "reason");

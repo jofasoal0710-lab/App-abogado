@@ -5,6 +5,7 @@ import type { CurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
 import { formatBytes } from "@/lib/file-types";
 import { deleteDocumentAction } from "./actions";
+import { can } from "@/lib/permissions";
 
 export type DocRow = {
   id: number;
@@ -61,7 +62,7 @@ export function DocumentsTable({
               <td className="whitespace-nowrap">{formatDate(d.createdAt)}</td>
               <td className="whitespace-nowrap text-right tabular-nums">{formatBytes(d.sizeBytes)}</td>
               <td>
-                {user.role !== "asistente" && (
+                {can(user, "documentos.borrar") && (
                   <form action={deleteDocumentAction.bind(null, d.id)}>
                     <ConfirmButton message={`¿Eliminar «${d.name}»? El archivo se borrará definitivamente.`} className="btn-ghost btn-sm text-red-700">
                       Borrar

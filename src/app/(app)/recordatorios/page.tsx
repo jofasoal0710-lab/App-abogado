@@ -6,7 +6,7 @@ import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { events, matters, reminderLog } from "@/db/schema";
 import { matterAccessSql } from "@/lib/access";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { formatDate, formatDateTime, formatTime, relativeDays } from "@/lib/dates";
 import { eventKindLabels } from "@/lib/labels";
 import { getReminderConfig, isSmtpConfigured } from "@/lib/reminders/config";
@@ -22,7 +22,7 @@ function describeOffsets(offsets: number[]): string {
 }
 
 export default async function RemindersPage() {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("recordatorios.gestionar");
   const cfg = getReminderConfig();
   const smtpOk = isSmtpConfigured(cfg);
 

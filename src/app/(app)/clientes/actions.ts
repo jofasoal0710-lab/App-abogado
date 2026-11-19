@@ -12,6 +12,7 @@ import { logAccessChange, logClientAccessChange } from "@/lib/access-log";
 import { CLIENT_ACCESS_DENIED, describeVisibility } from "@/lib/access-rules";
 import { firstZodError, optStr, str, type ActionState } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 
 const clientSchema = z.object({
   type: z.enum(["persona", "empresa"]),
@@ -40,8 +41,8 @@ export async function createClientAction(_prev: ActionState, formData: FormData)
   const parsed = parseClient(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
 
-  // Solo administradores y abogados pueden dar de alta un cliente confidencial.
-  const visibility = str(formData, "visibility") === "confidencial" && user.role !== "asistente" ? "confidencial" : "abierto";
+  // Solo con el permiso «gestionar clientes» se puede dar de alta un cliente confidencial.
+  const visibility = str(formData, "visibility") === "confidencial" && can(user, "clientes.gestionar") ? "confidencial" : "abierto";
   const row = await db.transaction(async (tx) => {
     const [created] = await tx.insert(clients).values({ ...parsed.data, visibility, createdById: user.id }).returning({ id: clients.id });
     if (visibility === "confidencial") await logClientAccessChange(created.id, user.id, "Cliente creado como confidencial", tx);
@@ -69,7 +70,7 @@ export async function updateClientAction(
 export async function deleteClientAction(id: number) {
   const user = await requireUser();
   if (!(await getAccessibleClient(user, id))) redirect("/clientes");
-  if (user.role === "asistente") redirect(`/clientes/${id}?error=forbidden`);
+  if (!can(user, "clientes.gestionar")) redirect(`/clientes/${id}?error=forbidden`);
 
   const [{ m }] = await db.select({ m: count() }).from(matters).where(eq(matters.clientId, id));
   const [{ i }] = await db.select({ i: count() }).from(invoices).where(eq(invoices.clientId, id));
@@ -89,7 +90,7 @@ export async function setClientVisibilityAction(clientId: number, _prev: ActionS
   const user = await requireUser();
   const client = await getAccessibleClient(user, clientId);
   if (!client) return { error: CLIENT_ACCESS_DENIED };
-  if (user.role === "asistente" || !(user.role === "admin" || client.createdById === user.id)) {
+  if (!(can(user, "clientes.gestionar_todos") || (can(user, "clientes.gestionar") && client.createdById === user.id))) {
     return { error: "Solo quien dio de alta al cliente o un administrador con acceso puede cambiar su confidencialidad." };
   }
   const target = str(formData, "visibility") === "confidencial" ? "confidencial" : "abierto";

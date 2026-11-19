@@ -13,6 +13,7 @@ import { ALLOWED_TYPES, formatBytes, mimeForFilename, sanitizeFilename } from "@
 import { isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { deleteFile, newStorageKey, objectSize, presignUpload, saveFile, storageDriver } from "@/lib/storage";
 import { signUploadToken, verifyUploadToken } from "@/lib/upload-token";
+import { can } from "@/lib/permissions";
 
 export async function uploadDocumentAction(
   matterId: number,
@@ -63,7 +64,7 @@ export async function uploadDocumentAction(
 
 export async function deleteDocumentAction(documentId: number) {
   const user = await requireUser();
-  if (user.role === "asistente") return;
+  if (!can(user, "documentos.borrar")) return;
   if (!(await canAccessDocument(user, documentId))) return;
 
   const [doc] = await db.delete(documents).where(eq(documents.id, documentId)).returning();

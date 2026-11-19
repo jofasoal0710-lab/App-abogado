@@ -11,7 +11,7 @@ import { getAccessibleMatter, getHolders, listOrphanConfidentialMatters } from "
 import { reassignLostAccessEvents } from "@/lib/access-effects";
 import { logAccessChange } from "@/lib/access-log";
 import { ACCESS_DENIED, activeHolderIds, canManageMatterAccess, describeVisibility } from "@/lib/access-rules";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requirePermission, requireUser } from "@/lib/auth";
 
 /** Solo administradores (con acceso) y el responsable pueden gestionar el acceso. Devuelve el expediente o un error. */
 async function loadManageable(matterId: number) {
@@ -123,7 +123,7 @@ export async function removeMemberAction(matterId: number, userId: number) {
  * en el historial. Solo funciona si de verdad está huérfano; no es una puerta trasera para los demás.
  */
 export async function claimOrphanMatterAction(matterId: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("expedientes.gestionar_acceso");
   const reason = str(formData, "reason");
   if (reason.length < 10) return { error: "Indica el motivo (mínimo 10 caracteres): quedará registrado en el expediente." };
 

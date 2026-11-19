@@ -11,6 +11,7 @@ import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseDurationToMinutes, parseMoneyToCents } from "@/lib/money";
+import { can } from "@/lib/permissions";
 
 const entrySchema = z.object({
   matterId: z.number({ error: "Selecciona un expediente" }).int().positive("Selecciona un expediente"),
@@ -53,8 +54,8 @@ export async function addTimeEntryAction(_prev: ActionState, formData: FormData)
 export async function deleteTimeEntryAction(entryId: number) {
   const user = await requireUser();
   if (!(await canAccessTimeEntry(user, entryId))) return;
-  // Solo se pueden borrar entradas no facturadas; el autor o un administrador.
-  const own = user.role === "admin" ? undefined : eq(timeEntries.userId, user.id);
+  // Solo se pueden borrar entradas no facturadas; el autor o quien pueda «borrar horas de otras personas».
+  const own = can(user, "horas.borrar_todas") ? undefined : eq(timeEntries.userId, user.id);
   const [deleted] = await db
     .delete(timeEntries)
     .where(and(eq(timeEntries.id, entryId), isNull(timeEntries.invoiceId), own))

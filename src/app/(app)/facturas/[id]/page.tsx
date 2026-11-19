@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { can } from "@/lib/permissions";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -8,7 +9,7 @@ import { Badge, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
-import { canManageInvoices, requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { formatDate, todayISO } from "@/lib/dates";
 import { invoiceErrorMessage } from "@/lib/invoice-errors";
@@ -37,7 +38,7 @@ export default async function InvoicePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requirePermission("facturacion.ver");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const { error } = await searchParams;
@@ -60,7 +61,7 @@ export default async function InvoicePage({
   const s = summarizeInvoice(inv, today, adjustment);
   const isRectification = inv.kind === "rectificativa";
   const isDraft = inv.status === "borrador";
-  const manage = canManageInvoices(user);
+  const manage = can(user, "facturacion.emitir");
   const errorMessage = invoiceErrorMessage(error);
 
   const label = inv.number ?? `Borrador #${inv.id}`;
@@ -339,7 +340,7 @@ export default async function InvoicePage({
             )}
           </div>
 
-          {inv.status === "emitida" && (
+          {inv.status === "emitida" && can(user, "facturacion.cobros") && (
             <ActionForm action={registerPaymentAction.bind(null, inv.id)} resetOnSuccess className="card card-pad">
               <h2 className="mb-3 font-serif text-lg font-semibold">Registrar cobro</h2>
               <div className="grid gap-3 sm:grid-cols-2">

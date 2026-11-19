@@ -64,6 +64,20 @@
       "when": 1795031946581,
       "tag": "0008_marvelous_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795108559046,
+      "tag": "0009_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795108562777,
+      "tag": "0010_roles_required",
+      "breakpoints": true
     }
   ]
 }
