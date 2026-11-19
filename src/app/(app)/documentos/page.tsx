@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import Link from "next/link";
+import { Icon } from "@/components/icons";
 import { PageHeader, Pagination } from "@/components/ui";
 import { db } from "@/db";
 import { documents, matters, users } from "@/db/schema";
@@ -63,7 +64,13 @@ export default async function DocumentsPage({
     <>
       <PageHeader
         title="Documentos"
-        subtitle="Los documentos se suben desde la pestaña «Documentos» de cada expediente."
+        subtitle="Todos los documentos de los expedientes a los que tienes acceso."
+        actions={
+          <Link href="/documentos/subir" className="btn-primary">
+            <Icon name="subir" className="h-4 w-4" />
+            Subir documento
+          </Link>
+        }
       />
       <form className="mb-4 flex gap-2" role="search">
         <input className="input max-w-sm" type="search" name="q" defaultValue={q} placeholder="Buscar por nombre, categoría o expediente" />

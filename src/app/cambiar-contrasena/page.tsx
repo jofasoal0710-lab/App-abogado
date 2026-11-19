@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Icon } from "@/components/icons";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { config } from "@/lib/config";
@@ -19,13 +20,16 @@ export default async function ForcedPasswordChangePage({ searchParams }: { searc
   const { next } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-brand-700 px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <p className="font-serif text-3xl font-semibold text-ink-900">{config.firmName}</p>
-          <p className="mt-1 text-sm text-ink-500">Elige tu contraseña</p>
+          <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-brand-700">
+            <Icon name="balanza" className="h-6 w-6" />
+          </span>
+          <p className="font-serif text-3xl font-semibold text-white">{config.firmName}</p>
+          <p className="mt-1 text-sm text-brand-100">Elige tu contraseña</p>
         </div>
-        <div className="card card-pad">
+        <div className="card card-pad shadow-xl shadow-brand-900/30">
           <p className="mb-4 text-sm text-ink-700">
             Hola {user.name}. Antes de continuar tienes que elegir una contraseña que solo conozcas tú: la que tienes ahora es
             provisional (te la dio un administrador o se configuró al instalar la aplicación). Escríbela en «Contraseña actual».
@@ -33,7 +37,7 @@ export default async function ForcedPasswordChangePage({ searchParams }: { searc
           <PasswordForm next={safeNext(next)} submitLabel="Guardar y entrar" />
         </div>
         <form action={logoutAction} className="mt-4 text-center">
-          <button className="text-sm text-ink-500 hover:text-ink-800">Salir sin cambiarla</button>
+          <button className="text-sm text-brand-100 hover:text-white">Salir sin cambiarla</button>
         </form>
       </div>
     </main>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Icon } from "@/components/icons";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Field } from "@/components/ui";
 import { redirect } from "next/navigation";
@@ -20,13 +21,16 @@ export default async function LoginPage({
   if (user?.mustChangePassword) redirect("/cambiar-contrasena");
   if (user) redirect(safeNext(next));
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-brand-700 px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="font-serif text-3xl font-semibold text-ink-900">{config.firmName}</p>
-          <p className="mt-1 text-sm text-ink-500">Acceso al sistema de gestión</p>
+          <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-brand-700">
+            <Icon name="balanza" className="h-6 w-6" />
+          </span>
+          <p className="font-serif text-3xl font-semibold text-white">{config.firmName}</p>
+          <p className="mt-1 text-sm text-brand-100">Acceso al sistema de gestión</p>
         </div>
-        <div className="card card-pad">
+        <div className="card card-pad shadow-xl shadow-brand-900/30">
           <ActionForm action={loginAction} className="space-y-4">
             <input type="hidden" name="next" value={next ?? ""} />
             <Field label="Correo electrónico">

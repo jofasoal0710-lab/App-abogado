@@ -3,21 +3,28 @@
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --color-ink-50: #f6f7f9;
-  --color-ink-100: #eceef2;
-  --color-ink-200: #d9dde5;
-  --color-ink-300: #b9c0cd;
-  --color-ink-400: #8892a5;
-  --color-ink-500: #5d6879;
-  --color-ink-600: #444d5c;
-  --color-ink-700: #333a46;
-  --color-ink-800: #1f2530;
-  --color-ink-900: #141922;
-  --color-brand-50: #eef3fb;
-  --color-brand-100: #d7e3f6;
-  --color-brand-500: #2f5fa8;
-  --color-brand-600: #254d8a;
-  --color-brand-700: #1d3d6e;
+  /* Tinta: grises con un punto de azul, para que convivan con la marca. */
+  --color-ink-50: #f3f6fb;
+  --color-ink-100: #e8edf5;
+  --color-ink-200: #d5dce8;
+  --color-ink-300: #b4bfd0;
+  --color-ink-400: #8592a8;
+  --color-ink-500: #5a6780;
+  --color-ink-600: #434e63;
+  --color-ink-700: #323b4d;
+  --color-ink-800: #1f2737;
+  --color-ink-900: #131a28;
+  /* Azul del despacho: el menú lateral es brand-700; botones y enlaces, brand-600. */
+  --color-brand-50: #eef4fe;
+  --color-brand-100: #d9e7fc;
+  --color-brand-200: #b4cef7;
+  --color-brand-300: #84aeee;
+  --color-brand-400: #4f86e0;
+  --color-brand-500: #2a68d1;
+  --color-brand-600: #1f57b8;
+  --color-brand-700: #1a4794;
+  --color-brand-800: #163a77;
+  --color-brand-900: #112d5c;
   --color-gold-500: #b8893a;
 }
 
@@ -33,21 +40,21 @@ body { @apply bg-ink-50 text-ink-800 antialiased; }
 }
 
 @layer components {
-  .card { @apply min-w-0 rounded-lg border border-ink-200 bg-white shadow-xs; }
+  .card { @apply min-w-0 rounded-xl border border-ink-200/80 bg-white; }
   .card-pad { @apply p-5; }
 
-  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+  .btn-primary { @apply btn bg-brand-600 text-white shadow-xs hover:bg-brand-700; }
   .btn-secondary { @apply btn border border-ink-300 bg-white text-ink-700 hover:bg-ink-50; }
   .btn-danger { @apply btn border border-red-300 bg-white text-red-700 hover:bg-red-50; }
   .btn-ghost { @apply btn text-ink-600 hover:bg-ink-100; }
   .btn-sm { @apply px-2.5 py-1.5 text-xs; }
 
   .input { @apply block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-2 focus:outline-brand-500/30 disabled:bg-ink-100; }
-  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500; }
+  .label { @apply mb-1 block text-sm font-medium text-ink-700; }
   .hint { @apply mt-1 text-xs text-ink-500; }
 
   .table { @apply w-full text-left text-sm; }
-  .table thead th { @apply border-b border-ink-200 bg-ink-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-500; }
+  .table thead th { @apply border-b border-ink-200 bg-ink-50 px-4 py-2.5 text-xs font-semibold text-ink-600; }
   .table tbody td { @apply border-b border-ink-100 px-4 py-3 align-top; }
   .table tbody tr:last-child td { @apply border-b-0; }
   .table tbody tr.row-link:hover { @apply bg-brand-50/60; }

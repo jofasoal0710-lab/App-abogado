@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon, type IconName } from "./icons";
 
 export function PageHeader({
   title,
@@ -60,24 +61,39 @@ export function Stat({
   value,
   hint,
   href,
+  icon,
   tone = "default",
 }: {
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
   href?: string;
+  icon?: IconName;
   tone?: "default" | "warn" | "danger";
 }) {
-  const color =
-    tone === "danger" ? "text-red-700" : tone === "warn" ? "text-amber-700" : "text-ink-900";
+  const color = tone === "danger" ? "text-red-700" : tone === "warn" ? "text-amber-700" : "text-ink-900";
+  const chip = tone === "danger" ? "bg-red-50 text-red-600" : tone === "warn" ? "bg-amber-50 text-amber-700" : "bg-brand-50 text-brand-600";
   const body = (
-    <div className="card card-pad h-full transition-shadow hover:shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p>
-      <p className={`mt-2 font-serif text-3xl font-semibold ${color}`}>{value}</p>
+    <div className={`card card-pad h-full transition-colors ${href ? "hover:border-brand-300" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-ink-600">{label}</p>
+        {icon && (
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${chip}`}>
+            <Icon name={icon} className="h-5 w-5" />
+          </span>
+        )}
+      </div>
+      <p className={`mt-1 font-serif text-3xl font-semibold tabular-nums ${color}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? (
+    <Link href={href} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
 }
 
 const matterStatusTone: Record<string, string> = {
