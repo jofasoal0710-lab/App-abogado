@@ -361,7 +361,7 @@ async function HoursTab({ matterId, user }: { matterId: number; user: Awaited<Re
     <div className="space-y-4">
       <TimeEntryForm matterId={matterId} defaultRateCents={user.hourlyRateCents} />
       <div className="card">
-        <TimeEntriesTable rows={rows} user={user} showMatter={false} />
+        <TimeEntriesTable rows={rows} user={user} showMatter={false} returnTo={`/expedientes/${matterId}?tab=horas`} />
       </div>
     </div>
   );
