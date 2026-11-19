@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PasswordInput } from "@/components/password-input";
 import { Icon } from "@/components/icons";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Field } from "@/components/ui";
@@ -37,7 +38,7 @@ export default async function LoginPage({
               <input className="input" type="email" name="email" autoComplete="username" required autoFocus />
             </Field>
             <Field label="Contraseña">
-              <input className="input" type="password" name="password" autoComplete="current-password" required />
+              <PasswordInput name="password" autoComplete="current-password" required />
             </Field>
             <SubmitButton className="btn-primary w-full" pendingText="Entrando…">
               Entrar

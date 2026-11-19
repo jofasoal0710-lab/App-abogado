@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PasswordInput } from "@/components/password-input";
 import Link from "next/link";
 import { asc, count, gt, sql } from "drizzle-orm";
 import { ActionForm, SubmitButton } from "@/components/form";
@@ -292,7 +293,7 @@ function UserForm({
               : "Deberá cambiarla por una suya al entrar por primera vez. Mínimo 10 caracteres."
           }
         >
-          <input className="input" type="password" name="password" autoComplete="new-password" required={!user} />
+          <PasswordInput name="password" autoComplete="new-password" required={!user} />
         </Field>
         <div className="space-y-2 self-end pb-2 text-sm text-ink-700">
           {user && (
