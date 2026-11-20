@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ConfirmButton } from "@/components/form";
 import { Badge, EmptyState } from "@/components/ui";
 import type { eventKindEnum } from "@/db/schema";
-import { daysUntil, formatDate, formatTime, relativeDays } from "@/lib/dates";
+import { dayKey, daysUntil, formatDate, formatTime, todayISO } from "@/lib/dates";
+import { countdown, URGENCY, urgencyOf } from "@/lib/deadlines";
 import { eventKindLabels } from "@/lib/labels";
 import { deleteEventAction, toggleEventAction } from "./actions";
 
@@ -31,13 +32,16 @@ export function EventsList({
   empty?: string;
 }) {
   if (rows.length === 0) return <EmptyState title={empty} />;
+  const today = todayISO();
   return (
     <ul className="divide-y divide-ink-100">
       {rows.map((e) => {
         const days = daysUntil(e.startsAt);
-        const overdue = !e.completed && days < 0 && (e.kind === "plazo" || e.kind === "tarea");
+        const urgency = urgencyOf(days, e.completed);
+        const u = URGENCY[urgency];
         return (
-          <li key={e.id} className="flex flex-wrap items-start gap-3 px-5 py-3">
+          <li key={e.id} className="relative flex flex-wrap items-start gap-3 py-3 pl-6 pr-5">
+            <span className={`absolute inset-y-2 left-2 w-1 rounded-full ${u.bar}`} aria-hidden="true" />
             <form action={toggleEventAction.bind(null, e.id)}>
               <button
                 aria-label={e.completed ? "Marcar como pendiente" : "Marcar como completado"}
@@ -54,7 +58,11 @@ export function EventsList({
               <p className="mt-0.5 text-xs text-ink-500">
                 {formatDate(e.startsAt)} · {formatTime(e.startsAt)}
                 {e.endsAt && `–${formatTime(e.endsAt)}`}
-                {!e.completed && <span className={overdue ? "ml-1 font-semibold text-red-700" : "ml-1"}>({relativeDays(days)})</span>}
+                {!e.completed && (
+                  <span className={`ml-1 ${urgency === "vencido" || urgency === "hoy" ? "font-semibold text-red-700" : urgency === "pronto" ? "font-medium text-amber-800" : ""}`}>
+                    · {countdown(dayKey(e.startsAt), today, days, e.completed)}
+                  </span>
+                )}
                 {e.location && ` · ${e.location}`}
                 {e.assignedName && ` · ${e.assignedName}`}
                 {showMatter && e.matterId && e.matterNumber && (

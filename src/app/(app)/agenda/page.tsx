@@ -7,7 +7,9 @@ import { events, matters, users } from "@/db/schema";
 import { eventSelect } from "@/lib/agenda-data";
 import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
-import { buildMonthGrid, currentMonth, dayKey, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { buildMonthGrid, currentMonth, dayKey, daysUntil, formatTime, monthLabel, monthRange, shiftMonth, todayISO } from "@/lib/dates";
+import { holidayName } from "@/lib/cr-holidays";
+import { URGENCY, urgencyOf } from "@/lib/deadlines";
 import { qs } from "@/lib/search";
 import { EventsList } from "./events-list";
 
@@ -24,7 +26,7 @@ const kindDot: Record<string, string> = {
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; mios?: string }>;
+  searchParams: Promise<{ mes?: string; mios?: string; vista?: string; semana?: string }>;
 }) {
   const user = await requireUser();
   const sp = await searchParams;
@@ -38,6 +40,42 @@ export default async function AgendaPage({
     .from(events)
     .leftJoin(matters, eq(matters.id, events.matterId))
     .leftJoin(users, eq(users.id, events.assignedId));
+
+  // Vista semanal: del lunes de la semana pedida (o la actual) al domingo.
+  const weekView = sp.vista === "semana";
+  const today0 = todayISO();
+  const mondayOf = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return todayISO(d);
+  };
+  const weekStart = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(sp.semana ?? "") ? sp.semana! : today0);
+  const addDaysIso = (iso: string, n: number) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + n);
+    return todayISO(d);
+  };
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i));
+  const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
+  const in8 = new Date(startOfToday.getTime() + 8 * 86_400_000);
+
+  const [weekEvents, upcoming] = await Promise.all([
+    weekView
+      ? base
+          .where(and(gte(events.startsAt, new Date(`${weekStart}T00:00:00`)), lt(events.startsAt, new Date(`${addDaysIso(weekStart, 7)}T00:00:00`)), mineFilter, accessFilter))
+          .orderBy(asc(events.startsAt))
+      : Promise.resolve([]),
+    db
+      .select({ startsAt: events.startsAt })
+      .from(events)
+      .leftJoin(matters, eq(matters.id, events.matterId))
+      .where(and(eq(events.completed, false), gte(events.startsAt, startOfToday), lt(events.startsAt, in8), mineFilter, accessFilter)),
+  ]);
+  const counts = { hoy: 0, pronto: 0, semana: 0 };
+  for (const e of upcoming) {
+    const u = urgencyOf(daysUntil(e.startsAt), false);
+    if (u === "hoy" || u === "pronto" || u === "semana") counts[u]++;
+  }
 
   const [monthEvents, overdue] = await Promise.all([
     base.where(and(gte(events.startsAt, start), lt(events.startsAt, end), mineFilter, accessFilter)).orderBy(asc(events.startsAt)),
@@ -80,6 +118,25 @@ export default async function AgendaPage({
         }
       />
 
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(
+          [
+            ["vencido", overdue.length, "vencidos sin completar"],
+            ["hoy", counts.hoy, "vencen hoy"],
+            ["pronto", counts.pronto, "mañana o pasado"],
+            ["semana", counts.semana, "resto de la semana"],
+          ] as const
+        ).map(([k, n, label]) => (
+          <div key={k} className={`card flex items-center gap-3 px-4 py-3 ${n > 0 && (k === "vencido" || k === "hoy") ? "ring-1 ring-red-200" : ""}`}>
+            <span className={`h-3 w-3 shrink-0 rounded-full ${URGENCY[k].dot}`} aria-hidden="true" />
+            <span>
+              <span className="block text-2xl font-semibold tabular-nums text-ink-900">{n}</span>
+              <span className="text-xs text-ink-600">{label}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+
       {overdue.length > 0 && (
         <section className="mb-6 overflow-hidden rounded-lg border border-red-200 bg-red-50/50">
           <h2 className="border-b border-red-200 px-5 py-2.5 text-sm font-semibold text-red-800">
@@ -101,12 +158,72 @@ export default async function AgendaPage({
             Siguiente →
           </Link>
         </div>
-        <Link className="link text-sm" href={`/agenda${qs({ mes: month, mios: mine ? "" : "1" })}`}>
-          {mine ? "Ver agenda de todo el equipo" : "Ver solo mi agenda"}
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="inline-flex overflow-hidden rounded-md border border-ink-300 text-sm" role="group" aria-label="Vista">
+            <Link className={`px-3 py-1.5 ${!weekView ? "bg-brand-600 text-white" : "bg-surface text-ink-700 hover:bg-ink-50"}`} href={`/agenda${qs({ mes: month, mios: mine ? "1" : "" })}`} aria-current={!weekView ? "page" : undefined}>
+              Mes
+            </Link>
+            <Link className={`px-3 py-1.5 ${weekView ? "bg-brand-600 text-white" : "bg-surface text-ink-700 hover:bg-ink-50"}`} href={`/agenda${qs({ vista: "semana", mios: mine ? "1" : "" })}`} aria-current={weekView ? "page" : undefined}>
+              Semana
+            </Link>
+          </div>
+          <Link className="link text-sm" href={`/agenda${qs({ mes: month, vista: weekView ? "semana" : "", semana: weekView ? weekStart : "", mios: mine ? "" : "1" })}`}>
+            {mine ? "Ver agenda de todo el equipo" : "Ver solo mi agenda"}
+          </Link>
+        </div>
       </div>
 
-      <div className="card mb-6 hidden overflow-hidden md:block">
+      {weekView && (
+        <section className="mb-6">
+          <div className="mb-2 flex items-center gap-2">
+            <Link className="btn-secondary btn-sm" href={`/agenda${qs({ vista: "semana", semana: addDaysIso(weekStart, -7), mios: mine ? "1" : "" })}`}>
+              ← Semana anterior
+            </Link>
+            <Link className="btn-secondary btn-sm" href={`/agenda${qs({ vista: "semana", mios: mine ? "1" : "" })}`}>
+              Esta semana
+            </Link>
+            <Link className="btn-secondary btn-sm" href={`/agenda${qs({ vista: "semana", semana: addDaysIso(weekStart, 7), mios: mine ? "1" : "" })}`}>
+              Semana siguiente →
+            </Link>
+          </div>
+          <div className="grid gap-2 md:grid-cols-7">
+            {weekDays.map((d, i) => {
+              const evs = weekEvents.filter((e) => dayKey(e.startsAt) === d);
+              const hol = holidayName(d);
+              return (
+                <div key={d} className={`card min-h-40 p-2 ${d === today0 ? "ring-2 ring-brand-500" : ""} ${i >= 5 || hol ? "bg-ink-50" : ""}`}>
+                  <p className="mb-2 flex items-baseline justify-between text-xs font-semibold text-ink-600">
+                    <span>
+                      {WEEKDAYS[i]} {Number(d.slice(8))}
+                    </span>
+                    {hol && <span className="truncate pl-1 font-normal text-ink-500" title={hol}>Feriado</span>}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {evs.map((e) => {
+                      const u = URGENCY[urgencyOf(daysUntil(e.startsAt), e.completed)];
+                      return (
+                        <li key={e.id}>
+                          <Link
+                            href={`/agenda/${e.id}/editar?returnTo=${encodeURIComponent(`/agenda${qs({ vista: "semana", semana: weekStart })}`)}`}
+                            className={`relative block rounded-md border border-ink-200 bg-surface py-1.5 pl-3 pr-2 text-xs hover:border-brand-400 ${e.completed ? "text-ink-500 line-through" : "text-ink-800"}`}
+                          >
+                            <span className={`absolute inset-y-1 left-1 w-1 rounded-full ${u.bar}`} aria-hidden="true" />
+                            <span className="block font-medium">{formatTime(e.startsAt)} · {e.title}</span>
+                            {e.matterNumber && <span className="block text-ink-500">{e.matterNumber}</span>}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                    {evs.length === 0 && <li className="text-xs text-ink-400">—</li>}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <div className={`card mb-6 hidden overflow-hidden ${weekView ? "" : "md:block"}`}>
         <div className="grid grid-cols-7 border-b border-ink-200 bg-ink-50 text-center text-xs font-semibold uppercase tracking-wide text-ink-500">
           {WEEKDAYS.map((d) => (
             <div key={d} className="py-2">

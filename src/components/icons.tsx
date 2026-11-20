@@ -127,6 +127,15 @@ const paths = {
       <path d="M12 10v4M12 17h.01" />
     </>
   ),
+  buscar: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  cerrar: <path d="M6 6l12 12M18 6 6 18" />,
+  flecha: <path d="m9 6 6 6-6 6" />,
   sol: (
     <>
       <circle cx="12" cy="12" r="4" />

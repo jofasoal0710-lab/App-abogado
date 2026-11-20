@@ -19,7 +19,8 @@ import { qs } from "@/lib/search";
 import { Icon } from "@/components/icons";
 import { IndexAlert } from "@/components/index-alert";
 import { pendingIndexes } from "@/lib/notary";
-import { formatTime } from "@/lib/dates";
+import { daysUntil, formatTime } from "@/lib/dates";
+import { countdown, URGENCY, urgencyOf } from "@/lib/deadlines";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -329,11 +330,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${kindDot[e.kind]}`} aria-hidden="true" />
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${URGENCY[urgencyOf(daysUntil(e.startsAt), false)].dot}`} aria-hidden="true" />
                           <span className="truncate">{e.title}</span>
                         </span>
                         <span className="block truncate text-xs text-ink-500">
-                          {eventKindLabels[e.kind]} · {isToday ? "hoy" : d.toLocaleDateString(appLocale(), { weekday: "long" })} {formatTime(e.startsAt)}
+                          {eventKindLabels[e.kind]} · {isToday ? "hoy" : d.toLocaleDateString(appLocale(), { weekday: "long" })} {formatTime(e.startsAt)} · {countdown(dayKey(e.startsAt), todayISO(), daysUntil(e.startsAt), false)}
                           {e.matterNumber ? ` · ${e.matterNumber}` : ""}
                         </span>
                       </span>

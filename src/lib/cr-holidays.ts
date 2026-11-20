@@ -100,3 +100,15 @@ export function addBusinessDaysCR(date: string, n: number): string {
   }
   return d;
 }
+
+/** Días hábiles desde mañana hasta `to` (incluido). 0 si `to` es hoy o anterior. */
+export function businessDaysUntil(from: string, to: string): number {
+  if (to <= from) return 0;
+  let d = from;
+  let n = 0;
+  while (d < to) {
+    d = shift(d, 1);
+    if (isBusinessDayCR(d)) n++;
+  }
+  return n;
+}
