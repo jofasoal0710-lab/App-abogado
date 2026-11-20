@@ -63,3 +63,18 @@ describe("asistente: normativa", () => {
     expect(parseIntent("índice de la quincena").kind).toBe("notaria");
   });
 });
+
+describe("asistente: consultas jurídicas y cálculos", () => {
+  it("preguntas en lenguaje natural van a la base de conocimiento", () => {
+    expect(parseIntent("¿cuánto tiempo tengo para apelar una sentencia?").kind).toBe("consulta");
+    expect(parseIntent("me notificaron el 20/11, ¿cuándo vence la casación?").kind).toBe("consulta");
+    expect(parseIntent("¿qué pasa con la prescripción de un despido?").kind).toBe("consulta");
+    expect(parseIntent("expediente de despido").kind).toBe("expediente");
+    expect(parseIntent("plazos de esta semana").kind).toBe("plazos");
+    expect(parseIntent("artículo 29 del código de trabajo").kind).toBe("normativa");
+  });
+  it("cálculo de liquidación", () => {
+    expect(parseIntent("calcula la cesantía de 3 años y 7 meses con salario de 600 000").kind).toBe("liquidacion");
+    expect(parseIntent("liquidación de 18 meses ganando 450000").kind).toBe("liquidacion");
+  });
+});

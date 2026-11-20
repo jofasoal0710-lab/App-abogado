@@ -13,6 +13,10 @@ export type Intent =
   | { kind: "plazos"; days: number }
   | { kind: "expedientes_activos" }
   | { kind: "buscar"; query: string }
+  /** Pregunta jurídica (plazos, recursos, laboral…): base de conocimiento + leyes + cálculo de fechas. */
+  | { kind: "consulta"; question: string }
+  /** Cálculo de liquidación laboral a partir de la antigüedad y el salario. */
+  | { kind: "liquidacion"; question: string }
   | { kind: "formularios" }
   | { kind: "generar"; template: string | null; ref: string | null }
   | { kind: "escritos"; ref: string | null }
@@ -70,6 +74,10 @@ export function subject(text: string, extraStop: string[] = []): string {
     .trim();
 }
 
+/** Temas jurídicos: la pregunta va a la base de conocimiento y a las leyes, no a los datos del despacho. */
+const LEGAL_TOPIC =
+  /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra)\b/;
+
 export function parseIntent(raw: string): Intent {
   const text = raw.slice(0, 300);
   const n = normalize(text);
@@ -86,6 +94,12 @@ export function parseIntent(raw: string): Intent {
   if (/\bindices?\b|\bquincena\b|\bindex\b/.test(n)) return { kind: "notaria", what: "indice" };
   if (/\btestimonios?\b/.test(n)) return { kind: "notaria", what: "testimonios" };
   if (/\b(escrituras|protocolo|ultima escritura)\b/.test(n)) return { kind: "notaria", what: "ultimas" };
+
+  // Cálculo de liquidación («cesantía de 3 años y 7 meses con salario de 600 000»)
+  if (/\b(liquidacion|cesantia|prestaciones|preaviso|calcul\w*)\b/.test(n) && /\b\d+\s*(anos?|mes(es)?)\b/.test(n) && !/\bplazo\b/.test(n)) return { kind: "liquidacion", question: text };
+
+  // Pregunta jurídica en lenguaje natural (no un artículo concreto ni un expediente)
+  if (LEGAL_TOPIC.test(n) && !/\bexpedientes?\b|\bclientes?\b|\bfacturas?\b/.test(n) && !/\bart(iculo|\.)?\s*\d/.test(n) && !/\bley\s*\d/.test(n) && !expRef(n) && !/\b(esta semana|del mes|mis plazos|agenda)\b/.test(n)) return { kind: "consulta", question: text };
 
   // Normativa: «ley 7764», «código de familia», «normativa del EXP-2026-0001»
   if (/\b(ley|leyes|codigo|codigos|normativa|norma|normas|articulos?|constitucion|reglamento|fundamento)\b/.test(n)) {

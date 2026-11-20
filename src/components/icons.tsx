@@ -127,6 +127,18 @@ const paths = {
       <path d="M12 10v4M12 17h.01" />
     </>
   ),
+  calculadora: (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15v3M8 18h.01M12 18h.01" />
+    </>
+  ),
+  conocimiento: (
+    <>
+      <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z" />
+      <path d="M4 21a2 2 0 0 1 2-2h12v2H6M9 8h6M9 12h4" />
+    </>
+  ),
   subir: (
     <>
       <path d="M12 16V4M7 9l5-5 5 5" />

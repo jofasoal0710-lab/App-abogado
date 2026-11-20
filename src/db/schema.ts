@@ -738,6 +738,32 @@ export const lawArticles = pgTable(
   (t) => [index("law_articles_law_idx").on(t.lawId, t.ordinal), index("law_articles_number_idx").on(t.lawId, t.number)],
 ).enableRLS();
 
+/**
+ * Base de conocimiento del despacho: procedimientos, plazos, criterios y respuestas tipo. La usa el
+ * asistente para responder. source: «despacho» (escrita por el equipo) o «guia» (guía inicial que
+ * conviene revisar). La columna «search» (tsvector en español) se crea en la migración.
+ */
+export const knowledgeEntries = pgTable(
+  "knowledge_entries",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    title: text().notNull(),
+    body: text().notNull(),
+    area: text().notNull().default("general"),
+    /** Palabras y preguntas con las que también se debe encontrar (sinónimos, «cuánto tiempo tengo para…»). */
+    keywords: text(),
+    /** Referencias legales, p. ej. «ley-2:28,29; ley-9342:67». */
+    refs: text(),
+    source: text().notNull().default("despacho"),
+    reviewed: boolean().notNull().default(false),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedById: integer("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("knowledge_entries_area_idx").on(t.area)],
+).enableRLS();
+
 /* ---------- Factura electrónica (Hacienda, v4.4) ---------- */
 
 /**

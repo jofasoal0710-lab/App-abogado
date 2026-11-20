@@ -134,6 +134,13 @@
       "when": 1795186247612,
       "tag": "0018_textos_de_leyes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795189147167,
+      "tag": "0019_base_conocimiento",
+      "breakpoints": true
     }
   ]
 }

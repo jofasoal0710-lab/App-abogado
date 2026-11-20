@@ -1,4 +1,4 @@
-import { addBusinessDays } from "@dojocoding/hacienda-sdk";
+import { addBusinessDaysCR } from "./cr-holidays";
 import type { Quincena } from "./notary-period";
 
 /**
@@ -11,7 +11,7 @@ export const INDEX_BUSINESS_DAYS = 5;
 
 /** Último día para presentar el índice de la quincena (días hábiles con feriados de Costa Rica). */
 export function indexDeadline(q: Quincena): string {
-  return addBusinessDays(q.end, INDEX_BUSINESS_DAYS).toISOString().slice(0, 10);
+  return addBusinessDaysCR(q.end, INDEX_BUSINESS_DAYS);
 }
 
 export type IndexState =

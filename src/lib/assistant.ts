@@ -4,8 +4,12 @@ import { db } from "@/db";
 import { clients, deedParties, deeds, events, invoices, matterCitations, matters, testimonies, timeEntries, users, writings } from "@/db/schema";
 import { getTemplate, TEMPLATES } from "./forms/templates";
 import { getNotaryProfile, nextDeedNumber, pendingIndexes } from "./notary";
-import { citationText, NORM_AREAS, normLabel, searchNorms } from "./normativa";
+import { citationText, getNorm, NORM_AREAS, normLabel, searchNorms } from "./normativa";
 import { articlesByNumber, loadedLaws, searchArticles } from "./laws";
+import { bestPassage, detectProcedure, expandQuery, extractDate, extractDuration, extractSettlement } from "./assistant-reason";
+import { laborSettlement, procedureDeadline } from "./calculators";
+import { holidayName } from "./cr-holidays";
+import { parseRefs, searchKnowledge } from "./knowledge";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
@@ -31,6 +35,16 @@ const NO_BILLING = "No tienes permiso para ver la facturación.";
 /** Responde a una pregunta con los datos que la persona puede ver (mismas reglas que el resto de la app). */
 export async function answer(user: CurrentUser, question: string): Promise<AssistantAnswer> {
   const intent = parseIntent(question);
+  const res = await route(user, question, intent);
+  // Si se interpretó como un nombre de cliente que no existe («¿cuánto cobramos por la consulta?»),
+  // quizá era una pregunta para la base de conocimiento. (Nunca con expedientes: un «no encuentro»
+  // ahí es la respuesta correcta, también cuando es confidencial.)
+  if ((intent.kind === "cliente" || intent.kind === "facturas_pendientes") && /^No (encuentro|he entendido)/.test(res.text))
+    return (await legalAnswer(user, question, { quiet: true })) ?? res;
+  return res;
+}
+
+async function route(user: CurrentUser, question: string, intent: ReturnType<typeof parseIntent>): Promise<AssistantAnswer> {
   switch (intent.kind) {
     case "ayuda":
       return help();
@@ -48,8 +62,11 @@ export async function answer(user: CurrentUser, question: string): Promise<Assis
       return deadlines(user, intent.days);
     case "expedientes_activos":
       return activeMatters(user);
-    case "buscar":
-      return search(user, intent.query);
+    case "buscar": {
+      // Primero, por si es una pregunta de conocimiento; si no, se buscan expedientes y clientes.
+      const k = await legalAnswer(user, question, { quiet: true });
+      return k ?? search(user, intent.query);
+    }
     case "formularios":
       return formsList();
     case "generar":
@@ -60,14 +77,18 @@ export async function answer(user: CurrentUser, question: string): Promise<Assis
       return notaryInfo(user, intent.what);
     case "normativa":
       return normativa(user, intent.query, intent.ref, intent.article);
+    case "consulta":
+      return (await legalAnswer(user, intent.question))!;
+    case "liquidacion":
+      return settlementAnswer(intent.question);
   }
 }
 
 function help(): AssistantAnswer {
   return {
     text:
-      "Puedo darte información del despacho con lo que tienes permiso para ver y llevarte a generar escritos. Prueba: «estado del expediente EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «genera una demanda laboral para EXP-2026-0001», «escritos del EXP-2026-0001», «próxima escritura» o «ley 7764».",
-    suggestions: [...HELP_SUGGESTIONS, "Formularios"],
+      "Puedo ayudarte con:\n- El despacho (con tus permisos): «estado del EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «escritos del EXP-2026-0001», «próxima escritura».\n- Dudas jurídicas, con la base de conocimiento y las leyes cargadas: «¿cuánto tengo para apelar una sentencia?», «¿cuándo prescribe un reclamo laboral?», «artículo 29 del código de trabajo».\n- Cálculos: «me notificaron el 20/11, ¿cuándo vence la apelación?», «liquidación de 3 años y 7 meses con salario de 600 000».\n- Redactar: «genera una demanda laboral para EXP-2026-0001».\nLo que el despacho añada en Conocimiento, lo uso para responder.",
+    suggestions: [...HELP_SUGGESTIONS, "¿Cuánto tengo para apelar una sentencia?", "Formularios"],
   };
 }
 
@@ -365,6 +386,95 @@ async function matterWritings(user: CurrentUser, ref: string | null): Promise<As
   return {
     text: ref ? `Escritos de ${ref}:` : "Últimos escritos:",
     items: rows.map((w) => ({ label: w.title, detail: `${w.kind === "escritura" ? "Escritura" : "Escrito"}${w.number ? ` · ${w.number}` : ""} · ${formatDateTime(w.updatedAt)}`, href: `/escritos/${w.id}` })),
+  };
+}
+
+/* ---------- Conocimiento: base del despacho + leyes cargadas + cálculo de plazos ---------- */
+
+const money = (n: number) => formatMoney(Math.round(n * 100));
+
+/**
+ * Responde una pregunta jurídica:
+ *  1. Si es un trámite con plazo conocido (apelar, contestar…) y hay fecha, calcula el vencimiento.
+ *  2. Escoge, en la base de conocimiento, el fragmento que mejor responde (y dice de dónde sale).
+ *  3. Añade los artículos de las leyes cargadas que tratan el tema.
+ * Con `quiet`, devuelve null si no encuentra nada (para seguir buscando en los datos del despacho).
+ */
+async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: true } = {}): Promise<AssistantAnswer | null> {
+  const today = todayISO();
+  const expanded = expandQuery(question);
+  const proc = detectProcedure(question);
+  const date = extractDate(question, today);
+  const duration = extractDuration(question);
+  const lines: string[] = [];
+  const items: AssistantItem[] = [];
+
+  if (date && (duration || proc)) {
+    const amount = duration?.amount ?? proc!.days;
+    const unit = duration?.unit ?? "dias";
+    const d = procedureDeadline({ notified: date, amount, unit });
+    lines.push(
+      `${proc && !duration ? `Para ${proc.label} hay ${proc.days} días hábiles (${proc.ref}). ` : ""}Notificado el ${formatDate(date)}, el plazo de ${amount} ${unit === "dias" ? "días hábiles" : unit === "meses" ? (amount === 1 ? "mes" : "meses") : amount === 1 ? "año" : "años"} empieza a correr el ${formatDate(d.start)} y vence el ${formatDate(d.due)}.`,
+    );
+    const hol = d.skipped.map((x) => holidayName(x)).filter(Boolean);
+    if (hol.length) lines.push(`Se saltan feriados: ${[...new Set(hol)].join(", ")}.`);
+    lines.push("Regla: art. 30.5 del CPC (desde el día hábil siguiente; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial.");
+    items.push({ label: "Abrir la calculadora de plazos", href: `/herramientas?calc=plazo&notificado=${date}&cantidad=${amount}&unidad=${unit}#plazo` });
+  } else if (proc) {
+    lines.push(`Para ${proc.label} el plazo es de ${proc.days} días hábiles (${proc.ref}), contados desde el día hábil siguiente a la notificación. Dime la fecha de notificación y te digo cuándo vence.`);
+  }
+
+  const [kb, arts] = await Promise.all([searchKnowledge(expanded, { limit: 4 }), searchArticles(expanded, { anyWords: true, limit: 4 })]);
+  // En modo «quiet» (respaldo de otra intención) solo vale una coincidencia clara.
+  const top = kb[0] && (!opts.quiet || kb[0].rank >= 0.5) ? kb[0] : undefined;
+  if (opts.quiet && !top && !lines.length) return null;
+  if (top && (!lines.length || top.rank > 0.05)) {
+    if (!lines.length) lines.push(bestPassage(top.body, expanded));
+    lines.push(`Fuente: «${top.title}» (base de conocimiento${top.reviewed ? "" : ", guía sin revisar"}).`);
+    items.push({ label: `Ver «${top.title}»`, href: `/conocimiento?q=${encodeURIComponent(top.title)}#k${top.id}` });
+    const loaded = await loadedLaws();
+    for (const r of parseRefs(top.refs).filter((x) => loaded.has(x.normKey)).slice(0, 2))
+      for (const a of r.articles.slice(0, 3)) items.push({ label: `Artículo ${a} · ${getNorm(r.normKey)?.name ?? r.normKey}`, href: `/normativa/${r.normKey}?art=${encodeURIComponent(a)}` });
+  }
+  for (const k of kb.slice(1, 3)) items.push({ label: k.title, detail: "Base de conocimiento", href: `/conocimiento?q=${encodeURIComponent(k.title)}#k${k.id}` });
+  for (const a of arts.slice(0, lines.length ? 2 : 4))
+    if (!items.some((i) => i.href === `/normativa/${a.normKey}?art=${encodeURIComponent(a.number)}`))
+      items.push({ label: `Artículo ${a.number} · ${a.title}`, detail: a.snippet.replace(/\[\[|\]\]/g, "").slice(0, 140), href: `/normativa/${a.normKey}?art=${encodeURIComponent(a.number)}` });
+
+  if (!lines.length && items.length) lines.push("Esto es lo que encontré sobre tu pregunta:");
+  if (!lines.length) {
+    if (opts.quiet) return null;
+    return {
+      text: "No encontré nada sobre eso en la base de conocimiento ni en las leyes cargadas. Si es algo que el despacho sabe, añádelo en Conocimiento y lo usaré a partir de ahora.",
+      items: [{ label: "Añadir a la base de conocimiento", href: "/conocimiento/nueva" }],
+    };
+  }
+  return { text: lines.join("\n"), items: items.slice(0, 7) };
+}
+
+/** «Calcula la cesantía de 3 años y 7 meses con salario de 600 000» → liquidación estimada. */
+async function settlementAnswer(question: string): Promise<AssistantAnswer> {
+  const e = extractSettlement(question);
+  const tool = { label: "Abrir la calculadora de liquidación", href: "/herramientas?calc=liquidacion#liquidacion" };
+  if (!e || !e.salary) return { text: "Para calcularlo necesito la antigüedad y el salario promedio mensual de los últimos seis meses. Por ejemplo: «liquidación de 3 años y 7 meses con salario de 600 000».", items: [tool] };
+  const end = todayISO();
+  const startD = new Date(`${end}T12:00:00Z`);
+  startD.setUTCMonth(startD.getUTCMonth() - (e.years * 12 + e.months));
+  const start = startD.toISOString().slice(0, 10);
+  const r = laborSettlement({ start, end, avgMonthlySalary: e.salary, withoutJustCause: !e.justCause });
+  const lines = [
+    `Con ${e.years ? `${e.years} ${e.years === 1 ? "año" : "años"}` : ""}${e.years && e.months ? " y " : ""}${e.months ? `${e.months} ${e.months === 1 ? "mes" : "meses"}` : ""} y salario promedio de ${money(e.salary)} (${e.justCause ? "renuncia o justa causa" : "despido sin justa causa"}):`,
+    ...r.lines.map((l) => `- ${l.concept}${l.days !== null ? ` (${String(l.days).replace(".", ",")} días)` : ""}: ${money(l.amount)}`),
+    `Total estimado: ${money(r.total)}.`,
+    ...r.lines.filter((l) => l.concept === "Auxilio de cesantía" || l.concept === "Preaviso").map((l) => l.basis),
+    "Estimación orientativa (vacaciones y aguinaldo calculados con supuestos); ajústala en la calculadora.",
+  ];
+  return {
+    text: lines.join("\n"),
+    items: [
+      { label: "Abrir en la calculadora", href: `/herramientas?calc=liquidacion&ingreso=${start}&salida=${end}&salario=${e.salary}&causa=${e.justCause ? "justa" : "sin"}#liquidacion` },
+      { label: "Artículos 28 y 29 del Código de Trabajo", href: "/normativa/ley-2?q=28 y 29" },
+    ],
   };
 }
 

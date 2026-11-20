@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { lawArticles, lawTexts } from "@/db/schema";
+import { anyWordsQuery } from "./knowledge";
 import type { ParsedArticle } from "./law-parser";
 
 export type LoadedLaw = typeof lawTexts.$inferSelect;
@@ -65,16 +66,17 @@ export type ArticleHit = { lawId: number; normKey: string; title: string; ordina
  * Búsqueda de texto completo en español (raíces: «despido» encuentra «despidos», «despedido»…).
  * Devuelve fragmentos con las coincidencias marcadas entre «[[» y «]]» (se pintan sin HTML).
  */
-export async function searchArticles(query: string, opts: { lawId?: number; limit?: number } = {}): Promise<ArticleHit[]> {
-  const q = query.trim().slice(0, 200);
+export async function searchArticles(query: string, opts: { lawId?: number; limit?: number; anyWords?: boolean } = {}): Promise<ArticleHit[]> {
+  const q = query.trim().slice(0, 300);
   if (!q) return [];
-  const tsq = sql`websearch_to_tsquery('spanish', ${q})`;
+  // anyWords: preguntas en lenguaje natural (basta con que coincida alguna palabra; ordena por relevancia).
+  const tsq = opts.anyWords ? anyWordsQuery(q) : sql`websearch_to_tsquery('spanish', ${q})`;
   const rows = await db.execute(sql`
     select a.law_id as "lawId", t.norm_key as "normKey", t.title, a.ordinal, a.number, a.heading,
       ts_headline('spanish', a.body, ${tsq}, 'StartSel=[[, StopSel=]], MaxWords=40, MinWords=15, MaxFragments=2, FragmentDelimiter=" … "') as snippet
     from law_articles a join law_texts t on t.id = a.law_id
     where a.search @@ ${tsq} ${opts.lawId ? sql`and a.law_id = ${opts.lawId}` : sql``}
-    order by ts_rank(a.search, ${tsq}) desc, a.ordinal
+    order by ts_rank_cd(a.search, ${tsq}, 32) desc, a.ordinal
     limit ${opts.limit ?? 30}`);
   return rows.rows as ArticleHit[];
 }

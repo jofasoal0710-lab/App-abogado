@@ -9,8 +9,8 @@ type Message = { from: "yo" } & { text: string } | ({ from: "asistente" } & Assi
 
 const START: Message = {
   from: "asistente",
-  text: "Hola. Pregúntame por un expediente, un cliente, lo que hay pendiente de cobro o los plazos próximos.",
-  suggestions: ["Resumen", "Plazos de esta semana", "Facturas pendientes", "Expedientes activos"],
+  text: "Hola. Pregúntame por expedientes, clientes, cobros y plazos, o una duda jurídica: respondo con la base de conocimiento del despacho y las leyes cargadas, y hago cálculos de plazos y liquidaciones.",
+  suggestions: ["Resumen", "Plazos de esta semana", "¿Cuánto tengo para apelar una sentencia?", "Liquidación de 3 años con salario de 600 000"],
 };
 
 /** Burbuja de chat del asistente: abajo a la derecha en todas las pantallas. */
@@ -54,7 +54,7 @@ export function AssistantChat() {
           <header className="flex items-center justify-between bg-brand-700 px-4 py-3 text-white">
             <div>
               <p className="font-serif text-base font-semibold">Asistente</p>
-              <p className="text-xs text-brand-100">Expedientes, clientes, cobros y plazos</p>
+              <p className="text-xs text-brand-100">Despacho, conocimiento, leyes y cálculos</p>
             </div>
             <button onClick={() => setOpen(false)} className="rounded-md p-2 text-brand-100 hover:bg-white/10 hover:text-white" aria-label="Cerrar el asistente">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -72,7 +72,7 @@ export function AssistantChat() {
               ) : (
                 <div key={i} className="max-w-[92%] space-y-2">
                   <div className="rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-800">
-                    <p>{m.text}</p>
+                    <p className="whitespace-pre-line">{m.text}</p>
                     {m.items && m.items.length > 0 && (
                       <ul className="mt-2 divide-y divide-ink-100">
                         {m.items.map((it, j) => (
