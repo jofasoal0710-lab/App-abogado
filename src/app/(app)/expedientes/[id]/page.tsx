@@ -27,6 +27,7 @@ import { TimeEntryForm } from "../../horas/time-entry-form";
 import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction } from "../actions";
 import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
 import { READ_VERBS } from "@/lib/read-audit";
+import { BillingTab } from "./billing-tab";
 
 export const metadata: Metadata = { title: "Expediente" };
 
@@ -39,6 +40,7 @@ const TABS = [
   ["registros", "Registros"],
   ["horas", "Horas"],
   ["agenda", "Agenda"],
+  ["cobro", "Cobro"],
   ["facturas", "Facturas"],
   ["acceso", "Acceso"],
 ] as const;
@@ -73,7 +75,7 @@ export default async function MatterPage({
   const [pending] = await db
     .select({
       minutes: sql<number>`coalesce(sum(${timeEntries.minutes}), 0)::int`,
-      cents: sql<number>`coalesce(sum(round(${timeEntries.minutes} * ${timeEntries.rateCents} / 60.0)), 0)::int`,
+      cents: sql<number>`coalesce(sum(round(${timeEntries.minutes} * ${timeEntries.rateCents} / 60.0)), 0)::float8`,
     })
     .from(timeEntries)
     .where(and(eq(timeEntries.matterId, id), eq(timeEntries.billable, true), isNull(timeEntries.invoiceId)));
@@ -171,7 +173,7 @@ export default async function MatterPage({
       </div>
 
       <nav className="no-print mb-5 flex gap-1 overflow-x-auto border-b border-ink-200" aria-label="Secciones del expediente">
-        {TABS.filter(([key]) => key !== "facturas" || seesBilling).map(([key, label]) => (
+        {TABS.filter(([key]) => (key !== "facturas" && key !== "cobro") || seesBilling).map(([key, label]) => (
           <Link
             key={key}
             href={key === "resumen" ? base : `${base}?tab=${key}`}
@@ -197,7 +199,7 @@ export default async function MatterPage({
             <Item label="Parte contraria" value={matter.opposingParty} />
             <Item
               label="Honorarios"
-              value={`${billingTypeLabels[matter.billingType]}${matter.billingType === "tarifa_fija" && matter.fixedFeeCents ? ` · ${formatMoney(matter.fixedFeeCents)}` : ""}`}
+              value={`${billingTypeLabels[matter.billingType]}${matter.billingType === "tarifa_fija" && matter.fixedFeeCents ? ` · ${formatMoney(matter.fixedFeeCents)}` : ""}${matter.billingType === "por_horas" && matter.hourlyRateCents ? ` · ${formatMoney(matter.hourlyRateCents)}/h` : ""}`}
             />
           </dl>
           {matter.description && (
@@ -219,11 +221,13 @@ export default async function MatterPage({
 
       {tab === "registros" && <RegistryPanel target={{ matterId: id }} defaultReference="" defaultKind="finca" userId={user.id} />}
 
-      {tab === "horas" && <HoursTab matterId={id} user={user} />}
+      {tab === "horas" && <HoursTab matterId={id} user={user} matterRate={matter.billingType === "por_horas" ? matter.hourlyRateCents : null} />}
 
       {tab === "agenda" && <AgendaTab matterId={id} base={base} />}
 
       {tab === "acceso" && <AccessTab matter={matter} responsibleName={row.responsible} canManage={canManage} />}
+
+      {tab === "cobro" && seesBilling && <BillingTab matter={matter} canEmit={can(user, "facturacion.emitir")} defaultRateCents={user.hourlyRateCents} />}
 
       {tab === "facturas" && seesBilling && (
         <section className="card overflow-x-auto">
@@ -348,7 +352,7 @@ async function DocumentsTab({ matterId, user }: { matterId: number; user: Awaite
   );
 }
 
-async function HoursTab({ matterId, user }: { matterId: number; user: Awaited<ReturnType<typeof requireUser>> }) {
+async function HoursTab({ matterId, user, matterRate }: { matterId: number; user: Awaited<ReturnType<typeof requireUser>>; matterRate: number | null }) {
   const rows = await db
     .select({
       id: timeEntries.id,
@@ -371,7 +375,7 @@ async function HoursTab({ matterId, user }: { matterId: number; user: Awaited<Re
 
   return (
     <div className="space-y-4">
-      <TimeEntryForm matterId={matterId} defaultRateCents={user.hourlyRateCents} />
+      <TimeEntryForm matterId={matterId} defaultRateCents={matterRate ?? user.hourlyRateCents} />
       <div className="card">
         <TimeEntriesTable rows={rows} user={user} showMatter={false} returnTo={`/expedientes/${matterId}?tab=horas`} />
       </div>

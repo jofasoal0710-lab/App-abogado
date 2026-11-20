@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ],
     },
     ...(can(user, "notaria.usar") ? [{ title: "Notaría", items: [{ href: "/notaria", label: "Gestor notarial", icon: "notario" }] } satisfies NavGroup] : []),
-    ...(can(user, "facturacion.ver") ? [{ title: "Facturación", items: [{ href: "/facturas", label: "Facturas", icon: "facturas" }] } satisfies NavGroup] : []),
+    ...(can(user, "facturacion.ver") ? [{ title: "Facturación", items: [{ href: "/facturas", label: "Facturas", icon: "facturas" }, { href: "/tarifario", label: "Tarifario", icon: "calculadora" }] } satisfies NavGroup] : []),
     {
       title: "Administración",
       items: [

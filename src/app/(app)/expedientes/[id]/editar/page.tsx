@@ -8,6 +8,7 @@ import { clientAccessSql, requireMatterPage } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { canManageMatterAccess } from "@/lib/access-rules";
 import { updateMatterAction } from "../../actions";
+import { guideData } from "@/lib/tariff";
 import { MatterForm } from "../../matter-form";
 
 export const metadata: Metadata = { title: "Editar expediente" };
@@ -18,9 +19,10 @@ export default async function EditMatterPage({ params }: { params: Promise<{ id:
   if (!Number.isInteger(id)) notFound();
   const matter = await requireMatterPage(user, id);
 
-  const [allClients, lawyers] = await Promise.all([
+  const [allClients, lawyers, guide] = await Promise.all([
     db.select({ id: clients.id, name: clients.name }).from(clients).where(clientAccessSql(user, clients.id)).orderBy(asc(clients.name)),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.active, true)).orderBy(asc(users.name)),
+    guideData(),
   ]);
 
   return (
@@ -33,6 +35,8 @@ export default async function EditMatterPage({ params }: { params: Promise<{ id:
         lawyers={lawyers}
         canChangeResponsible={canManageMatterAccess(user, matter)}
         cancelHref={`/expedientes/${matter.id}`}
+        services={guide.services}
+        adjustBp={guide.adjustBp}
       />
     </>
   );

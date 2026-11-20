@@ -3,6 +3,7 @@ import { Field } from "@/components/ui";
 import { todayISO } from "@/lib/dates";
 import type { ActionState } from "@/lib/actions";
 import { addTimeEntryAction } from "./actions";
+import { RateInput } from "./rate-input";
 
 /** Entrada existente que se está corrigiendo. */
 export type EditableEntry = { matterId: number; workedOn: string; minutes: number; rateCents: number; description: string; billable: boolean };
@@ -51,7 +52,7 @@ export function TimeEntryForm({
           <input className="input" name="duration" placeholder="1:30" defaultValue={entry ? asDuration(entry.minutes) : undefined} required />
         </Field>
         <Field label="Tarifa / hora" className="sm:col-span-1">
-          <input className="input" name="rate" defaultValue={rate} inputMode="decimal" />
+          <RateInput defaultValue={rate} />
         </Field>
         <Field label="Trabajo realizado" className="sm:col-span-6">
           <input className="input" name="description" placeholder="Redacción de la demanda, reunión con el cliente…" defaultValue={entry?.description} required maxLength={1000} />

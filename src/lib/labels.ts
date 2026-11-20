@@ -22,7 +22,8 @@ export const matterStatusLabels = {
   archivado: "Archivado",
 } as const;
 
-export const billingTypeLabels = { por_horas: "Por horas", tarifa_fija: "Tarifa fija" } as const;
+export const billingTypeLabels = { por_horas: "Por horas", tarifa_fija: "Por proceso (monto total)" } as const;
+export const expenseKindLabels = { timbre: "Timbres", registro: "Derechos de registro", gasto: "Gasto", viaticos: "Viáticos y traslados" } as const;
 
 export const eventKindLabels = {
   audiencia: "Audiencia",

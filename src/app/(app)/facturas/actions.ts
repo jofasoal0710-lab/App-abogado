@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { invoiceItems, invoices, matters, payments, timeEntries, type Invoice } from "@/db/schema";
+import { invoiceItems, invoices, matterFeeStages, matters, payments, timeEntries, type Invoice } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
 import { canAccessInvoice, getAccessibleClient, getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED, CLIENT_ACCESS_DENIED } from "@/lib/access-rules";
@@ -68,6 +68,7 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
   if (!header.success) return { error: firstZodError(header.error) };
 
   const entryIds = formData.getAll("entry").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const stageIds = formData.getAll("stage").map(Number).filter((n) => Number.isInteger(n) && n > 0);
   const feeRaw = str(formData, "fixedFee");
   const includeFee = formData.get("includeFixedFee") === "on";
   const feeCents = includeFee ? parseMoneyToCents(feeRaw) : null;
@@ -82,7 +83,7 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
         if (!m) throw new BusinessError("matter_missing");
         if (m.clientId !== clientId) throw new BusinessError("matter_client_mismatch");
         matterTitle = m.title;
-      } else if (entryIds.length || includeFee) {
+      } else if (entryIds.length || includeFee || stageIds.length) {
         throw new BusinessError("matter_required");
       }
 
@@ -124,6 +125,29 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
             })),
         );
         await tx.update(timeEntries).set({ invoiceId: inv.id }).where(inArray(timeEntries.id, entries.map((e) => e.id)));
+      }
+
+      if (stageIds.length) {
+        // Bloquea las etapas: dos facturas simultáneas no pueden cobrar la misma etapa.
+        const stages = await tx
+          .select()
+          .from(matterFeeStages)
+          .where(and(inArray(matterFeeStages.id, stageIds), eq(matterFeeStages.matterId, matterId!), isNull(matterFeeStages.invoiceId)))
+          .for("update");
+        if (stages.length !== new Set(stageIds).size) throw new BusinessError("stage_billed");
+        const all = await tx.select({ id: matterFeeStages.id }).from(matterFeeStages).where(eq(matterFeeStages.matterId, matterId!));
+        stages.sort((a, b) => a.position - b.position);
+        await tx.insert(invoiceItems).values(
+          stages.map((st) => ({
+            invoiceId: inv.id,
+            description: `Honorarios profesionales: ${matterTitle} — etapa ${st.position + 1} de ${all.length}: ${st.name}`,
+            unit: "unidades" as const,
+            quantity: 100,
+            unitPriceCents: st.amountCents,
+            feeStageId: st.id,
+          })),
+        );
+        await tx.update(matterFeeStages).set({ invoiceId: inv.id }).where(inArray(matterFeeStages.id, stages.map((st) => st.id)));
       }
 
       if (includeFee && feeCents) {
@@ -247,10 +271,13 @@ export async function deleteItemAction(invoiceId: number, itemId: number) {
     const [item] = await tx
       .delete(invoiceItems)
       .where(and(eq(invoiceItems.id, itemId), eq(invoiceItems.invoiceId, invoiceId)))
-      .returning({ timeEntryId: invoiceItems.timeEntryId });
-    // Libera las horas para poder facturarlas en otra factura.
+      .returning({ timeEntryId: invoiceItems.timeEntryId, feeStageId: invoiceItems.feeStageId });
+    // Libera las horas (o la etapa) para poder facturarlas en otra factura.
     if (item?.timeEntryId) {
       await tx.update(timeEntries).set({ invoiceId: null }).where(eq(timeEntries.id, item.timeEntryId));
+    }
+    if (item?.feeStageId) {
+      await tx.update(matterFeeStages).set({ invoiceId: null }).where(eq(matterFeeStages.id, item.feeStageId));
     }
   });
   if (failed) redirect(`/facturas/${invoiceId}?error=${failed.code}`);
@@ -319,6 +346,7 @@ export async function emitInvoiceAction(id: number) {
         // Solo si la original queda del todo anulada (neto 0) se liberan sus horas para volver a facturarlas.
         if (inv.releaseHours && (await netTotal(tx, originalId)) === 0) {
           await tx.update(timeEntries).set({ invoiceId: null }).where(eq(timeEntries.invoiceId, originalId));
+          await tx.update(matterFeeStages).set({ invoiceId: null }).where(eq(matterFeeStages.invoiceId, originalId));
         }
         await reconcileStatus(tx, originalId);
       }

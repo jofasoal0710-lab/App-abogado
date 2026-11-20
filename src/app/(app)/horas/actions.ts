@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { timeEntries } from "@/db/schema";
+import { matters, timeEntries } from "@/db/schema";
 import { firstZodError, intOrNull, str, type ActionState } from "@/lib/actions";
 import { canAccessTimeEntry, getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED } from "@/lib/access-rules";
@@ -58,7 +58,10 @@ export async function addTimeEntryAction(_prev: ActionState, formData: FormData)
   if (minutes === null) return { error: "Duración no válida. Usa formatos como 1:30, 90m, 1h 15m o 1,5." };
 
   const rateRaw = str(formData, "rate");
-  const rateCents = rateRaw ? parseMoneyToCents(rateRaw) : user.hourlyRateCents;
+  // Sin tarifa escrita: la del expediente (si se cobra por horas con tarifa propia) o la del abogado.
+  const matterForRate = intOrNull(formData, "matterId");
+  const [mRate] = !rateRaw && matterForRate ? await db.select({ rate: matters.hourlyRateCents, type: matters.billingType }).from(matters).where(eq(matters.id, matterForRate)).limit(1) : [];
+  const rateCents = rateRaw ? parseMoneyToCents(rateRaw) : mRate?.type === "por_horas" && mRate.rate ? mRate.rate : user.hourlyRateCents;
   if (rateCents === null || rateCents < 0) return { error: "La tarifa por hora no es un importe válido." };
 
   const parsed = entrySchema.safeParse({

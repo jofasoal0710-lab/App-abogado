@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   date,
   index,
@@ -35,6 +36,10 @@ export const matterStatusEnum = pgEnum("matter_status", [
   "archivado",
 ]);
 export const billingTypeEnum = pgEnum("billing_type", ["por_horas", "tarifa_fija"]);
+/** Cómo calcula su precio un servicio del tarifario del despacho. */
+export const feeModeEnum = pgEnum("fee_mode", ["fijo", "horas", "porcentaje", "arancel"]);
+/** Gastos del expediente que no son honorarios (no llevan IVA): se cobran aparte. */
+export const expenseKindEnum = pgEnum("expense_kind", ["timbre", "registro", "gasto", "viaticos"]);
 export const eventKindEnum = pgEnum("event_kind", ["audiencia", "plazo", "reunion", "tarea"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "borrador",
@@ -170,8 +175,16 @@ export const matters = pgTable(
     opposingParty: text("opposing_party"),
     description: text(),
     billingType: billingTypeEnum("billing_type").notNull().default("por_horas"),
-    /** Honorarios pactados cuando la facturación es de tarifa fija (céntimos). */
-    fixedFeeCents: integer("fixed_fee_cents"),
+    /** Honorarios pactados cuando se cobra por proceso (monto total, céntimos). */
+    fixedFeeCents: bigint("fixed_fee_cents", { mode: "number" }),
+    /** Servicio del tarifario elegido (la guía de precios). */
+    serviceId: integer("service_id").references((): AnyPgColumn => feeServices.id, { onDelete: "set null" }),
+    /** Cuantía o valor del acto sobre el que se calculó la sugerencia (céntimos). */
+    feeBaseCents: bigint("fee_base_cents", { mode: "number" }),
+    /** Monto sugerido por el tarifario/arancel al pactarlo (para comparar con lo cobrado). */
+    suggestedFeeCents: bigint("suggested_fee_cents", { mode: "number" }),
+    /** Tarifa por hora de este expediente; si falta, la de cada abogado. */
+    hourlyRateCents: integer("hourly_rate_cents"),
     openedAt: date("opened_at").notNull().default(sql`current_date`),
     closedAt: date("closed_at"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -377,9 +390,11 @@ export const invoiceItems = pgTable(
      */
     quantity: integer().notNull().default(100),
     /** Precio por hora (unit = "horas") o por unidad, en céntimos. */
-    unitPriceCents: integer("unit_price_cents").notNull(),
+    unitPriceCents: bigint("unit_price_cents", { mode: "number" }).notNull(),
     /** Entrada de horas de la que procede la línea (para liberarla si se borra la línea). */
     timeEntryId: integer("time_entry_id").references(() => timeEntries.id, { onDelete: "set null" }),
+    /** Etapa del cobro por proceso de la que procede la línea (para liberarla si se borra la línea). */
+    feeStageId: integer("fee_stage_id").references((): AnyPgColumn => matterFeeStages.id, { onDelete: "set null" }),
     /** Código CABYS (13 dígitos) para la factura electrónica. Si falta, se usa el predeterminado del emisor. */
     cabys: text(),
   },
@@ -393,7 +408,7 @@ export const payments = pgTable(
     invoiceId: integer("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
-    amountCents: integer("amount_cents").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
     paidAt: date("paid_at").notNull().default(sql`current_date`),
     method: paymentMethodEnum().notNull().default("transferencia"),
     reference: text(),
@@ -845,6 +860,88 @@ export const einvoicesRelations = relations(einvoices, ({ one }) => ({
 /* ---------- Tipos ---------- */
 
 export type User = typeof users.$inferSelect;
+/* ---------- Tarifario y cobro por proceso ---------- */
+
+export type FeeStage = { name: string; percent: number };
+
+/** Servicios que ofrece el despacho, con su forma de cobro. Es la guía de precios. */
+export const feeServices = pgTable("fee_services", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull(),
+  /** Área del arancel (abogacia, laboral, familia, penal, constitucional, notariado) u «otros». */
+  area: text().notNull().default("abogacia"),
+  mode: feeModeEnum().notNull().default("fijo"),
+  /** Precio del servicio (modo fijo). */
+  amountCents: bigint("amount_cents", { mode: "number" }),
+  /** Tarifa por hora (modo horas). */
+  hourlyRateCents: integer("hourly_rate_cents"),
+  /** Porcentaje sobre la cuantía (modo porcentaje), en puntos básicos: 2,5 % = 250. */
+  percentBp: integer("percent_bp"),
+  /** Mínimo a cobrar (modos porcentaje y arancel). */
+  minimumCents: bigint("minimum_cents", { mode: "number" }),
+  /** Recargo sobre el arancel (modo arancel), en puntos básicos. */
+  markupBp: integer("markup_bp").notNull().default(0),
+  /** Referencia al arancel oficial (clave de lib/arancel). */
+  arancelKey: text("arancel_key"),
+  /** Forma de pago por etapas (porcentajes del total). */
+  stages: jsonb().$type<FeeStage[]>().notNull().default([]),
+  description: text(),
+  active: boolean().notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/** Ajustes del cobro (una sola fila, id = 1). */
+export const feeSettings = pgTable("fee_settings", {
+  id: integer().primaryKey(),
+  /** Actualización del arancel publicada por el Colegio (art. 112), en puntos básicos: 5 % = 500. */
+  arancelAdjustBp: integer("arancel_adjust_bp").notNull().default(0),
+  arancelAdjustNote: text("arancel_adjust_note"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/** Etapas de cobro de un expediente por proceso (p. ej. 1/3 con la demanda). */
+export const matterFeeStages = pgTable(
+  "matter_fee_stages",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    position: integer().notNull().default(0),
+    name: text().notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    /** Factura en la que se cobró (null = pendiente). */
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("matter_fee_stages_matter_idx").on(t.matterId)],
+).enableRLS();
+
+/** Gastos, timbres y derechos de registro del expediente (aparte de los honorarios). */
+export const matterExpenses = pgTable(
+  "matter_expenses",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    kind: expenseKindEnum().notNull().default("gasto"),
+    description: text().notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    spentOn: date("spent_on").notNull().default(sql`current_date`),
+    /** Cuándo lo reembolsó el cliente (null = pendiente de cobrar). */
+    reimbursedAt: date("reimbursed_at"),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("matter_expenses_matter_idx").on(t.matterId)],
+).enableRLS();
+
+export type FeeService = typeof feeServices.$inferSelect;
+export type MatterFeeStage = typeof matterFeeStages.$inferSelect;
+export type MatterExpense = typeof matterExpenses.$inferSelect;
+
 export type Role = typeof roles.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Matter = typeof matters.$inferSelect;

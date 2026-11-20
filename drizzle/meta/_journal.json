@@ -148,6 +148,13 @@
       "when": 1795193173915,
       "tag": "0020_apariencia",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795203246586,
+      "tag": "0021_tarifario",
+      "breakpoints": true
     }
   ]
 }

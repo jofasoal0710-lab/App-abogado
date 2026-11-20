@@ -106,3 +106,21 @@ describe("asistente: crear, modificar, borrar o consultar", () => {
     expect(act("generar demanda laboral para EXP-2026-0001")).not.toMatch(/^crear/);
   });
 });
+
+describe("asistente: honorarios y tarifas", () => {
+  const k = (t: string) => parseIntent(t).kind;
+  it("reconoce las preguntas de cobro", () => {
+    expect(k("¿cuánto cobro por un traspaso de carro de 5 millones?")).toBe("tarifa");
+    expect(k("cuánto cobro por hacer una escritura de compraventa")).toBe("tarifa");
+    expect(k("honorarios mínimos de una sociedad")).toBe("tarifa");
+    expect(k("tarifa por hora mínima")).toBe("tarifa");
+    expect(k("timbre de una escritura de 20 millones")).toBe("tarifa");
+    expect(k("qué dice el arancel sobre el divorcio")).toBe("tarifa");
+  });
+  it("no se confunde con facturas ni con acciones", () => {
+    expect(k("facturas pendientes")).toBe("facturas_pendientes");
+    const a = parseIntent("crear un servicio en el tarifario");
+    expect(a.kind === "accion" && a.entity === "tarifario" && a.verb === "crear").toBe(true);
+    expect(k("liquidación de 3 años con salario de 500000")).toBe("liquidacion");
+  });
+});

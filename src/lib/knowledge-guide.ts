@@ -1,7 +1,8 @@
 /**
  * Guía inicial de la base de conocimiento (Costa Rica). Redactada a partir del texto vigente del
  * Código de Trabajo (versión 64) y del Código Procesal Civil (Ley 9342, versión 5), consultados en el
- * SCIJ. Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
+ * SCIJ, y del Arancel de honorarios de abogacía y notariado (Decreto 41457-JP reformado por el 41930-JP,
+ * SINALEVI versión 4 de 4). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
  */
 export type GuideEntry = { title: string; area: string; keywords: string; refs: string; body: string };
 
@@ -151,5 +152,78 @@ En la app: Gestor notarial → Índice muestra el plazo de cada quincena, permit
     body: `El asistente responde con los datos del despacho (expedientes, clientes, plazos, facturas, escritos), con esta base de conocimiento y con las leyes cargadas en Normativa.
 Ejemplos: «¿cuánto tiempo tengo para apelar una sentencia?», «calcula la cesantía de 3 años y 7 meses con salario de 600 000», «¿cuándo vence un plazo de 5 días notificado el 20/11?», «artículo 29 del código de trabajo», «estado del EXP-2026-0001».
 Para que aprenda algo nuevo, añade una entrada en Conocimiento: título claro, explicación, palabras con las que la buscarías y referencias legales.`,
+  },
+  {
+    title: "Honorarios mínimos: el arancel oficial de abogacía y notariado",
+    area: "despacho",
+    keywords: "arancel honorarios mínimos tarifa cobrar cobro cuánto cobro colegio de abogados decreto 41457 obligatorio contrato de servicios cuota litis",
+    refs: "",
+    body: `Rige el Arancel de honorarios por servicios profesionales de abogacía y notariado: Decreto Ejecutivo 41457-JP (2018), reformado por el 41930-JP (2019). La reforma del Decreto 43704-JP (2022), que eliminaba los mínimos, fue anulada por el Tribunal Contencioso Administrativo (resolución 00958 del 16/02/2024), así que los mínimos siguen vigentes.
+- Es de acatamiento obligatorio (art. 1): los honorarios no pueden ser inferiores a los mínimos (art. 5).
+- Se pueden pactar montos mayores con convenio escrito que indique el objeto del servicio, el monto y la forma de pago (art. 5).
+- Hay que informar al cliente el monto de los honorarios desde el inicio (art. 3).
+- El contrato de cuota litis (una parte de lo que se obtenga) es independiente de las costas personales (art. 6).
+- Los montos se actualizan cada dos años según el IPC, como máximo un 10 % (art. 112): el Colegio publica la actualización.
+En la app: Facturación → Tarifario muestra el arancel completo y permite registrar la actualización vigente.`,
+  },
+  {
+    title: "Cobrar por horas: hora profesional mínima",
+    area: "despacho",
+    keywords: "hora profesional tarifa por hora cobrar por horas mínimo por hora noventa mil honorarios por hora notario",
+    refs: "",
+    body: `Se puede pactar con el cliente el pago por horas profesionales, siempre que el total no sea inferior al mínimo que el arancel fija para ese asunto (art. 7).
+- La hora profesional mínima es de ₡90.750 (art. 7), según el texto del decreto (más la actualización del Colegio, si la hay).
+- En notariado, el pago por horas procede solo para actos o asesorías no previstos en el arancel, o por trámites y desplazamientos extraordinarios; mínimo ₡90.750 por hora (art. 63).
+En la app: cada expediente por horas puede tener su propia tarifa (Editar → Cobro de honorarios); si no, se usa la de cada abogado. El botón «Guía» junto a la tarifa muestra el tarifario y el mínimo.`,
+  },
+  {
+    title: "Cobrar por proceso: tarifa general y pago por etapas",
+    area: "despacho",
+    keywords: "cobrar por proceso monto total tarifa general procesos civiles cuantía porcentaje etapas tercios demanda sentencia conciliación monitorio ejecución desahucio sucesorio casación",
+    refs: "",
+    body: `Procesos con cuantía (civil, comercial, agrario, contencioso, tributario), art. 16: 20 % hasta ₡16.500.000; 15 % sobre el exceso hasta ₡82.500.000; 10 % sobre el exceso. Cuantía inestimable: mínimo ₡242.000 (art. 19).
+Pago por etapas, salvo convenio escrito (art. 18): un tercio al presentar la demanda o contestación, un tercio al concluir la fase demostrativa y un tercio con la sentencia.
+- Conciliación, mediación o transacción: 50 % de la tarifa (art. 17).
+- Incluye recursos ordinarios e incidentes hasta segunda instancia; la casación se cobra aparte, mínimo ₡605.000 (art. 20).
+- Monitorio: 50 % de la tarifa, mínimo ₡60.500; 50 % con la demanda, 25 % con la sentencia firme y 25 % con el remate (art. 21).
+- Ejecución: 50 % de la tarifa, mínimo ₡60.500; mitad con la demanda y mitad con el remate (art. 22).
+- Desahucio: tarifa general sobre la cuantía, mínimo ₡181.500; mitad con la demanda y mitad con la sentencia o desocupación (art. 24).
+- Sucesorio: 50 % de la tarifa sobre el valor de los bienes, mínimo ₡242.000 (art. 28). Medida cautelar: mínimo ₡121.000 (art. 25).
+En la app: al abrir el expediente elige «Por proceso», el servicio del tarifario y la cuantía; la pestaña Cobro reparte los honorarios en etapas y cada etapa se factura cuando se cumple.`,
+  },
+  {
+    title: "Honorarios notariales: escrituras, traspasos, sociedades y poderes",
+    area: "notarial",
+    keywords: "honorarios notariales escritura traspaso compraventa vehículo carro inmueble hipoteca sociedad poder testamento matrimonio tarifa notarial cuánto cobro notario",
+    refs: "",
+    body: `Tarifa general notarial según la cuantía o valor real del acto (art. 74), mínimo ₡60.500: 2 % hasta ₡11.000.000; 1,5 % sobre el exceso hasta ₡16.500.000; 1,25 % sobre el exceso hasta ₡33.000.000; 1 % sobre el exceso.
+- Traspaso de vehículos, buques y aeronaves: tarifa general sobre el mayor entre valor fiscal y valor real, mínimo ₡60.500 (art. 82).
+- Cancelación de hipoteca o prenda y otros actos del art. 75: mitad de la tarifa, mínimo ₡60.500.
+- Segregación en cabeza propia o rectificación de medida: 25 % de la tarifa por finca, mínimo ₡60.500 (art. 76).
+- Constitución de sociedades, asociaciones o fundaciones: mínimo ₡181.500; modificaciones y nombramientos: ₡90.750 (art. 95).
+- Poderes: mínimo ₡90.750 (art. 96). Testamento: ₡121.000 (art. 97). Matrimonio: ₡121.000 (art. 94).
+- Actos complejos: recargo del 50 % con convenio escrito; varias operaciones en un instrumento se cobran por separado (art. 71). Desplazamientos fuera de la oficina: pago adicional pactado (art. 73).
+- Corregir errores propios no genera honorarios (art. 66).
+Ejemplo: compraventa de ₡20.000.000 → ₡220.000 + ₡82.500 + ₡43.750 = ₡346.250.`,
+  },
+  {
+    title: "Timbre del Colegio de Abogados y gastos del expediente",
+    area: "despacho",
+    keywords: "timbre del colegio de abogados timbres gastos derechos de registro viáticos cobrar aparte reembolso cuánto timbre escritura demanda",
+    refs: "",
+    body: `El timbre del Colegio se paga según la cuantía, con la misma escala para el escrito inicial de los procesos (art. 107) y para los instrumentos públicos (art. 108):
+- Hasta ₡250.000: exento. Hasta ₡1.000.000: ₡1.100. Hasta ₡5.000.000: ₡2.200. Hasta ₡25.000.000: ₡5.500. Hasta ₡50.000.000: ₡11.000. De ₡50 a ₡100 millones: ₡16.500. De ₡100 a ₡500 millones: ₡27.500. Desde ₡500 millones: ₡55.000.
+- Procesos de cuantía inestimable (salvo familia, trabajo y penal): ₡12.100. Instrumentos inestimables: ₡275 cada uno.
+Los timbres, derechos de registro y viáticos no son honorarios: se cobran aparte al cliente y no llevan IVA. En la app se registran en la pestaña Cobro del expediente («Gastos, timbres y derechos de registro») y se marcan cuando el cliente los reembolsa.`,
+  },
+  {
+    title: "Honorarios en procesos laborales, de familia, penales y constitucionales",
+    area: "despacho",
+    keywords: "honorarios laboral ordinario laboral riesgos del trabajo divorcio pensión alimentaria familia penal defensa amparo querella cuánto cobro porcentaje condenatoria",
+    refs: "",
+    body: `Laboral (art. 32): ordinario, del 25 % al 30 % de la condenatoria (o la absolutoria), mínimo ₡121.000; riesgos del trabajo, del 20 % al 25 %, mínimo ₡121.000. Otros procesos laborales: mínimo ₡121.000 (art. 36).
+Familia: divorcio o separación por mutuo acuerdo, ₡181.500 (mitad con la homologación y mitad con la inscripción, art. 48); divorcio, unión de hecho, filiación o adopción sin gananciales, ₡181.500 (mitad al presentar y mitad con la sentencia); con gananciales, mínimo ₡242.000 (art. 49); pensión alimentaria, ₡181.500 (art. 50).
+Penal: defensa ante Tribunal Unipersonal, mínimo ₡484.000, por tercios: investigación, audiencia preliminar y juicio; abreviado o medida alterna, 75 % (art. 38). Querella por delitos de acción privada: mínimo ₡363.000 (art. 43).
+Constitucional: recurso de amparo, ₡181.500, pagado con la presentación (art. 46).`,
   },
 ];

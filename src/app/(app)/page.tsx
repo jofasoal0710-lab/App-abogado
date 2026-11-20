@@ -47,7 +47,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     db
       .select({
         minutes: sql<number>`coalesce(sum(${timeEntries.minutes}), 0)::int`,
-        cents: sql<number>`coalesce(sum(round(${timeEntries.minutes} * ${timeEntries.rateCents} / 60.0)), 0)::int`,
+        cents: sql<number>`coalesce(sum(round(${timeEntries.minutes} * ${timeEntries.rateCents} / 60.0)), 0)::float8`,
       })
       .from(timeEntries)
       .innerJoin(matters, eq(matters.id, timeEntries.matterId))
@@ -99,7 +99,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     db.select({ status: matters.status, n: count() }).from(matters).where(matterAccessSql(user, matters.id)).groupBy(matters.status),
     seesBilling
       ? db
-          .select({ month: sql<string>`to_char(${payments.paidAt}, 'YYYY-MM')`, cents: sql<number>`sum(${payments.amountCents})::int` })
+          .select({ month: sql<string>`to_char(${payments.paidAt}, 'YYYY-MM')`, cents: sql<number>`sum(${payments.amountCents})::float8` })
           .from(payments)
           .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
           .where(and(gte(payments.paidAt, `${chartMonths[0]}-01`), invoiceAccessSql(user)))

@@ -13,7 +13,10 @@ import { parseRefs, searchKnowledge } from "./knowledge";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
-import { parseIntent, type ActionEntity, type ActionVerb, type Intent } from "./assistant-intent";
+import { normalize, parseIntent, type ActionEntity, type ActionVerb, type Intent } from "./assistant-intent";
+import { ARANCEL_SOURCE, arancelItem, arancelMinimum, searchArancel, timbreColegio } from "./arancel";
+import { extractAmountCents, suggestFee } from "./fees";
+import { getFeeSettings, listServices, toGuideService } from "./tariff";
 import type { CurrentUser } from "./auth";
 import { formatId } from "./cr-id";
 import { formatDate, formatDateTime, todayISO } from "./dates";
@@ -81,6 +84,8 @@ async function route(user: CurrentUser, question: string, intent: ReturnType<typ
       return (await legalAnswer(user, intent.question))!;
     case "liquidacion":
       return settlementAnswer(intent.question);
+    case "tarifa":
+      return feeAnswer(user, intent.question);
     case "accion":
       return actionAnswer(user, intent.verb, intent.entity, intent.target);
   }
@@ -485,6 +490,15 @@ const ENTITY_INFO: Record<ActionEntity, EntityInfo> = {
       consultar: "El equipo está en «Equipo».",
     },
   },
+  tarifario: {
+    name: "servicio del tarifario", plural: "servicios del tarifario", list: "/tarifario", create: "/tarifario/nuevo", createLabel: "Nuevo servicio del tarifario", perm: "facturacion.emitir",
+    how: {
+      crear: "En el Tarifario defines cada servicio y cómo se cobra: monto fijo por proceso, por horas, porcentaje de la cuantía o según el arancel oficial (con un recargo si quieres), y sus etapas de pago. También puedes añadirlo directamente desde la tabla del arancel.",
+      modificar: "En «Tarifario», pulsa «Corregir» en el servicio. Los expedientes ya abiertos conservan su monto pactado.",
+      borrar: "En «Tarifario», pulsa «Borrar» en el servicio (o desmarca «Activo» para que deje de salir en la guía).",
+      consultar: "El tarifario está en Facturación → Tarifario; en los formularios, el botón ⓘ «Guía de tarifas» lo muestra con el arancel.",
+    },
+  },
   escrito: {
     name: "escrito", plural: "escritos", list: "/formularios", create: "/formularios", createLabel: "Generar escrito",
     how: {
@@ -606,6 +620,86 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
 }
 
 /** «Calcula la cesantía de 3 años y 7 meses con salario de 600 000» → liquidación estimada. */
+/* ---------- Honorarios: tarifario del despacho, arancel oficial y timbres ---------- */
+
+const FEE_STOP = new Set(["cuanto", "cobro", "cobrar", "cobra", "cobran", "cobramos", "honorarios", "honorario", "minimo", "minimos", "arancel", "tarifa", "tarifas", "para", "cuesta", "debo", "deberia", "puedo", "precio", "colones", "millones", "millon", "segun", "valor", "seria", "sale"]);
+
+async function feeAnswer(user: CurrentUser, question: string): Promise<AssistantAnswer> {
+  const n = normalize(question);
+  const base = extractAmountCents(question);
+  const { arancelAdjustBp: adj } = await getFeeSettings();
+  const seesPrices = can(user, "facturacion.ver");
+  const lines: string[] = [];
+  const items: AssistantItem[] = [];
+  const source = `Fuente: ${ARANCEL_SOURCE.decree}, ${ARANCEL_SOURCE.version}.${adj ? ` Con la actualización del ${adj / 100} % registrada en el tarifario.` : " Montos del texto del decreto (el Colegio los actualiza cada dos años, art. 112)."}`;
+
+  if (/\btimbres?\b/.test(n)) {
+    if (base) {
+      const t = timbreColegio(base);
+      lines.push(`Timbre del Colegio de Abogados para una cuantía de ${formatMoney(base)}: ${t ? formatMoney(t) : "exento"} (arts. 107 y 108 del arancel).`);
+    } else {
+      lines.push("El timbre del Colegio depende de la cuantía (arts. 107 y 108): hasta ₡250.000 exento; hasta ₡1 millón, ₡1.100; hasta ₡5 millones, ₡2.200; hasta ₡25 millones, ₡5.500; hasta ₡50 millones, ₡11.000; hasta ₡100 millones, ₡16.500; hasta ₡500 millones, ₡27.500; más, ₡55.000.");
+      lines.push("Dime el monto (p. ej. «timbre de una escritura de 20 millones») y lo calculo.");
+    }
+    lines.push("Los timbres y derechos de registro se cobran aparte de los honorarios: regístralos en la pestaña Cobro del expediente.");
+    return { text: `${lines.join("\n")}\n${source}`, items: seesPrices ? [{ label: "Ver el arancel completo", href: "/tarifario" }] : [] };
+  }
+
+  const hourly = /\b(por hora|hora profesional|tarifa por hora|la hora|cada hora)\b/.test(n);
+  const words = n.split(/[^a-z0-9ñ]+/).filter((w) => w.length >= 4 && !FEE_STOP.has(w));
+  if (seesPrices) {
+    const services = await listServices();
+    const scored = services
+      .map((s) => {
+        const name = normalize(`${s.name} ${s.description ?? ""}`);
+        const g = suggestFee(toGuideService(s), base, adj);
+        return { s, g, score: hourly ? (g.perHour ? 1 : 0) : words.reduce((acc, w) => acc + (name.includes(w) || name.includes(w.slice(0, -1)) ? 1 : 0), 0) };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    for (const { s, g } of scored) {
+      const amount = g.amountCents != null ? `${formatMoney(g.amountCents)}${g.perHour ? " por hora" : ""}` : "según la cuantía";
+      lines.push(`• ${s.name} (tarifario del despacho): ${amount}. ${g.explanation}${g.belowArancel ? " ⚠ Por debajo del mínimo del arancel." : ""}${s.stages.length ? ` Se cobra en ${s.stages.length} etapas.` : ""}`);
+      items.push({ label: s.name, detail: amount, href: "/tarifario" });
+    }
+  }
+
+  // Lo que el despacho escribió en Conocimiento va primero: es su criterio propio.
+  const expanded = expandQuery(question);
+  const own = (await searchKnowledge(expanded, { limit: 4 })).find((k) => k.source !== "guia" && k.rank >= 0.1);
+  if (own) {
+    lines.unshift(`• ${own.title} (conocimiento del despacho): ${bestPassage(own.body, expanded)}`);
+    items.unshift({ label: `Ver «${own.title}»`, href: `/conocimiento?q=${encodeURIComponent(own.title)}#k${own.id}` });
+  }
+
+  const ref = hourly ? [arancelItem(/\bnotari/.test(n) ? "hora_notarial" : "hora")!] : searchArancel(question, 3);
+  let needsBase = false;
+  for (const it of ref) {
+    const r = arancelMinimum(it, base, adj);
+    needsBase ||= r.needsBase && !base;
+    const pay = it.stages ? ` Pago, salvo convenio: ${it.stages.map((st) => `${st.name.toLowerCase()} (${Math.round(st.percent)} %)`).join(", ")}.` : "";
+    lines.push(`• Arancel — ${it.name}: ${r.explanation}${pay}${it.note ? ` ${it.note}` : ""}`);
+  }
+
+  if (!lines.length) {
+    const legal = await legalAnswer(user, question, { quiet: true });
+    if (legal) return legal;
+    return {
+      text: "No encontré ese servicio en el tarifario ni en el arancel. Prueba con «traspaso de un carro de 5 millones», «constitución de sociedad», «divorcio», «proceso laboral» o «tarifa por hora».",
+      items: seesPrices ? [{ label: "Abrir el tarifario", href: "/tarifario" }] : [],
+    };
+  }
+  if (needsBase) lines.push("Si me dices el valor del acto o la cuantía (p. ej. «… de 5 millones»), lo calculo.");
+  const intro = base ? `Para un valor de ${formatMoney(base)}:` : "Esto es lo que tengo:";
+  if (seesPrices && !items.length) items.push({ label: "Abrir el tarifario", href: "/tarifario" });
+  return {
+    text: `${intro}\n${lines.join("\n")}\nLos honorarios no pueden ser inferiores a los mínimos del arancel; puedes pactar más con convenio escrito (art. 5).\n${source}`,
+    items,
+    suggestions: ["Tarifa por hora mínima", "Timbre de una escritura de 20 millones", "Honorarios de una sociedad"],
+  };
+}
+
 async function settlementAnswer(question: string): Promise<AssistantAnswer> {
   const e = extractSettlement(question);
   const tool = { label: "Abrir la calculadora de liquidación", href: "/herramientas?calc=liquidacion#liquidacion" };

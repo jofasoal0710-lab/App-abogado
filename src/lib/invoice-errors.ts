@@ -6,6 +6,7 @@ export const INVOICE_ERRORS = {
   matter_client_mismatch: "El expediente no pertenece al cliente seleccionado.",
   matter_required: "Para facturar horas u honorarios hay que seleccionar un expediente.",
   already_billed: "Alguna de las horas seleccionadas ya está facturada o no es facturable. Recarga la página.",
+  stage_billed: "Alguna de las etapas seleccionadas ya está facturada. Recarga la página.",
   no_items: "Añade al menos una línea antes de emitir la factura.",
   zero_total: "El total de la factura debe ser mayor que cero.",
   not_emitted_pay: "Solo se pueden registrar cobros en facturas emitidas.",

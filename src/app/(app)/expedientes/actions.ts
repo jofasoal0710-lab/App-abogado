@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { documents, invoices, matterMembers, matterNotes, matters, users } from "@/db/schema";
+import { documents, feeServices, invoices, matterFeeStages, matterMembers, matterNotes, matters, users } from "@/db/schema";
+import { replaceMatterStages } from "@/lib/tariff";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
 import { canAccessNote, getAccessibleClient, getAccessibleMatter, getHolders } from "@/lib/access";
 import { reassignLostAccessEvents } from "@/lib/access-effects";
@@ -32,11 +33,15 @@ const matterSchema = z
     description: z.string().max(10000).nullable(),
     billingType: z.enum(["por_horas", "tarifa_fija"]),
     fixedFeeCents: z.number().int().nonnegative().nullable(),
+    serviceId: z.number().int().positive().nullable(),
+    feeBaseCents: z.number().int().nonnegative().nullable(),
+    suggestedFeeCents: z.number().int().nonnegative().nullable(),
+    hourlyRateCents: z.number().int().nonnegative().max(2_000_000_000).nullable(),
     openedAt: isoDate,
     visibility: z.enum(["abierto", "restringido", "confidencial"]).optional(),
   })
   .refine((v) => v.billingType !== "tarifa_fija" || (v.fixedFeeCents ?? 0) > 0, {
-    message: "Indica los honorarios pactados para la tarifa fija",
+    message: "Indica los honorarios del proceso (monto total)",
     path: ["fixedFeeCents"],
   });
 
@@ -45,6 +50,17 @@ function parseMatter(formData: FormData) {
   const fee = feeRaw ? parseMoneyToCents(feeRaw) : null;
   if (feeRaw && fee === null) return { error: "Los honorarios pactados no son un importe válido" } as const;
   const billingType = str(formData, "billingType");
+  const money = (name: string, label: string) => {
+    const raw = str(formData, name);
+    if (!raw) return { cents: null };
+    const cents = parseMoneyToCents(raw);
+    return cents === null || cents < 0 ? { error: `${label} no es un importe válido` } : { cents };
+  };
+  const base = money("feeBase", "La cuantía");
+  if ("error" in base) return { error: base.error } as const;
+  const rate = money("hourlyRate", "La tarifa por hora");
+  if ("error" in rate) return { error: rate.error } as const;
+  const suggested = money("suggestedFee", "El monto sugerido");
 
   const parsed = matterSchema.safeParse({
     title: str(formData, "title"),
@@ -57,6 +73,10 @@ function parseMatter(formData: FormData) {
     description: optStr(formData, "description"),
     billingType,
     fixedFeeCents: billingType === "tarifa_fija" ? fee : null,
+    serviceId: intOrNull(formData, "serviceId"),
+    feeBaseCents: base.cents,
+    suggestedFeeCents: "cents" in suggested ? suggested.cents : null,
+    hourlyRateCents: billingType === "por_horas" ? rate.cents : null,
     openedAt: str(formData, "openedAt") || todayISO(),
     visibility: str(formData, "visibility") || undefined,
   });
@@ -72,6 +92,8 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
   // El cliente debe ser uno que puedas ver; si es confidencial, sus expedientes nunca son abiertos.
   const client = await getAccessibleClient(user, result.data.clientId);
   if (!client) return { error: CLIENT_ACCESS_DENIED };
+  const service = await serviceFor(result.data.serviceId);
+  if (service === false) return { error: "El servicio elegido ya no existe en el tarifario." };
   const visibility = minimumMatterVisibility(client, result.data.visibility ?? "abierto");
   if (visibility === "confidencial") {
     if (result.data.responsibleId === null) return { error: "Un expediente confidencial necesita un responsable." };
@@ -95,6 +117,10 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
       .insert(matters)
       .values({ ...result.data, visibility, number })
       .returning({ id: matters.id });
+    // Por proceso con un servicio que se cobra por etapas: se reparten los honorarios.
+    if (result.data.billingType === "tarifa_fija" && service?.stages.length && result.data.fixedFeeCents) {
+      await replaceMatterStages(tx, created.id, result.data.fixedFeeCents, service.stages);
+    }
     // Quien crea un expediente restringido o confidencial sin ser su responsable no puede quedarse sin
     // acceso a lo que acaba de crear: se le añade como miembro. (Un administrador ya ve los restringidos,
     // pero no los confidenciales.)
@@ -123,6 +149,8 @@ export async function updateMatterAction(
   if (!current) return { error: ACCESS_DENIED };
   const result = parseMatter(formData);
   if ("error" in result) return { error: result.error };
+  const service = await serviceFor(result.data.serviceId);
+  if (service === false) return { error: "El servicio elegido ya no existe en el tarifario." };
 
   // Solo los administradores y el responsable actual pueden cambiar quién es el responsable.
   const canManage = canManageMatterAccess(user, current);
@@ -146,6 +174,15 @@ export async function updateMatterAction(
   // Todo o nada: los datos, las anotaciones en el historial y la reasignación de eventos.
   await db.transaction(async (tx) => {
     await tx.update(matters).set({ ...data, visibility }).where(eq(matters.id, id));
+    // Etapas de cobro: si ninguna está facturada, se rehacen según el servicio y el monto nuevos.
+    const feeChanged = data.billingType !== current.billingType || data.fixedFeeCents !== current.fixedFeeCents || data.serviceId !== current.serviceId;
+    if (feeChanged) {
+      const stages = await tx.select({ invoiceId: matterFeeStages.invoiceId }).from(matterFeeStages).where(eq(matterFeeStages.matterId, id));
+      if (!stages.some((st) => st.invoiceId !== null)) {
+        const next = data.billingType === "tarifa_fija" && data.fixedFeeCents && service ? service.stages : [];
+        if (next.length || stages.length) await replaceMatterStages(tx, id, data.fixedFeeCents ?? 0, next);
+      }
+    }
     if (visibility !== current.visibility) {
       await logAccessChange(id, user.id, "visibilidad", `Visibilidad: ${describeVisibility(visibility)} (el nuevo cliente es confidencial)`, tx);
     }
@@ -161,6 +198,13 @@ export async function updateMatterAction(
   // Si quien edita ya no ve el expediente (se quitó como responsable), no se le deja en un 404.
   if (!(await getAccessibleMatter(user, id))) redirect("/expedientes");
   redirect(`/expedientes/${id}`);
+}
+
+/** El servicio del tarifario (null si no se eligió; false si no existe). */
+async function serviceFor(serviceId: number | null): Promise<{ id: number; stages: { name: string; percent: number }[] } | null | false> {
+  if (!serviceId) return null;
+  const [svc] = await db.select({ id: feeServices.id, stages: feeServices.stages }).from(feeServices).where(eq(feeServices.id, serviceId)).limit(1);
+  return svc ?? false;
 }
 
 const statusSchema = z.enum(["abierto", "en_curso", "en_espera", "cerrado", "archivado"]);

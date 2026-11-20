@@ -4,7 +4,9 @@ import { Field } from "@/components/ui";
 import type { Matter } from "@/db/schema";
 import type { ActionState } from "@/lib/actions";
 import { todayISO } from "@/lib/dates";
-import { areaLabels, billingTypeLabels, entries } from "@/lib/labels";
+import { areaLabels, entries } from "@/lib/labels";
+import type { GuideService } from "@/lib/tariff";
+import { BillingFields } from "./billing-fields";
 
 type Option = { id: number; name: string };
 
@@ -17,6 +19,8 @@ export function MatterForm({
   defaultResponsibleId,
   canChangeResponsible = true,
   cancelHref,
+  services,
+  adjustBp,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   matter?: Matter;
@@ -27,8 +31,10 @@ export function MatterForm({
   /** Falso si no puedes cambiar el responsable (no eres administrador ni el responsable actual). */
   canChangeResponsible?: boolean;
   cancelHref: string;
+  /** Tarifario activo (guía de precios) y ajuste del arancel. */
+  services: GuideService[];
+  adjustBp: number;
 }) {
-  const fee = matter?.fixedFeeCents != null ? (matter.fixedFeeCents / 100).toFixed(2).replace(".", ",") : "";
   return (
     <ActionForm action={action} className="card card-pad space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -90,18 +96,17 @@ export function MatterForm({
         <Field label="Descripción" className="sm:col-span-2">
           <textarea className="input min-h-28" name="description" defaultValue={matter?.description ?? ""} maxLength={10000} />
         </Field>
-        <Field label="Modalidad de honorarios">
-          <select className="input" name="billingType" defaultValue={matter?.billingType ?? "por_horas"}>
-            {entries(billingTypeLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Honorarios pactados (solo tarifa fija)" hint="Importe sin IVA, p. ej. 1.500,00">
-          <input className="input" name="fixedFee" defaultValue={fee} inputMode="decimal" />
-        </Field>
+        <BillingFields
+          services={services}
+          adjustBp={adjustBp}
+          initial={{
+            billingType: matter?.billingType ?? "por_horas",
+            serviceId: matter?.serviceId ?? null,
+            feeBaseCents: matter?.feeBaseCents ?? null,
+            fixedFeeCents: matter?.fixedFeeCents ?? null,
+            hourlyRateCents: matter?.hourlyRateCents ?? null,
+          }}
+        />
       </div>
       <div className="flex gap-2">
         <SubmitButton>Guardar expediente</SubmitButton>

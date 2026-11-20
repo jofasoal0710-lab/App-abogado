@@ -19,6 +19,8 @@ export type Intent =
   | { kind: "consulta"; question: string }
   /** Cálculo de liquidación laboral a partir de la antigüedad y el salario. */
   | { kind: "liquidacion"; question: string }
+  /** Honorarios: tarifario del despacho, arancel oficial y timbres («¿cuánto cobro por un traspaso?»). */
+  | { kind: "tarifa"; question: string }
   | { kind: "formularios" }
   | { kind: "generar"; template: string | null; ref: string | null }
   | { kind: "escritos"; ref: string | null }
@@ -77,7 +79,7 @@ export function subject(text: string, extraStop: string[] = []): string {
 }
 
 export type ActionVerb = "crear" | "modificar" | "borrar" | "consultar";
-export type ActionEntity = "cliente" | "expediente" | "evento" | "factura" | "documento" | "horas" | "nota" | "escritura" | "conocimiento" | "usuario" | "escrito";
+export type ActionEntity = "cliente" | "expediente" | "evento" | "factura" | "documento" | "horas" | "nota" | "escritura" | "conocimiento" | "usuario" | "escrito" | "tarifario";
 
 const VERBS: [RegExp, ActionVerb][] = [
   [/\b(crear|crea|creo|nuevo|nueva|agregar|agrega|agrego|anadir|anade|ingresar|ingresa|ingreso|registrar|registra|registro|dar de alta|alta de|abrir un|abrir una|subir|sube|cargar|hacer una?|hago una?|emitir una?)\b/, "crear"],
@@ -97,6 +99,7 @@ const ENTITIES: [RegExp, ActionEntity][] = [
   [/\b(conocimiento|entrada de conocimiento)\b/, "conocimiento"],
   [/\b(usuarios?|abogad[oa]s? al equipo|miembros? del equipo|persona al equipo)\b/, "usuario"],
   [/\bescritos?\b/, "escrito"],
+  [/\b(tarifario|servicios? del tarifario|servicios? del despacho)\b/, "tarifario"],
 ];
 
 /** «Quiero ingresar un nuevo cliente», «editar el expediente EXP-2026-0001», «borrar el plazo de mañana». */
@@ -112,6 +115,9 @@ export function parseAction(text: string): { verb: ActionVerb; entity: ActionEnt
   return { verb, entity: ent, target };
 }
 
+const FEE_TOPIC =
+  /\b(cuanto (cobro|cobrar|cobra|cobran|cobramos|se cobra|se cobran|debo cobrar|deberia cobrar|puedo cobrar|cuesta|vale|sale|es el minimo)|honorarios?|arancel|tarifas?|tarifario|hora profesional|timbres?|cobrar por|precio (de|por|del))\b/;
+
 /** Temas jurídicos: la pregunta va a la base de conocimiento y a las leyes, no a los datos del despacho. */
 const LEGAL_TOPIC =
   /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra)\b/;
@@ -120,6 +126,9 @@ export function parseIntent(raw: string): Intent {
   const text = raw.slice(0, 300);
   const n = normalize(text);
   if (!n || /^(hola|buenas|ayuda|help|que puedes hacer|que sabes hacer|menu|opciones)\b/.test(n)) return { kind: "ayuda" };
+
+  // Honorarios y tarifas (antes que «escritura» o «hacer»: «¿cuánto cobro por hacer una escritura?»)
+  if (FEE_TOPIC.test(n) && !expRef(n) && !/\bfacturas?\b/.test(n) && parseAction(text)?.entity !== "tarifario") return { kind: "tarifa", question: text };
 
   // Generar o redactar un escrito o escritura («genera una demanda laboral para EXP-2026-0001»)
   if (/\b(genera|generar|genere|redacta|redactar|redacte|prepara|preparar|hacer|haz|crea|crear|nuevo|nueva)\b/.test(n) && (matchTemplate(n) || /\b(escrito|escritura|formulario)\b/.test(n))) {

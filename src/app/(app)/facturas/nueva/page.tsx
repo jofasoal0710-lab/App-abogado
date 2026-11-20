@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
-import { clients, matters, timeEntries, users } from "@/db/schema";
+import { clients, matterFeeStages, matters, timeEntries, users } from "@/db/schema";
 import { clientAccessSql, getAccessibleClient, getAccessibleMatter, matterAccessSql } from "@/lib/access";
 import { requirePermission } from "@/lib/auth";
 import { config } from "@/lib/config";
@@ -101,6 +101,11 @@ export default async function NewInvoicePage({
         .orderBy(asc(timeEntries.workedOn), asc(timeEntries.id))
     : [];
 
+  const stages = matter
+    ? await db.select().from(matterFeeStages).where(eq(matterFeeStages.matterId, matter.id)).orderBy(asc(matterFeeStages.position))
+    : [];
+  const pendingStages = stages.filter((st) => st.invoiceId === null);
+
   const today = todayISO();
   const fixedFee = matter?.billingType === "tarifa_fija" ? matter.fixedFeeCents : null;
 
@@ -174,7 +179,36 @@ export default async function NewInvoicePage({
           </section>
         )}
 
-        {matter && matter.billingType === "tarifa_fija" && (
+        {matter && stages.length > 0 && (
+          <section className="card">
+            <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Honorarios por etapas</h2>
+            {pendingStages.length === 0 ? (
+              <EmptyState title="Todas las etapas ya están facturadas" />
+            ) : (
+              <table className="table">
+                <tbody>
+                  {stages.map((st, i) => (
+                    <tr key={st.id} className={st.invoiceId ? "opacity-60" : ""}>
+                      <td className="w-px">
+                        {st.invoiceId ? (
+                          <span className="text-xs text-ink-500">Facturada</span>
+                        ) : (
+                          <input type="checkbox" name="stage" value={st.id} defaultChecked={st.id === pendingStages[0].id} aria-label={`Facturar la etapa ${st.name}`} />
+                        )}
+                      </td>
+                      <td>
+                        Etapa {i + 1} de {stages.length}: {st.name}
+                      </td>
+                      <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(st.amountCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
+
+        {matter && matter.billingType === "tarifa_fija" && stages.length === 0 && (
           <section className="card card-pad">
             <h2 className="mb-3 font-serif text-lg font-semibold">Honorarios fijos</h2>
             <label className="flex items-center gap-2 text-sm">
