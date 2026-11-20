@@ -57,7 +57,7 @@ export function ArticlePicker({ onInsert }: { onInsert: (text: string) => void }
       {pending && <p className="mt-2 text-xs text-ink-500">Buscando…</p>}
       {results && results.length === 0 && !pending && <p className="mt-2 text-xs text-ink-500">Sin resultados. Prueba con el número y la ley: «28 trabajo».</p>}
       {results && results.length > 0 && (
-        <ul className="mt-2 max-h-80 divide-y divide-brand-100 overflow-y-auto rounded-md bg-white">
+        <ul className="mt-2 max-h-80 divide-y divide-brand-100 overflow-y-auto rounded-md bg-surface">
           {results.map((r) => (
             <li key={r.key} className="px-3 py-2 text-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -90,7 +90,7 @@ export function PreviewDialog({ blocks, onClose }: { blocks: Block[]; onClose: (
   }, []);
   return (
     <dialog ref={ref} onClose={onClose} aria-label="Vista previa" className="m-auto max-h-[92vh] w-[min(56rem,96vw)] rounded-xl p-0 backdrop:bg-ink-900/50">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-100 bg-white px-5 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-100 bg-surface px-5 py-3">
         <p className="font-serif text-lg font-semibold">Vista previa</p>
         <button type="button" className="btn-secondary btn-sm" onClick={() => ref.current?.close()}>
           Cerrar
@@ -124,7 +124,7 @@ export function SpellingPanel({ results, onFix, onClose }: { results: FieldIssue
             {r.issues.map((i, n) => {
               const id = `${r.field}-${i.index}-${n}`;
               return (
-                <li key={id} className="rounded-md bg-white px-3 py-2 text-sm">
+                <li key={id} className="rounded-md bg-surface px-3 py-2 text-sm">
                   <span className="mr-2 rounded bg-ink-100 px-1.5 py-0.5 text-xs text-ink-600">{ISSUE_LABELS[i.kind]}</span>
                   {i.message}
                   <span className="mt-0.5 block text-xs text-ink-500">{i.excerpt}</span>

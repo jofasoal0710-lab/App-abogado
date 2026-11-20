@@ -49,14 +49,14 @@ export function AssistantChat() {
         <section
           role="dialog"
           aria-label="Asistente del despacho"
-          className="flex h-[min(34rem,calc(100dvh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-2xl shadow-brand-900/20"
+          className="flex h-[min(34rem,calc(100dvh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-2xl shadow-brand-900/20"
         >
           <header className="flex items-center justify-between bg-brand-700 px-4 py-3 text-white">
             <div>
               <p className="font-serif text-base font-semibold">Asistente</p>
-              <p className="text-xs text-brand-100">Despacho, conocimiento, leyes y cálculos</p>
+              <p className="text-xs text-white/80">Despacho, conocimiento, leyes y cálculos</p>
             </div>
-            <button onClick={() => setOpen(false)} className="rounded-md p-2 text-brand-100 hover:bg-white/10 hover:text-white" aria-label="Cerrar el asistente">
+            <button onClick={() => setOpen(false)} className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Cerrar el asistente">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
@@ -71,7 +71,7 @@ export function AssistantChat() {
                 </p>
               ) : (
                 <div key={i} className="max-w-[92%] space-y-2">
-                  <div className="rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-800">
+                  <div className="rounded-2xl rounded-bl-sm border border-ink-200 bg-surface px-3.5 py-2.5 text-sm text-ink-800">
                     <p className="whitespace-pre-line">{m.text}</p>
                     {m.items && m.items.length > 0 && (
                       <ul className="mt-2 divide-y divide-ink-100">
@@ -93,7 +93,7 @@ export function AssistantChat() {
                   {m.suggestions && i === messages.length - 1 && (
                     <div className="flex flex-wrap gap-1.5">
                       {m.suggestions.map((s) => (
-                        <button key={s} onClick={() => ask(s)} className="rounded-full border border-brand-200 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50">
+                        <button key={s} onClick={() => ask(s)} className="rounded-full border border-brand-200 bg-surface px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50">
                           {s}
                         </button>
                       ))}
@@ -110,7 +110,7 @@ export function AssistantChat() {
               e.preventDefault();
               ask(input);
             }}
-            className="flex gap-2 border-t border-ink-200 bg-white p-3"
+            className="flex gap-2 border-t border-ink-200 bg-surface p-3"
           >
             <input
               ref={inputRef}

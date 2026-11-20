@@ -29,7 +29,7 @@ export default async function LoginPage({
             <Icon name="balanza" className="h-6 w-6" />
           </span>
           <p className="font-serif text-3xl font-semibold text-white">{config.firmName}</p>
-          <p className="mt-1 text-sm text-brand-100">Acceso al sistema de gestión</p>
+          <p className="mt-1 text-sm text-white/80">Acceso al sistema de gestión</p>
         </div>
         <div className="card card-pad shadow-xl shadow-brand-900/30">
           <ActionForm action={loginAction} className="space-y-4">

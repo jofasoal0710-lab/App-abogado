@@ -11,6 +11,7 @@ import { MAX_PER_EMAIL, MAX_PER_IP, MAX_PER_IP_EMAIL, clearFailures, emailKey, i
 import { safeNext } from "@/lib/safe-redirect";
 import { loggedRecently, logSecurityEvent, requestMeta } from "@/lib/security-log";
 import { createSession, destroySession } from "@/lib/session";
+import { restoreUserTheme } from "@/lib/theme-server";
 
 // Se compara siempre contra un hash real (aunque el usuario no exista) para que el
 // tiempo de respuesta no revele si el correo está registrado.
@@ -66,6 +67,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   // haciendo que la víctima inicie sesión).
   await clearFailures(byIp);
   await createSession(user.id, { ip, userAgent });
+  await restoreUserTheme(user.id);
   await logSecurityEvent("login_ok", { actorId: user.id, targetId: user.id, email, ip, detail: userAgent?.slice(0, 200) });
   if (user.mustChangePassword) redirect(`/cambiar-contrasena?next=${encodeURIComponent(next)}`);
   redirect(next);

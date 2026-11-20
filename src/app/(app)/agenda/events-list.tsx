@@ -43,7 +43,7 @@ export function EventsList({
                 aria-label={e.completed ? "Marcar como pendiente" : "Marcar como completado"}
                 title={e.completed ? "Marcar como pendiente" : "Marcar como completado"}
                 className={`relative mt-0.5 flex h-5 w-5 items-center before:absolute before:-inset-3 before:content-[''] justify-center rounded border text-xs ${
-                  e.completed ? "border-emerald-600 bg-emerald-600 text-white" : "border-ink-300 bg-white text-transparent hover:border-brand-500"
+                  e.completed ? "border-emerald-600 bg-emerald-600 text-white" : "border-ink-300 bg-surface text-transparent hover:border-brand-500"
                 }`}
               >
                 ✓

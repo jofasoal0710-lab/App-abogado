@@ -27,7 +27,7 @@ export default async function ForcedPasswordChangePage({ searchParams }: { searc
             <Icon name="balanza" className="h-6 w-6" />
           </span>
           <p className="font-serif text-3xl font-semibold text-white">{config.firmName}</p>
-          <p className="mt-1 text-sm text-brand-100">Elige tu contraseña</p>
+          <p className="mt-1 text-sm text-white/80">Elige tu contraseña</p>
         </div>
         <div className="card card-pad shadow-xl shadow-brand-900/30">
           <p className="mb-4 text-sm text-ink-700">
@@ -37,7 +37,7 @@ export default async function ForcedPasswordChangePage({ searchParams }: { searc
           <PasswordForm next={safeNext(next)} submitLabel="Guardar y entrar" />
         </div>
         <form action={logoutAction} className="mt-4 text-center">
-          <button className="text-sm text-brand-100 hover:text-white">Salir sin cambiarla</button>
+          <button className="text-sm text-white/80 hover:text-white">Salir sin cambiarla</button>
         </form>
       </div>
     </main>

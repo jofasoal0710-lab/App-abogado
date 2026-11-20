@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
+import { currentTheme } from "@/lib/theme-server";
 
 // Tipografías alojadas por la propia app (next/font las descarga al compilar): no se pide nada a
 // Google desde el navegador y la política de seguridad de contenido no cambia.
@@ -13,9 +14,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // La apariencia elegida (modo, paleta y barra lateral) se aplica desde el servidor: sin parpadeo.
+  const theme = await currentTheme();
   return (
-    <html lang="es" className={`${display.variable} ${body.variable}`}>
+    <html lang="es" className={`${display.variable} ${body.variable}`} data-theme={theme.mode} data-palette={theme.palette} data-sidebar={theme.sidebar}>
       <body className="min-h-screen font-sans">{children}</body>
     </html>
   );

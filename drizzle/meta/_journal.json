@@ -141,6 +141,13 @@
       "when": 1795189147167,
       "tag": "0019_base_conocimiento",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795193173915,
+      "tag": "0020_apariencia",
+      "breakpoints": true
     }
   ]
 }

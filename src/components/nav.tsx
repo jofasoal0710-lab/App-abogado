@@ -17,11 +17,11 @@ export function Nav({ items }: { items: NavItem[] }) {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white ${
-              active ? "bg-white text-brand-700 shadow-sm" : "text-brand-100 hover:bg-white/10 hover:text-white"
+            className={`flex items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-side-fg ${
+              active ? "bg-side-active text-side-active-fg shadow-sm" : "text-side-muted hover:bg-side-hover hover:text-side-fg"
             }`}
           >
-            <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-brand-600" : "text-brand-200"}`} />
+            <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-side-active-fg" : "text-side-muted"}`} />
             {item.label}
           </Link>
         );

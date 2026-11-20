@@ -113,6 +113,10 @@ export const users = pgTable(
     passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     /** Carné del Colegio de Abogados (sale en la firma de los escritos). */
     barNumber: text("bar_number"),
+    /** Apariencia elegida (ver lib/theme.ts): modo claro/oscuro/sistema, paleta y estilo de la barra lateral. */
+    themeMode: text("theme_mode"),
+    themePalette: text("theme_palette"),
+    themeSidebar: text("theme_sidebar"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],

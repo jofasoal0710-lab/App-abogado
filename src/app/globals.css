@@ -3,32 +3,153 @@
 @theme {
   --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-serif: var(--font-display), "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  /* Tinta: grises con un punto de azul, para que convivan con la marca. */
-  --color-ink-50: #f3f6fb;
-  --color-ink-100: #e8edf5;
-  --color-ink-200: #d5dce8;
-  --color-ink-300: #b4bfd0;
-  --color-ink-400: #8592a8;
-  --color-ink-500: #5a6780;
-  --color-ink-600: #434e63;
-  --color-ink-700: #323b4d;
-  --color-ink-800: #1f2737;
-  --color-ink-900: #131a28;
-  /* Azul del despacho: el menú lateral es brand-700; botones y enlaces, brand-600. */
-  --color-brand-50: #eef4fe;
-  --color-brand-100: #d9e7fc;
-  --color-brand-200: #b4cef7;
-  --color-brand-300: #84aeee;
-  --color-brand-400: #4f86e0;
-  --color-brand-500: #2a68d1;
-  --color-brand-600: #1f57b8;
-  --color-brand-700: #1a4794;
-  --color-brand-800: #163a77;
-  --color-brand-900: #112d5c;
+  /* Los colores salen de la paleta y el modo elegidos (ver «Apariencia» más abajo). */
+  --color-ink-50: var(--t-ink-50);
+  --color-ink-100: var(--t-ink-100);
+  --color-ink-200: var(--t-ink-200);
+  --color-ink-300: var(--t-ink-300);
+  --color-ink-400: var(--t-ink-400);
+  --color-ink-500: var(--t-ink-500);
+  --color-ink-600: var(--t-ink-600);
+  --color-ink-700: var(--t-ink-700);
+  --color-ink-800: var(--t-ink-800);
+  --color-ink-900: var(--t-ink-900);
+  --color-brand-50: var(--t-brand-50);
+  --color-brand-100: var(--t-brand-100);
+  --color-brand-200: var(--t-brand-200);
+  --color-brand-300: var(--p-300);
+  --color-brand-400: var(--p-400);
+  --color-brand-500: var(--p-500);
+  --color-brand-600: var(--p-600);
+  --color-brand-700: var(--p-700);
+  --color-brand-800: var(--p-800);
+  --color-brand-900: var(--p-900);
+  /* Superficie de tarjetas, campos y paneles (blanca en claro, oscura en oscuro). */
+  --color-surface: var(--t-surface);
+  /* Barra lateral. */
+  --color-side: var(--t-side);
+  --color-side-2: var(--t-side-2);
+  --color-side-fg: var(--t-side-fg);
+  --color-side-muted: var(--t-side-muted);
+  --color-side-hover: var(--t-side-hover);
+  --color-side-active: var(--t-side-active);
+  --color-side-active-fg: var(--t-side-active-fg);
   --color-gold-500: #b8893a;
 }
 
-html { color-scheme: light; }
+/* ================= Apariencia: paletas, modo claro/oscuro y barra lateral ================= */
+
+/* Paletas (escala 300–900; el 600 tiene contraste suficiente con texto blanco). */
+:root, [data-palette="azul"] {
+  --p-50: #eef4fe; --p-100: #d9e7fc; --p-200: #b4cef7; --p-300: #84aeee; --p-400: #4f86e0;
+  --p-500: #2a68d1; --p-600: #1f57b8; --p-700: #1a4794; --p-800: #163a77; --p-900: #112d5c;
+}
+[data-palette="esmeralda"] {
+  --p-50: #ecfdf5; --p-100: #d1fae5; --p-200: #a7f3d0; --p-300: #6ee7b7; --p-400: #34d399;
+  --p-500: #059669; --p-600: #047857; --p-700: #065f46; --p-800: #064e3b; --p-900: #053b2e;
+}
+[data-palette="turquesa"] {
+  --p-50: #f0fdfa; --p-100: #ccfbf1; --p-200: #99f6e4; --p-300: #5eead4; --p-400: #2dd4bf;
+  --p-500: #0d9488; --p-600: #0f766e; --p-700: #115e59; --p-800: #134e4a; --p-900: #0f3d3a;
+}
+[data-palette="vino"] {
+  --p-50: #fdf2f4; --p-100: #fbe4e8; --p-200: #f5c2cc; --p-300: #ec94a5; --p-400: #dd5f78;
+  --p-500: #c43a58; --p-600: #a82645; --p-700: #8c1d3a; --p-800: #731a33; --p-900: #5c162b;
+}
+[data-palette="morado"] {
+  --p-50: #f5f3ff; --p-100: #ede9fe; --p-200: #ddd6fe; --p-300: #c4b5fd; --p-400: #a78bfa;
+  --p-500: #8b5cf6; --p-600: #7c3aed; --p-700: #6d28d9; --p-800: #5b21b6; --p-900: #4c1d95;
+}
+[data-palette="terracota"] {
+  --p-50: #fdf5f1; --p-100: #fae7dd; --p-200: #f4cab5; --p-300: #eba584; --p-400: #df7b53;
+  --p-500: #cc5d34; --p-600: #b04a28; --p-700: #8f3c22; --p-800: #74331f; --p-900: #5f2c1c;
+}
+[data-palette="grafito"] {
+  --p-50: #f8fafc; --p-100: #f1f5f9; --p-200: #e2e8f0; --p-300: #cbd5e1; --p-400: #94a3b8;
+  --p-500: #64748b; --p-600: #475569; --p-700: #334155; --p-800: #1e293b; --p-900: #0f172a;
+}
+
+/* Modo claro (por defecto): fondo con un toque de la paleta. */
+:root {
+  color-scheme: light;
+  --t-ink-50: color-mix(in oklab, var(--p-100) 30%, #f4f6fa);
+  --t-ink-100: #e8edf5; --t-ink-200: #d5dce8; --t-ink-300: #b4bfd0; --t-ink-400: #8592a8;
+  --t-ink-500: #5a6780; --t-ink-600: #434e63; --t-ink-700: #323b4d; --t-ink-800: #1f2737; --t-ink-900: #131a28;
+  --t-brand-50: var(--p-50); --t-brand-100: var(--p-100); --t-brand-200: var(--p-200);
+  --t-surface: #ffffff;
+}
+
+/* Modo oscuro: superficies oscuras con un matiz de la paleta, texto claro y colores de estado suavizados. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --t-ink-50: color-mix(in oklab, var(--p-900) 22%, #0b0f17);
+  --t-ink-100: color-mix(in oklab, var(--p-900) 18%, #161c28);
+  --t-ink-200: #2a3345; --t-ink-300: #3a4458; --t-ink-400: #6b778d; --t-ink-500: #8f9ab0;
+  --t-ink-600: #adb6c7; --t-ink-700: #c7cfdb; --t-ink-800: #dfe5ee; --t-ink-900: #f0f3f8;
+  --t-brand-50: color-mix(in oklab, var(--p-500) 16%, #131a26);
+  --t-brand-100: color-mix(in oklab, var(--p-500) 26%, #131a26);
+  --t-brand-200: color-mix(in oklab, var(--p-500) 38%, #131a26);
+  --t-surface: color-mix(in oklab, var(--p-900) 14%, #131a26);
+  --color-red-50: #2b1416; --color-red-100: #3a1a1d; --color-red-200: #5c2328; --color-red-300: #7a2c33;
+  --color-red-600: #f87171; --color-red-700: #fca5a5; --color-red-800: #fecaca;
+  --color-emerald-50: #0f261e; --color-emerald-200: #1f4a3a; --color-emerald-700: #6ee7b7; --color-emerald-800: #a7f3d0;
+  --color-amber-50: #2a210d; --color-amber-100: #3a2c10; --color-amber-200: #5a4416; --color-amber-700: #fbbf24; --color-amber-800: #fcd34d; --color-amber-900: #fde68a;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --t-ink-50: color-mix(in oklab, var(--p-900) 22%, #0b0f17);
+    --t-ink-100: color-mix(in oklab, var(--p-900) 18%, #161c28);
+    --t-ink-200: #2a3345; --t-ink-300: #3a4458; --t-ink-400: #6b778d; --t-ink-500: #8f9ab0;
+    --t-ink-600: #adb6c7; --t-ink-700: #c7cfdb; --t-ink-800: #dfe5ee; --t-ink-900: #f0f3f8;
+    --t-brand-50: color-mix(in oklab, var(--p-500) 16%, #131a26);
+    --t-brand-100: color-mix(in oklab, var(--p-500) 26%, #131a26);
+    --t-brand-200: color-mix(in oklab, var(--p-500) 38%, #131a26);
+    --t-surface: color-mix(in oklab, var(--p-900) 14%, #131a26);
+    --color-red-50: #2b1416; --color-red-100: #3a1a1d; --color-red-200: #5c2328; --color-red-300: #7a2c33;
+    --color-red-600: #f87171; --color-red-700: #fca5a5; --color-red-800: #fecaca;
+    --color-emerald-50: #0f261e; --color-emerald-200: #1f4a3a; --color-emerald-700: #6ee7b7; --color-emerald-800: #a7f3d0;
+    --color-amber-50: #2a210d; --color-amber-100: #3a2c10; --color-amber-200: #5a4416; --color-amber-700: #fbbf24; --color-amber-800: #fcd34d; --color-amber-900: #fde68a;
+  }
+}
+
+/* En oscuro, el texto «de color» (enlaces, pestañas activas, etiquetas) usa el tono claro de la paleta. */
+:root[data-theme="dark"] :is(.text-brand-600, .text-brand-700, .text-brand-800, .text-brand-900, .badge-blue, .link, .hover\:text-brand-700:hover):not(.bg-white, .paper *),
+:root[data-theme="dark"] .link:hover { color: var(--p-300); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] :is(.text-brand-600, .text-brand-700, .text-brand-800, .text-brand-900, .badge-blue, .link, .hover\:text-brand-700:hover):not(.bg-white, .paper *),
+  :root[data-theme="system"] .link:hover { color: var(--p-300); }
+}
+
+/* Barra lateral: del color de la paleta (por defecto), oscura o clara. */
+:root, [data-sidebar="color"] {
+  --t-side: var(--p-700); --t-side-2: color-mix(in oklab, var(--p-900) 55%, transparent);
+  --t-side-fg: #ffffff; --t-side-muted: color-mix(in oklab, #ffffff 72%, var(--p-700));
+  --t-side-hover: rgb(255 255 255 / 0.1); --t-side-active: #ffffff; --t-side-active-fg: var(--p-700);
+}
+[data-sidebar="oscura"] {
+  --t-side: #111723; --t-side-2: #1b2331;
+  --t-side-fg: #f1f4f9; --t-side-muted: #9aa5b8;
+  --t-side-hover: rgb(255 255 255 / 0.07); --t-side-active: color-mix(in oklab, var(--p-500) 28%, #111723); --t-side-active-fg: #ffffff;
+}
+[data-sidebar="clara"] {
+  --t-side: var(--t-surface); --t-side-2: var(--t-ink-100);
+  --t-side-fg: var(--t-ink-900); --t-side-muted: var(--t-ink-600);
+  --t-side-hover: var(--t-ink-100); --t-side-active: var(--t-brand-100); --t-side-active-fg: var(--p-700);
+}
+:root[data-theme="dark"][data-sidebar="clara"] { --t-side-active-fg: var(--p-300); }
+
+/* Hoja de papel (escritos y documentos de Word): siempre en claro, como saldrá impresa. */
+/* (Las variables --color-* se fijan aquí y no en --t-*: una variable se resuelve donde se declara.) */
+.paper {
+  color-scheme: light;
+  --color-ink-50: #f4f6fa; --color-ink-100: #e8edf5; --color-ink-200: #d5dce8; --color-ink-300: #b4bfd0; --color-ink-400: #8592a8;
+  --color-ink-500: #5a6780; --color-ink-600: #434e63; --color-ink-700: #323b4d; --color-ink-800: #1f2737; --color-ink-900: #131a28;
+  --color-surface: #ffffff;
+  background-color: #ffffff;
+  color: #131a28;
+}
+
 body { @apply bg-ink-50 text-ink-800 antialiased; }
 
 @utility btn {
@@ -40,16 +161,16 @@ body { @apply bg-ink-50 text-ink-800 antialiased; }
 }
 
 @layer components {
-  .card { @apply min-w-0 rounded-xl border border-ink-200/80 bg-white; }
+  .card { @apply min-w-0 rounded-xl border border-ink-200/80 bg-surface; }
   .card-pad { @apply p-5; }
 
   .btn-primary { @apply btn bg-brand-600 text-white shadow-xs hover:bg-brand-700; }
-  .btn-secondary { @apply btn border border-ink-300 bg-white text-ink-700 hover:bg-ink-50; }
-  .btn-danger { @apply btn border border-red-300 bg-white text-red-700 hover:bg-red-50; }
+  .btn-secondary { @apply btn border border-ink-300 bg-surface text-ink-700 hover:bg-ink-50; }
+  .btn-danger { @apply btn border border-red-300 bg-surface text-red-700 hover:bg-red-50; }
   .btn-ghost { @apply btn text-ink-600 hover:bg-ink-100; }
   .btn-sm { @apply px-2.5 py-1.5 text-xs; }
 
-  .input { @apply block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-base text-ink-900 sm:text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-2 focus:outline-brand-500/30 disabled:bg-ink-100; }
+  .input { @apply block w-full rounded-md border border-ink-300 bg-surface px-3 py-2 text-base text-ink-900 sm:text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-2 focus:outline-brand-500/30 disabled:bg-ink-100; }
   .label { @apply mb-1 block text-sm font-medium text-ink-700; }
   .hint { @apply mt-1 text-xs text-ink-500; }
 

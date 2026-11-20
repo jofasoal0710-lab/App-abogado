@@ -9,6 +9,8 @@ import { requireUser } from "@/lib/auth";
 import { hashSessionId, readSessionCookie } from "@/lib/session";
 import { closeOtherSessionsAction } from "./actions";
 import { PasswordForm } from "./password-form";
+import { AppearanceForm } from "./appearance-form";
+import { currentTheme } from "@/lib/theme-server";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 
@@ -36,6 +38,12 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader title="Mi cuenta" subtitle={`${user.name} · ${user.email} · ${user.roleName}`} />
+
+      <section id="apariencia" className="card card-pad mb-6">
+        <h2 className="mb-1 font-serif text-lg font-semibold">Apariencia</h2>
+        <p className="mb-4 text-sm text-ink-600">Elige el modo claro u oscuro, la paleta de colores y cómo se ve el menú. Solo cambia para ti.</p>
+        <AppearanceForm current={await currentTheme()} />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card card-pad">

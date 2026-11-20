@@ -3,7 +3,7 @@ import { ordinal, type Block } from "@/lib/forms/engine";
 /** Documento redactado, con formato de escrito (letra con serifa, justificado, interlineado amplio). */
 export function LegalDocument({ blocks }: { blocks: Block[] }) {
   return (
-    <article className="legal-doc mx-auto max-w-[46rem] bg-white px-6 py-10 font-serif text-[17px] leading-[1.9] text-ink-900 sm:px-14">
+    <article className="paper legal-doc mx-auto max-w-[46rem] bg-white px-6 py-10 font-serif text-[17px] leading-[1.9] text-ink-900 sm:px-14">
       {blocks.map((b, i) => {
         switch (b.t) {
           case "titulo":

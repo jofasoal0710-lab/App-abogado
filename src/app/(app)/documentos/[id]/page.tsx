@@ -91,7 +91,7 @@ export default async function DocumentViewerPage({ params }: { params: Promise<{
         </div>
       )}
       {wordHtml !== null && (
-        <article className="card mx-auto max-w-3xl bg-white px-8 py-10 font-serif text-[15px] leading-relaxed text-ink-900 [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:border-ink-200 [&_td]:p-1.5 [&_ul]:list-disc">
+        <article className="paper card mx-auto max-w-3xl bg-white px-8 py-10 font-serif text-[15px] leading-relaxed text-ink-900 [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:border-ink-200 [&_td]:p-1.5 [&_ul]:list-disc">
           <p className="mb-4 font-sans text-xs text-ink-500">Vista del contenido del Word (sin el formato exacto de página). Para la versión original, descárgalo.</p>
           <div dangerouslySetInnerHTML={{ __html: wordHtml }} />
         </article>

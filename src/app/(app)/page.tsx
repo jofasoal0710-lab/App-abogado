@@ -152,11 +152,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Icon name="balanza" className="pointer-events-none absolute -right-6 -top-8 h-56 w-56 text-white/[0.06]" />
         <div className="relative flex flex-wrap items-end justify-between gap-5">
           <div className="min-w-0">
-            <p className="text-sm text-brand-200 first-letter:uppercase">
+            <p className="text-sm text-white/70 first-letter:uppercase">
               {new Date().toLocaleDateString(appLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </p>
             <h1 className="mt-1 font-serif text-3xl font-semibold sm:text-4xl">Hola, {user.name.split(" ")[0]}</h1>
-            <p className="mt-2 max-w-xl text-brand-100">
+            <p className="mt-2 max-w-xl text-white/80">
               {todayEvents.length > 0
                 ? `Hoy tienes ${todayEvents.length} ${todayEvents.length === 1 ? "evento" : "eventos"}: ${todayEvents[0].title}${todayEvents.length > 1 ? " y más" : ""}.`
                 : week.n > 0
@@ -172,7 +172,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <Link href="/horas" className="btn border border-white/30 text-white hover:bg-white/10">
               Registrar horas
             </Link>
-            <Link href="/expedientes/nuevo" className="btn bg-white text-brand-800 hover:bg-brand-50">
+            <Link href="/expedientes/nuevo" className="btn bg-white text-brand-800 hover:bg-white/90">
               Nuevo expediente
             </Link>
           </div>
