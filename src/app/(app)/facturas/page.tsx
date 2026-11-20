@@ -75,9 +75,14 @@ export default async function InvoicesPage({
         actions={
           <>
             {can(user, "facturacion.emitir") && (
-              <Link href="/facturas/exportar" className="btn-secondary">
-                Exportar CSV
-              </Link>
+              <>
+                <Link href="/facturas/electronica" className="btn-secondary">
+                  Factura electrónica
+                </Link>
+                <Link href="/facturas/exportar" className="btn-secondary">
+                  Exportar CSV
+                </Link>
+              </>
             )}
             <Link href="/facturas/nueva" className="btn-primary">
               Nueva factura

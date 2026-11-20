@@ -1,4 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { DOC_TYPES, type DocType } from "@/lib/einvoice/build";
+import { haciendaEnv } from "@/lib/einvoice/hacienda";
+import { einvoiceStatusLabels } from "@/lib/einvoice/labels";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
@@ -27,6 +30,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       rectifies: true,
       items: { orderBy: (i) => asc(i.id) },
       rectifications: { where: (r) => eq(r.status, "emitida"), orderBy: (r) => asc(r.id) },
+      einvoices: { orderBy: (e) => desc(e.id) },
     },
   });
   if (!inv) return new Response("No encontrado", { status: 404 });
@@ -53,6 +57,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     items: inv.items,
     rectifies: inv.rectifies ? { number: inv.rectifies.number, issueDate: inv.rectifies.issueDate } : null,
     rectifiedBy: inv.rectifications.flatMap((r) => (r.number ? [r.number] : [])),
+    einvoice: (() => {
+      const env = haciendaEnv();
+      const e = inv.einvoices.find((x) => x.environment === env && x.status !== "rechazado" && x.status !== "no_recibido");
+      return e
+        ? { label: DOC_TYPES[e.docType as DocType], consecutive: e.consecutive, clave: e.clave, issuedAt: e.issuedAt, status: einvoiceStatusLabels[e.status] }
+        : null;
+    })(),
   });
 
   const fileName = `${(inv.number ?? `borrador-${inv.id}`).replace(/[^A-Za-z0-9._-]/g, "_")}.pdf`;

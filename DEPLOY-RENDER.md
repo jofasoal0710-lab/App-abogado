@@ -129,6 +129,25 @@ Truco habitual: un servicio externo gratuito (por ejemplo [cron-job.org](https:/
 - Render podría cambiar sus condiciones; no es una garantía.
 - Como alternativa para los avisos, el mismo servicio puede llamar cada hora a `POST /api/cron/recordatorios?respectHour=1` con la cabecera `Authorization: Bearer <CRON_SECRET>` (el secreto está en *Environment*). Es idempotente: no duplica avisos.
 
+## 6b. Factura electrónica (Hacienda, v4.4)
+
+La aplicación genera el comprobante (XML v4.4), lo firma con tu llave criptográfica y lo envía directamente a Hacienda. Empieza **siempre en el ambiente de pruebas**.
+
+1. **Datos del emisor:** en la app, *Facturas → Factura electrónica*: nombre, cédula, actividad económica (6 dígitos), dirección con códigos de provincia, cantón y distrito, y el CABYS predeterminado.
+2. **Credenciales** (solo en Render → *Environment*, nunca en la app ni en un chat):
+   - `HACIENDA_USERNAME`: usuario del API que generas en ATV / TRIBU-CR (`cpf-…` o `cpj-…`).
+   - `HACIENDA_PASSWORD`: su contraseña.
+   - `HACIENDA_P12_BASE64`: la llave `.p12` en base64. En Mac o Linux: `base64 -i llave.p12 | tr -d '\n'`. En Windows (PowerShell): `[Convert]::ToBase64String([IO.File]::ReadAllBytes("llave.p12"))`.
+   - `HACIENDA_P12_PIN`: el PIN de la llave.
+   - `HACIENDA_ENV`: `pruebas` (por defecto) o `produccion`. El usuario, la contraseña y la llave de pruebas son distintos de los de producción.
+3. Pulsa **Probar conexión con Hacienda**. Luego, en una factura emitida, pulsa **Enviar a Hacienda**:
+   - Cliente con cédula, DIMEX o NITE → factura electrónica.
+   - Cliente sin identificación costarricense → tiquete electrónico.
+   - Rectificativa → nota de crédito (si abona) o de débito (si cobra más), con referencia a la factura original, que debe estar aceptada antes.
+4. Para pasar a producción: cambia las 4 credenciales por las de producción y pon `HACIENDA_ENV=produccion`. Si ya facturabas con otro sistema, usa otra terminal (00002) para no repetir consecutivos.
+
+Cada comprobante guarda el XML firmado y la respuesta de Hacienda (descargables desde la factura), y el PDF incluye la clave y el consecutivo. Si un envío queda «sin confirmar», pulsa **Consultar estado** antes de reintentar.
+
 ## 7. Cambios posteriores (despliegue continuo) y seguridad
 
 - Cada `git push` a la rama compila, aplica las migraciones pendientes y publica. Render conserva despliegues anteriores.

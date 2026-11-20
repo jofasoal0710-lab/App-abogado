@@ -209,6 +209,8 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
   const quantity =
     unit === "horas" ? parseDurationToMinutes(str(formData, "quantity")) : parseQuantityToHundredths(str(formData, "quantity"));
   const price = parseMoneyToCents(str(formData, "unitPrice"));
+  const cabys = str(formData, "cabys").replace(/\D/g, "");
+  if (cabys && cabys.length !== 13) return { error: "El código CABYS tiene 13 dígitos." };
   const parsed = itemSchema.safeParse({
     description: str(formData, "description"),
     unit,
@@ -232,7 +234,7 @@ export async function addItemAction(invoiceId: number, _prev: ActionState, formD
   if (draft.kind === "rectificativa" && parsed.data.unitPriceCents === 0) return { error: "El precio no puede ser cero." };
 
   // (El tipo de factura no cambia nunca, así que validar el signo con la lectura previa es seguro.)
-  const failed = await editDraft(invoiceId, (tx) => tx.insert(invoiceItems).values({ invoiceId, ...parsed.data }));
+  const failed = await editDraft(invoiceId, (tx) => tx.insert(invoiceItems).values({ invoiceId, ...parsed.data, cabys: cabys || null }));
   if (failed) return { error: failed.message };
   refresh(invoiceId);
   return { ok: "Línea añadida." };
@@ -441,6 +443,7 @@ export async function createRectificationAction(invoiceId: number, _prev: Action
               unit: it.unit,
               quantity: it.quantity,
               unitPriceCents: it.unitPriceCents,
+              cabys: it.cabys,
               // Sin vínculo con las horas: borrar una línea del abono no debe liberar horas de la original.
               timeEntryId: null,
             })),

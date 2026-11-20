@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { can } from "@/lib/permissions";
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ActionForm, ConfirmButton, PrintButton, SubmitButton } from "@/components/form";
 import { ReadBeacon } from "@/components/read-beacon";
@@ -18,6 +18,11 @@ import { summarizeInvoice } from "@/lib/invoices";
 import { canRectify } from "@/lib/rectification";
 import { entries, invoiceStatusLabels, paymentMethodLabels } from "@/lib/labels";
 import { formatMoney, formatQuantity, invoiceTotals, lineAmountCents } from "@/lib/money";
+import { DOC_TYPES, type DocType } from "@/lib/einvoice/build";
+import { haciendaEnv } from "@/lib/einvoice/hacienda";
+import { einvoiceStatusBadge, einvoiceStatusLabels } from "@/lib/einvoice/labels";
+import { blocksResend } from "@/lib/einvoice/service";
+import { checkHaciendaStatusAction, sendToHaciendaAction } from "../electronica/actions";
 import {
   addItemAction,
   createRectificationAction,
@@ -36,12 +41,12 @@ export default async function InvoicePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; fe_ok?: string; fe_error?: string }>;
 }) {
   const user = await requirePermission("facturacion.ver");
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
-  const { error } = await searchParams;
+  const { error, fe_ok, fe_error } = await searchParams;
 
   const inv = await db.query.invoices.findFirst({
     where: and(eq(invoices.id, id), invoiceAccessSql(user)),
@@ -52,6 +57,7 @@ export default async function InvoicePage({
       items: { orderBy: (i) => asc(i.id) },
       payments: { orderBy: (p) => asc(p.paidAt) },
       rectifications: { with: { items: true }, orderBy: (r) => asc(r.id) },
+      einvoices: { orderBy: (e) => desc(e.id) },
     },
   });
   if (!inv) notFound();
@@ -65,6 +71,10 @@ export default async function InvoicePage({
   const errorMessage = invoiceErrorMessage(error);
 
   const label = inv.number ?? `Borrador #${inv.id}`;
+  const env = haciendaEnv();
+  const envDocs = inv.einvoices.filter((e) => e.environment === env);
+  const canSendEinvoice = manage && (inv.status === "emitida" || inv.status === "pagada") && !envDocs.some(blocksResend);
+  const showHacienda = inv.einvoices.length > 0 || (manage && (inv.status === "emitida" || inv.status === "pagada"));
   const hasTimeLines = inv.items.some((i) => i.timeEntryId !== null);
   return (
     <>
@@ -185,7 +195,10 @@ export default async function InvoicePage({
               )}
               {inv.items.map((it) => (
                 <tr key={it.id}>
-                  <td>{it.description}</td>
+                  <td>
+                    {it.description}
+                    {it.cabys && <span className="block text-xs text-ink-500">CABYS {it.cabys}</span>}
+                  </td>
                   <td className="whitespace-nowrap text-right tabular-nums">{formatQuantity(it)}</td>
                   <td className="whitespace-nowrap text-right tabular-nums">
                     {formatMoney(it.unitPriceCents)}
@@ -272,8 +285,11 @@ export default async function InvoicePage({
               <Field label="Cantidad" className="sm:col-span-2" hint="2 · 1,5 · 1:30 (horas)">
                 <input className="input" name="quantity" defaultValue="1" required />
               </Field>
-              <Field label="Precio (€)" className="sm:col-span-2" hint={isRectification ? "Negativo para abonar (p. ej. -150,00)" : undefined}>
+              <Field label="Precio" className="sm:col-span-2" hint={isRectification ? "Negativo para abonar (p. ej. -150,00)" : undefined}>
                 <input className="input" name="unitPrice" inputMode="decimal" required />
+              </Field>
+              <Field label="CABYS (opcional)" className="sm:col-span-6" hint="13 dígitos. Vacío: el predeterminado de la factura electrónica">
+                <input className="input" name="cabys" inputMode="numeric" maxLength={13} />
               </Field>
             </div>
             <div className="mt-3 flex justify-end">
@@ -344,7 +360,7 @@ export default async function InvoicePage({
             <ActionForm action={registerPaymentAction.bind(null, inv.id)} resetOnSuccess className="card card-pad">
               <h2 className="mb-3 font-serif text-lg font-semibold">Registrar cobro</h2>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Importe (€)">
+                <Field label="Importe">
                   <input
                     className="input"
                     name="amount"
@@ -373,6 +389,81 @@ export default async function InvoicePage({
                 <SubmitButton pendingText="Registrando…">Registrar cobro</SubmitButton>
               </div>
             </ActionForm>
+          )}
+        </section>
+      )}
+
+      {showHacienda && (
+        <section id="hacienda" className="card no-print mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-3">
+            <h2 className="font-serif text-lg font-semibold">
+              Factura electrónica (Hacienda)
+              {env === "pruebas" && <span className="badge-amber ml-2 align-middle">Ambiente de pruebas</span>}
+            </h2>
+            {canSendEinvoice && (
+              <form action={sendToHaciendaAction.bind(null, inv.id)}>
+                <ConfirmButton message="Se firmará el comprobante con tu llave y se enviará a Hacienda. ¿Continuar?" className="btn-primary btn-sm">
+                  Enviar a Hacienda
+                </ConfirmButton>
+              </form>
+            )}
+          </div>
+          {fe_ok && (
+            <p role="status" className="mx-5 mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {fe_ok}
+            </p>
+          )}
+          {fe_error && (
+            <p role="alert" className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {fe_error}
+            </p>
+          )}
+          {inv.einvoices.length === 0 ? (
+            <p className="px-5 py-5 text-sm text-ink-600">
+              Aún no se ha enviado.{" "}
+              <Link className="link" href="/facturas/electronica">
+                Datos del emisor y credenciales
+              </Link>
+            </p>
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {inv.einvoices.map((e) => (
+                <li key={e.id} className="px-5 py-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={einvoiceStatusBadge[e.status]}>{einvoiceStatusLabels[e.status]}</span>
+                    <span className="font-medium text-ink-900">{DOC_TYPES[e.docType as DocType]}</span>
+                    <span className="text-ink-500">· {e.environment}</span>
+                    <span className="ml-auto tabular-nums">{formatMoney(e.totalCents)}</span>
+                  </div>
+                  <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-ink-600 sm:grid-cols-[auto_1fr]">
+                    <dt>Consecutivo</dt>
+                    <dd className="font-mono">{e.consecutive}</dd>
+                    <dt>Clave</dt>
+                    <dd className="break-all font-mono">{e.clave}</dd>
+                    <dt>Fecha</dt>
+                    <dd>{e.issuedAt.replace("T", " ").slice(0, 19)}</dd>
+                  </dl>
+                  {e.message && <p className="mt-2 text-sm text-red-700">{e.message}</p>}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a className="btn-secondary btn-sm" href={`/api/facturas/${inv.id}/xml?e=${e.id}`}>
+                      XML firmado
+                    </a>
+                    {e.responseXml && (
+                      <a className="btn-secondary btn-sm" href={`/api/facturas/${inv.id}/xml?e=${e.id}&tipo=respuesta`}>
+                        Respuesta de Hacienda
+                      </a>
+                    )}
+                    {manage && e.status !== "aceptado" && e.status !== "no_recibido" && (
+                      <form action={checkHaciendaStatusAction.bind(null, inv.id, e.id)}>
+                        <SubmitButton className="btn-secondary btn-sm" pendingText="Consultando…">
+                          Consultar estado
+                        </SubmitButton>
+                      </form>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       )}

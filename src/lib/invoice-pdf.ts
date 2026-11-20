@@ -23,6 +23,8 @@ export type InvoicePdfInput = {
   rectifies: { number: string | null; issueDate: string } | null;
   /** Números de las rectificativas emitidas que corrigen esta factura. */
   rectifiedBy: string[];
+  /** Comprobante electrónico de Hacienda (representación gráfica): clave y consecutivo. */
+  einvoice?: { label: string; consecutive: string; clave: string; issuedAt: string; status: string } | null;
 };
 
 const A4: [number, number] = [595.28, 841.89];
@@ -163,6 +165,14 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   if (input.rectifiedBy.length) {
     ensure(40); y -= 6;
     for (const ln of wrapText(t(`Esta factura ha sido rectificada por: ${input.rectifiedBy.join(", ")}.`), regular, 9, A4[0] - 2 * M)) { text(ln, M, 9, regular, GRAY); y -= 12; }
+  }
+  if (input.einvoice) {
+    const e = input.einvoice;
+    ensure(60); y -= 12;
+    text(e.label.toUpperCase(), M, 8, bold, GRAY); y -= 13;
+    text(`Consecutivo: ${e.consecutive}`, M, 9.5); y -= 12;
+    text(`Clave: ${e.clave}`, M, 9.5); y -= 12;
+    text(`Fecha de emisión: ${e.issuedAt.replace("T", " ").slice(0, 19)} · Estado en Hacienda: ${e.status}`, M, 9, regular, GRAY); y -= 12;
   }
   if (inv.notes) {
     ensure(40); y -= 10;
