@@ -78,3 +78,31 @@ describe("asistente: consultas jurídicas y cálculos", () => {
     expect(parseIntent("liquidación de 18 meses ganando 450000").kind).toBe("liquidacion");
   });
 });
+
+describe("asistente: crear, modificar, borrar o consultar", () => {
+  const act = (t: string) => {
+    const i = parseIntent(t);
+    return i.kind === "accion" ? `${i.verb} ${i.entity}` : i.kind;
+  };
+  it("entiende las formas de pedir crear", () => {
+    expect(act("quiero ingresar un nuevo cliente")).toBe("crear cliente");
+    expect(act("cómo creo un expediente")).toBe("crear expediente");
+    expect(act("agregar una audiencia")).toBe("crear evento");
+    expect(act("registrar horas")).toBe("crear horas");
+    expect(act("hacer una factura")).toBe("crear factura");
+    expect(act("subir un documento")).toBe("crear documento");
+  });
+  it("modificar, borrar y consultar", () => {
+    expect(act("modificar el cliente Gerson")).toBe("modificar cliente");
+    expect(act("cambiar los datos del expediente EXP-2026-0001")).toBe("modificar expediente");
+    expect(act("cómo borro una factura")).toBe("borrar factura");
+    expect(act("eliminar un plazo")).toBe("borrar evento");
+    expect(act("dónde veo los documentos")).toBe("consultar documento");
+  });
+  it("no confunde las preguntas que ya entendía", () => {
+    expect(act("cliente Gerson")).toBe("cliente");
+    expect(act("facturas pendientes")).not.toMatch(/^crear|^borrar/);
+    expect(act("plazos de esta semana")).not.toMatch(/^crear|^borrar/);
+    expect(act("generar demanda laboral para EXP-2026-0001")).not.toMatch(/^crear/);
+  });
+});

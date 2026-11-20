@@ -13,7 +13,7 @@ import { parseRefs, searchKnowledge } from "./knowledge";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
-import { parseIntent, type Intent } from "./assistant-intent";
+import { parseIntent, type ActionEntity, type ActionVerb, type Intent } from "./assistant-intent";
 import type { CurrentUser } from "./auth";
 import { formatId } from "./cr-id";
 import { formatDate, formatDateTime, todayISO } from "./dates";
@@ -21,7 +21,7 @@ import { loadAdjustments } from "./invoice-queries";
 import { summarizeInvoice } from "./invoices";
 import { areaLabels, eventKindLabels, matterStatusLabels } from "./labels";
 import { formatDuration, formatMoney } from "./money";
-import { can } from "./permissions";
+import { can, type Permission } from "./permissions";
 import { logRead } from "./read-audit";
 import { likePattern } from "./search";
 
@@ -81,6 +81,8 @@ async function route(user: CurrentUser, question: string, intent: ReturnType<typ
       return (await legalAnswer(user, intent.question))!;
     case "liquidacion":
       return settlementAnswer(intent.question);
+    case "accion":
+      return actionAnswer(user, intent.verb, intent.entity, intent.target);
   }
 }
 
@@ -387,6 +389,157 @@ async function matterWritings(user: CurrentUser, ref: string | null): Promise<As
     text: ref ? `Escritos de ${ref}:` : "Últimos escritos:",
     items: rows.map((w) => ({ label: w.title, detail: `${w.kind === "escritura" ? "Escritura" : "Escrito"}${w.number ? ` · ${w.number}` : ""} · ${formatDateTime(w.updatedAt)}`, href: `/escritos/${w.id}` })),
   };
+}
+
+/* ---------- Acciones: crear, modificar, borrar o consultar ---------- */
+
+type EntityInfo = { name: string; plural: string; list: string; create?: string; createLabel?: string; perm?: Permission; how: Record<ActionVerb, string> };
+const ENTITY_INFO: Record<ActionEntity, EntityInfo> = {
+  cliente: {
+    name: "cliente", plural: "clientes", list: "/clientes", create: "/clientes/nuevo", createLabel: "Nuevo cliente", perm: "clientes.gestionar",
+    how: {
+      crear: "Para ingresar un cliente, abre el formulario de nuevo cliente: tipo (persona o empresa), nombre, identificación (con la cédula se puede traer el nombre desde Hacienda), contacto y dirección.",
+      modificar: "Abre la ficha del cliente y pulsa «Editar».",
+      borrar: "Abre la ficha del cliente y pulsa «Eliminar» (pide confirmación). Solo se puede si no tiene expedientes ni facturas: así no se pierden los datos de los casos.",
+      consultar: "Los clientes están en «Mis clientes»; también puedes preguntarme «cliente Gerson».",
+    },
+  },
+  expediente: {
+    name: "expediente", plural: "expedientes", list: "/expedientes", create: "/expedientes/nuevo", createLabel: "Nuevo expediente",
+    how: {
+      crear: "Para abrir un expediente, elige el cliente, el título, la materia, quién es responsable, la visibilidad y cómo se cobra (por horas o por proceso).",
+      modificar: "Abre el expediente y pulsa «Editar» (datos, estado, juzgado, contraparte y cobro).",
+      borrar: "Normalmente basta con cerrarlo o archivarlo (cambia el estado en la ficha). Si de verdad hay que eliminarlo, en la ficha está «Eliminar» (borra también sus notas, horas, eventos y documentos; requiere permiso).",
+      consultar: "Los expedientes están en «Expedientes»; también puedes preguntarme «estado del EXP-2026-0001».",
+    },
+  },
+  evento: {
+    name: "evento o plazo", plural: "eventos", list: "/agenda", create: "/agenda/nuevo", createLabel: "Nuevo evento o plazo",
+    how: {
+      crear: "Para añadir un plazo, audiencia, reunión o tarea: tipo, título, fecha y hora, expediente y responsable. Avisa por correo antes del vencimiento.",
+      modificar: "En «Control de plazos», pulsa «Editar» en el evento.",
+      borrar: "En «Control de plazos», pulsa «Borrar» en el evento (o márcalo como completado si ya se cumplió).",
+      consultar: "Los plazos están en «Control de plazos» (con semáforo y vista por semana); también puedes preguntarme «plazos de esta semana».",
+    },
+  },
+  factura: {
+    name: "factura", plural: "facturas", list: "/facturas", create: "/facturas/nueva", createLabel: "Nueva factura", perm: "facturacion.ver",
+    how: {
+      crear: "Para facturar: elige el cliente o el expediente; las horas pendientes o la tarifa del proceso se añaden solas. Se crea como borrador y luego se emite.",
+      modificar: "Un borrador se cambia en la propia factura. Una factura emitida no se modifica: se corrige con una factura rectificativa (desde la factura).",
+      borrar: "Solo se puede eliminar un borrador (botón «Eliminar borrador» en la factura). Una factura emitida se anula con una rectificativa.",
+      consultar: "Las facturas están en «Facturas»; también puedes preguntarme «facturas pendientes».",
+    },
+  },
+  documento: {
+    name: "documento", plural: "documentos", list: "/documentos", create: "/documentos/subir", createLabel: "Subir documento",
+    how: {
+      crear: "Para subir un documento, elige el expediente y el archivo (PDF, Word, imágenes…).",
+      modificar: "Los documentos no se editan en la app: descárgalo, corrígelo y súbelo de nuevo.",
+      borrar: "En «Documentos», pulsa «Borrar» en el documento (necesita el permiso de borrar documentos).",
+      consultar: "En «Documentos» pulsa el nombre para verlo dentro de la app.",
+    },
+  },
+  horas: {
+    name: "registro de horas", plural: "horas", list: "/horas", create: "/horas", createLabel: "Registrar horas",
+    how: {
+      crear: "Para registrar horas: expediente, fecha, duración (1:30, 90m…) y descripción.",
+      modificar: "En «Horas», pulsa «Corregir» en el registro.",
+      borrar: "En «Horas», marca los registros y pulsa «Borrar marcadas».",
+      consultar: "En «Horas» ves lo registrado y lo pendiente de facturar.",
+    },
+  },
+  nota: {
+    name: "nota", plural: "notas", list: "/expedientes",
+    how: {
+      crear: "Las notas se añaden dentro del expediente, en la pestaña «Notas».",
+      modificar: "Las notas no se editan: en la pestaña «Notas» del expediente borra la nota y escribe otra.",
+      borrar: "En la pestaña «Notas» del expediente puedes borrar las tuyas.",
+      consultar: "Las notas están en la pestaña «Notas» de cada expediente.",
+    },
+  },
+  escritura: {
+    name: "escritura", plural: "escrituras", list: "/notaria", create: "/notaria/escrituras/nueva", createLabel: "Registrar escritura", perm: "notaria.usar",
+    how: {
+      crear: "Puedes registrar una escritura en el protocolo o redactarla con un formulario notarial (se numera sola).",
+      modificar: "Abre la escritura en el Gestor notarial: ahí corriges datos, comparecientes y firmas.",
+      borrar: "Las escrituras del protocolo no se borran: si no se firmó, márcala como «No pasó».",
+      consultar: "Tu protocolo está en el Gestor notarial.",
+    },
+  },
+  conocimiento: {
+    name: "entrada de conocimiento", plural: "entradas", list: "/conocimiento", create: "/conocimiento/nueva", createLabel: "Nueva entrada de conocimiento",
+    how: {
+      crear: "Escribe un título como lo preguntarías, la explicación y palabras relacionadas: lo usaré para responder.",
+      modificar: "En «Conocimiento», pulsa «Corregir» en la entrada (si la escribiste tú o gestionas el equipo).",
+      borrar: "En «Conocimiento», pulsa «Borrar» en la entrada.",
+      consultar: "Busca en «Conocimiento» o pregúntame directamente.",
+    },
+  },
+  usuario: {
+    name: "persona del equipo", plural: "personas", list: "/equipo", create: "/equipo", createLabel: "Añadir persona al equipo", perm: "equipo.gestionar",
+    how: {
+      crear: "En «Equipo» añades a la persona con su rol; recibe una contraseña provisional.",
+      modificar: "En «Equipo» cambias su rol, tarifa o datos.",
+      borrar: "Las personas no se borran (se conserva su historial): en «Equipo», abre a la persona y desmarca «Usuario activo».",
+      consultar: "El equipo está en «Equipo».",
+    },
+  },
+  escrito: {
+    name: "escrito", plural: "escritos", list: "/formularios", create: "/formularios", createLabel: "Generar escrito",
+    how: {
+      crear: "Elige el formulario y el expediente; los datos del cliente y del expediente se rellenan solos.",
+      modificar: "Abre el escrito y pulsa «Corregir»: vuelves a los campos.",
+      borrar: "Abre el escrito y pulsa «Eliminar escrito».",
+      consultar: "Los escritos están en la pestaña «Escritos» de cada expediente; o pregúntame «escritos del EXP-2026-0001».",
+    },
+  },
+};
+
+async function actionAnswer(user: CurrentUser, verb: ActionVerb, entity: ActionEntity, target: string): Promise<AssistantAnswer> {
+  const info = ENTITY_INFO[entity];
+  if (info.perm && !can(user, info.perm) && verb !== "consultar") return { text: `No tienes permiso para gestionar ${info.plural}. Pídeselo a quien administra el equipo.` };
+  const items: AssistantItem[] = [];
+
+  if (verb === "crear") {
+    if (info.create) items.push({ label: info.createLabel!, href: info.create });
+    return { text: info.how.crear, items };
+  }
+  if (verb === "consultar") {
+    if (entity === "cliente" && target) return clientInfo(user, target);
+    if (entity === "expediente" && target) return matterInfo(user, { kind: "expediente", ref: target.toUpperCase().startsWith("EXP") ? target.toUpperCase() : target });
+    return { text: info.how.consultar, items: [{ label: `Ir a ${info.plural}`, href: info.list }] };
+  }
+
+  // Modificar o borrar: si se nombró algo concreto, se busca (solo lo que la persona puede ver).
+  if (target && target.length >= 2) {
+    const like = likePattern(target);
+    if (entity === "cliente") {
+      const cs = await db.select({ id: clients.id, name: clients.name }).from(clients).where(and(ilike(clients.name, like), clientAccessSql(user, clients.id))).limit(5);
+      for (const c of cs) items.push({ label: c.name, detail: verb === "modificar" ? "Editar" : "Abrir la ficha", href: verb === "modificar" ? `/clientes/${c.id}/editar` : `/clientes/${c.id}` });
+    } else if (entity === "expediente") {
+      const ms = await db
+        .select({ id: matters.id, number: matters.number, title: matters.title })
+        .from(matters)
+        .where(and(or(ilike(matters.title, like), ilike(matters.number, like)), matterAccessSql(user, matters.id)))
+        .limit(5);
+      for (const m of ms) items.push({ label: `${m.number} · ${m.title}`, detail: verb === "modificar" ? "Editar" : "Abrir", href: verb === "modificar" ? `/expedientes/${m.id}/editar` : `/expedientes/${m.id}` });
+    } else if (entity === "evento") {
+      const es = await db
+        .select({ id: events.id, title: events.title, startsAt: events.startsAt })
+        .from(events)
+        .where(and(ilike(events.title, like), matterAccessSql(user, events.matterId, { orNone: true })))
+        .orderBy(desc(events.startsAt))
+        .limit(5);
+      for (const e of es) items.push({ label: e.title, detail: formatDateTime(e.startsAt), href: `/agenda/${e.id}/editar` });
+    } else if (entity === "factura" && can(user, "facturacion.ver")) {
+      const fs = await db.select({ id: invoices.id, number: invoices.number }).from(invoices).where(and(ilike(invoices.number, like), invoiceAccessSql(user))).limit(5);
+      for (const f of fs) items.push({ label: f.number ?? `Borrador #${f.id}`, href: `/facturas/${f.id}` });
+    }
+  }
+  const text = `${verb === "modificar" ? info.how.modificar : info.how.borrar}${items.length ? "" : target ? ` No encontré «${target}» entre ${info.plural} que puedas ver.` : ""}${verb === "borrar" ? " Por seguridad, desde el chat no se borra nada." : ""}`;
+  if (!items.length) items.push({ label: `Ir a ${info.plural}`, href: info.list });
+  return { text, items };
 }
 
 /* ---------- Conocimiento: base del despacho + leyes cargadas + cálculo de plazos ---------- */

@@ -13,6 +13,8 @@ export type Intent =
   | { kind: "plazos"; days: number }
   | { kind: "expedientes_activos" }
   | { kind: "buscar"; query: string }
+  /** Crear, modificar, borrar o consultar algo de la app («quiero ingresar un nuevo cliente»). */
+  | { kind: "accion"; verb: ActionVerb; entity: ActionEntity; target: string }
   /** Pregunta jurídica (plazos, recursos, laboral…): base de conocimiento + leyes + cálculo de fechas. */
   | { kind: "consulta"; question: string }
   /** Cálculo de liquidación laboral a partir de la antigüedad y el salario. */
@@ -74,6 +76,42 @@ export function subject(text: string, extraStop: string[] = []): string {
     .trim();
 }
 
+export type ActionVerb = "crear" | "modificar" | "borrar" | "consultar";
+export type ActionEntity = "cliente" | "expediente" | "evento" | "factura" | "documento" | "horas" | "nota" | "escritura" | "conocimiento" | "usuario" | "escrito";
+
+const VERBS: [RegExp, ActionVerb][] = [
+  [/\b(crear|crea|creo|nuevo|nueva|agregar|agrega|agrego|anadir|anade|ingresar|ingresa|ingreso|registrar|registra|registro|dar de alta|alta de|abrir un|abrir una|subir|sube|cargar|hacer una?|hago una?|emitir una?)\b/, "crear"],
+  [/\b(modificar|modifica|modifico|editar|edita|edito|cambiar|cambia|actualizar|actualiza|corregir|corrige)\b/, "modificar"],
+  [/\b(borrar|borra|borro|eliminar|elimina|elimino|quitar|quita|dar de baja|anular)\b/, "borrar"],
+  [/\b(ver|veo|encuentro|encontrar|consultar|consulta|mostrar|muestra|muestrame|listar|lista de|buscar|busca)\b/, "consultar"],
+];
+const ENTITIES: [RegExp, ActionEntity][] = [
+  [/\bclientes?\b/, "cliente"],
+  [/\bexpedientes?\b|\bcasos?\b|\basuntos?\b/, "expediente"],
+  [/\b(eventos?|plazos?|audiencias?|citas?|reunion(es)?|tareas?|vencimientos?)\b/, "evento"],
+  [/\bfacturas?\b/, "factura"],
+  [/\b(documentos?|archivos?|pdf)\b/, "documento"],
+  [/\bhoras\b|\btiempo trabajado\b/, "horas"],
+  [/\bnotas?\b/, "nota"],
+  [/\bescrituras?\b/, "escritura"],
+  [/\b(conocimiento|entrada de conocimiento)\b/, "conocimiento"],
+  [/\b(usuarios?|abogad[oa]s? al equipo|miembros? del equipo|persona al equipo)\b/, "usuario"],
+  [/\bescritos?\b/, "escrito"],
+];
+
+/** «Quiero ingresar un nuevo cliente», «editar el expediente EXP-2026-0001», «borrar el plazo de mañana». */
+export function parseAction(text: string): { verb: ActionVerb; entity: ActionEntity; target: string } | null {
+  const n = normalize(text);
+  const verb = VERBS.find(([re]) => re.test(n))?.[1];
+  const ent = ENTITIES.map(([re, e]) => ({ e, i: n.search(re) })).filter((x) => x.i >= 0).sort((a, b) => a.i - b.i)[0]?.e;
+  if (!verb || !ent) return null;
+  // Lo que queda después de la entidad es el nombre o la referencia («cliente Ana Pérez»).
+  const m = ENTITIES.find(([, e]) => e === ent)![0].exec(n)!;
+  const after = n.slice(m.index + m[0].length);
+  const target = subject(after, ["nuevo", "nueva", "de", "del", "la", "el", "llamado", "llamada", "que", "se", "llama", "con", "datos", "por", "favor"]);
+  return { verb, entity: ent, target };
+}
+
 /** Temas jurídicos: la pregunta va a la base de conocimiento y a las leyes, no a los datos del despacho. */
 const LEGAL_TOPIC =
   /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra)\b/;
@@ -94,6 +132,12 @@ export function parseIntent(raw: string): Intent {
   if (/\bindices?\b|\bquincena\b|\bindex\b/.test(n)) return { kind: "notaria", what: "indice" };
   if (/\btestimonios?\b/.test(n)) return { kind: "notaria", what: "testimonios" };
   if (/\b(escrituras|protocolo|ultima escritura)\b/.test(n)) return { kind: "notaria", what: "ultimas" };
+
+  // Acciones sobre la app: crear, modificar, borrar o consultar (si no es una pregunta jurídica)
+  {
+    const a = parseAction(text);
+    if (a && (a.verb !== "consultar" || /\b(como|donde)\b/.test(n)) && !(a.entity === "escrito" && a.verb === "crear")) return { kind: "accion", ...a };
+  }
 
   // Cálculo de liquidación («cesantía de 3 años y 7 meses con salario de 600 000»)
   if (/\b(liquidacion|cesantia|prestaciones|preaviso|calcul\w*)\b/.test(n) && /\b\d+\s*(anos?|mes(es)?)\b/.test(n) && !/\bplazo\b/.test(n)) return { kind: "liquidacion", question: text };
