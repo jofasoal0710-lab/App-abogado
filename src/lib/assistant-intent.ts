@@ -17,7 +17,7 @@ export type Intent =
   | { kind: "generar"; template: string | null; ref: string | null }
   | { kind: "escritos"; ref: string | null }
   | { kind: "notaria"; what: "proxima" | "ultimas" | "indice" | "testimonios" }
-  | { kind: "normativa"; query: string; ref: string | null };
+  | { kind: "normativa"; query: string; ref: string | null; article: string | null };
 
 /** Palabras que identifican cada formulario (de lo más concreto a lo más general). */
 const TEMPLATE_WORDS: [RegExp, string][] = [
@@ -89,8 +89,10 @@ export function parseIntent(raw: string): Intent {
 
   // Normativa: «ley 7764», «código de familia», «normativa del EXP-2026-0001»
   if (/\b(ley|leyes|codigo|codigos|normativa|norma|normas|articulos?|constitucion|reglamento|fundamento)\b/.test(n)) {
-    const query = subject(text, ["ley", "leyes", "normativa", "norma", "normas", "busca", "buscar", "articulo", "articulos", "sobre", "fundamento", "derecho", "citada", "citadas"]);
-    return { kind: "normativa", query: expRef(n) ? "" : query.replace(/^n\s*/, ""), ref: expRef(n) };
+    const art = /\bart(?:iculo|\.)?\s*(\d+(?:\s*bis)?)\b/.exec(n);
+    const query = subject(text, ["ley", "leyes", "normativa", "norma", "normas", "busca", "buscar", "articulo", "articulos", "sobre", "fundamento", "derecho", "citada", "citadas", "dice", "que"]);
+    const cleaned = (art ? query.replace(new RegExp(`\\b${art[1]}\\b`), "") : query).replace(/^n\s*/, "").replace(/\s+/g, " ").trim();
+    return { kind: "normativa", query: expRef(n) ? "" : cleaned, ref: expRef(n), article: art ? art[1].replace(/\s+/, " ") : null };
   }
 
   // Número de expediente (EXP-2026-0001, exp 2026-1, 2026-0001)

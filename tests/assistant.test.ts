@@ -53,9 +53,11 @@ describe("asistente: formularios y notariado", () => {
 
 describe("asistente: normativa", () => {
   it("leyes por número, nombre o tema, y la normativa de un expediente", () => {
-    expect(parseIntent("ley 7764")).toEqual({ kind: "normativa", query: "7764", ref: null });
+    expect(parseIntent("ley 7764")).toEqual({ kind: "normativa", query: "7764", ref: null, article: null });
+    expect(parseIntent("¿qué dice el artículo 29 del código de trabajo?")).toEqual({ kind: "normativa", query: "codigo trabajo", ref: null, article: "29" });
+    expect(parseIntent("articulo 97 bis codigo de trabajo")).toMatchObject({ article: "97 bis" });
     expect(parseIntent("código de familia")).toMatchObject({ kind: "normativa", query: "codigo familia" });
-    expect(parseIntent("normativa del EXP-2026-0002")).toEqual({ kind: "normativa", query: "", ref: "EXP-2026-0002" });
+    expect(parseIntent("normativa del EXP-2026-0002")).toEqual({ kind: "normativa", query: "", ref: "EXP-2026-0002", article: null });
     // no roba otras intenciones
     expect(parseIntent("genera una demanda laboral para el EXP-2026-0001").kind).toBe("generar");
     expect(parseIntent("índice de la quincena").kind).toBe("notaria");

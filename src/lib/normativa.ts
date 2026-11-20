@@ -103,11 +103,19 @@ export function normLabel(n: Pick<Norm, "name" | "number">): string {
   return n.number ? `${n.name} (Ley N.° ${n.number})` : n.name;
 }
 
-/** Busca por nombre, número («7764», «ley 7764») o palabras clave; sin tildes ni mayúsculas. */
+/** Busca por nombre, número («7764», «ley 7764») o palabras clave; sin tildes, mayúsculas ni «de», «la»… */
 export function searchNorms(query: string, area?: string): Norm[] {
   const q = fold(query.trim()).replace(/^ley\s*(n\.?\s*[°º]?\s*)?/, "").trim();
-  return NORMS.filter((n) => (!area || n.area === area) && (!q || n.number === q || fold(`${n.name} ${n.number ?? ""} ${(n.aka ?? []).join(" ")}`).includes(q)));
+  const words = q.split(/\s+/).filter((w) => w && !STOP_WORDS.has(w));
+  return NORMS.filter((n) => {
+    if (area && n.area !== area) return false;
+    if (!q) return true;
+    if (n.number === q) return true;
+    const hay = fold(`${n.name} ${n.number ?? ""} ${(n.aka ?? []).join(" ")}`);
+    return hay.includes(q) || (words.length > 0 && words.every((w) => hay.includes(w)));
+  });
 }
+const STOP_WORDS = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "en", "a", "para", "sobre", "n", "no", "nº"]);
 
 /** «1, 2 y 5» → «artículos 1, 2 y 5»; «45» → «artículo 45». */
 function articlesPhrase(articles: string): string {

@@ -705,6 +705,39 @@ export const matterCitations = pgTable(
   (t) => [index("matter_citations_matter_idx").on(t.matterId)],
 ).enableRLS();
 
+/**
+ * Texto de una ley cargado en la aplicación (copiado del SCIJ / SINALEVI), dividido en artículos para
+ * leerlo y buscarlo sin salir de la app. normKey enlaza con el catálogo (lib/normativa.ts).
+ * No se actualiza solo: versionLabel y retrievedOn dicen de cuándo es la copia.
+ */
+export const lawTexts = pgTable("law_texts", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  normKey: text("norm_key").notNull().unique(),
+  title: text().notNull(),
+  versionLabel: text("version_label"),
+  sourceUrl: text("source_url"),
+  retrievedOn: date("retrieved_on").notNull(),
+  articleCount: integer("article_count").notNull().default(0),
+  loadedById: integer("loaded_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/** Artículos de una ley. La columna «search» (tsvector en español) se crea en la migración. */
+export const lawArticles = pgTable(
+  "law_articles",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    lawId: integer("law_id")
+      .notNull()
+      .references(() => lawTexts.id, { onDelete: "cascade" }),
+    ordinal: integer().notNull(),
+    number: text().notNull(),
+    heading: text(),
+    body: text().notNull(),
+  },
+  (t) => [index("law_articles_law_idx").on(t.lawId, t.ordinal), index("law_articles_number_idx").on(t.lawId, t.number)],
+).enableRLS();
+
 /* ---------- Factura electrónica (Hacienda, v4.4) ---------- */
 
 /**

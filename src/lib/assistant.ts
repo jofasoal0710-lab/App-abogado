@@ -5,6 +5,7 @@ import { clients, deedParties, deeds, events, invoices, matterCitations, matters
 import { getTemplate, TEMPLATES } from "./forms/templates";
 import { getNotaryProfile, nextDeedNumber, pendingIndexes } from "./notary";
 import { citationText, NORM_AREAS, normLabel, searchNorms } from "./normativa";
+import { articlesByNumber, loadedLaws, searchArticles } from "./laws";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
@@ -58,7 +59,7 @@ export async function answer(user: CurrentUser, question: string): Promise<Assis
     case "notaria":
       return notaryInfo(user, intent.what);
     case "normativa":
-      return normativa(user, intent.query, intent.ref);
+      return normativa(user, intent.query, intent.ref, intent.article);
   }
 }
 
@@ -368,7 +369,7 @@ async function matterWritings(user: CurrentUser, ref: string | null): Promise<As
 }
 
 /** Normativa: del catálogo, o la citada en un expediente al que se tiene acceso. */
-async function normativa(user: CurrentUser, query: string, ref: string | null): Promise<AssistantAnswer> {
+async function normativa(user: CurrentUser, query: string, ref: string | null, article: string | null = null): Promise<AssistantAnswer> {
   if (ref) {
     const [m] = await db.select({ id: matters.id }).from(matters).where(and(eq(matters.number, ref), matterAccessSql(user, matters.id)));
     if (!m) return { text: `No encuentro ${ref} (o no tienes acceso).` };
@@ -377,6 +378,28 @@ async function normativa(user: CurrentUser, query: string, ref: string | null): 
     return { text: `Fundamento de derecho de ${ref}:`, items: rows.map((c) => ({ label: citationText(c), href: `/expedientes/${m.id}?tab=normativa` })) };
   }
   const found = searchNorms(query).slice(0, 8);
+  // «artículo 29 del código de trabajo»: si la ley está cargada, se responde con el texto.
+  if (article && found.length) {
+    const loaded = await loadedLaws();
+    const norm = found.find((n) => loaded.has(n.key));
+    if (norm) {
+      const [a] = await articlesByNumber(loaded.get(norm.key)!.id, [article]);
+      if (a) {
+        const body = a.body.length > 700 ? `${a.body.slice(0, 700)}…` : a.body;
+        return { text: `Artículo ${a.number} del ${norm.name}: ${body}`, items: [{ label: "Ver el artículo completo", href: `/normativa/${norm.key}?art=${encodeURIComponent(a.number)}` }] };
+      }
+      return { text: `No encuentro el artículo ${article} en el ${norm.name}.`, items: [{ label: `Abrir ${norm.name}`, href: `/normativa/${norm.key}` }] };
+    }
+  }
+  // Una búsqueda por tema en los textos cargados («preaviso», «vacaciones»).
+  if (!article && found.length === 0 && query) {
+    const hits = await searchArticles(query, { limit: 6 });
+    if (hits.length)
+      return {
+        text: `Artículos que tratan «${query}»:`,
+        items: hits.map((h) => ({ label: `Artículo ${h.number} · ${h.title}`, detail: h.snippet.replace(/\[\[|\]\]/g, "").slice(0, 140), href: `/normativa/${h.normKey}?art=${encodeURIComponent(h.number)}` })),
+      };
+  }
   if (found.length === 0) return { text: `No tengo «${query}» en el catálogo. Búscalo en el SCIJ desde Normativa.`, items: [{ label: "Abrir Normativa", href: `/normativa?q=${encodeURIComponent(query)}` }] };
   return {
     text: query ? `Normativa sobre «${query}»:` : "Normativa costarricense del catálogo:",

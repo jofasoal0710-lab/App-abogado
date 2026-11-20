@@ -127,6 +127,13 @@
       "when": 1795141209553,
       "tag": "0017_normativa",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795186247612,
+      "tag": "0018_textos_de_leyes",
+      "breakpoints": true
     }
   ]
 }

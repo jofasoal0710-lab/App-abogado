@@ -36,3 +36,10 @@ describe("normativa: citas y fundamento de derecho", () => {
     );
   });
 });
+
+describe("normativa: búsqueda por palabras sueltas", () => {
+  it("«codigo trabajo» (sin «de») encuentra el Código de Trabajo", () => {
+    expect(searchNorms("codigo trabajo").map((n) => n.key)).toContain("ley-2");
+    expect(searchNorms("trabajo codigo")[0].key).toBe("ley-2");
+  });
+});
