@@ -686,6 +686,25 @@ export const notaryIndexSubmissions = pgTable(
   (t) => [uniqueIndex("notary_index_submissions_uq").on(t.notaryId, t.period)],
 ).enableRLS();
 
+/** Normativa citada en un expediente (fundamento de derecho). normKey: del catálogo (lib/normativa.ts) o null si es libre. */
+export const matterCitations = pgTable(
+  "matter_citations",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    normKey: text("norm_key"),
+    normName: text("norm_name").notNull(),
+    normNumber: text("norm_number"),
+    articles: text(),
+    note: text(),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("matter_citations_matter_idx").on(t.matterId)],
+).enableRLS();
+
 /* ---------- Factura electrónica (Hacienda, v4.4) ---------- */
 
 /**

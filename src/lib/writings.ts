@@ -1,7 +1,8 @@
 import "server-only";
-import { and, eq, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, matters, users, writings } from "@/db/schema";
+import { clients, matterCitations, matters, users, writings } from "@/db/schema";
+import { legalBasis } from "./normativa";
 import { getAccessibleMatter, matterAccessSql } from "./access";
 import type { CurrentUser } from "./auth";
 import { formatId, MARITAL_STATUS, type MaritalStatus } from "./cr-id";
@@ -55,6 +56,7 @@ export async function autoValues(user: CurrentUser, matterId: number | null): Pr
     "expediente.numero": matter.courtCaseNumber ?? "",
     "expediente.contraparte": matter.opposingParty ?? "",
     "expediente.titulo": matter.title,
+    "expediente.fundamentos": legalBasis(await db.select().from(matterCitations).where(eq(matterCitations.matterId, matter.id)).orderBy(asc(matterCitations.id))),
     "cliente.nombre": c?.name ?? "",
     "cliente.cedula": c ? formatId(c.idType, c.taxId) : "",
     "cliente.estadoCivil": c?.maritalStatus ? MARITAL_STATUS[c.maritalStatus as MaritalStatus]?.toLowerCase() ?? "" : "",

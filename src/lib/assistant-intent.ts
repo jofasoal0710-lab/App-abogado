@@ -16,7 +16,8 @@ export type Intent =
   | { kind: "formularios" }
   | { kind: "generar"; template: string | null; ref: string | null }
   | { kind: "escritos"; ref: string | null }
-  | { kind: "notaria"; what: "proxima" | "ultimas" | "indice" | "testimonios" };
+  | { kind: "notaria"; what: "proxima" | "ultimas" | "indice" | "testimonios" }
+  | { kind: "normativa"; query: string; ref: string | null };
 
 /** Palabras que identifican cada formulario (de lo más concreto a lo más general). */
 const TEMPLATE_WORDS: [RegExp, string][] = [
@@ -85,6 +86,12 @@ export function parseIntent(raw: string): Intent {
   if (/\bindices?\b|\bquincena\b|\bindex\b/.test(n)) return { kind: "notaria", what: "indice" };
   if (/\btestimonios?\b/.test(n)) return { kind: "notaria", what: "testimonios" };
   if (/\b(escrituras|protocolo|ultima escritura)\b/.test(n)) return { kind: "notaria", what: "ultimas" };
+
+  // Normativa: «ley 7764», «código de familia», «normativa del EXP-2026-0001»
+  if (/\b(ley|leyes|codigo|codigos|normativa|norma|normas|articulos?|constitucion|reglamento|fundamento)\b/.test(n)) {
+    const query = subject(text, ["ley", "leyes", "normativa", "norma", "normas", "busca", "buscar", "articulo", "articulos", "sobre", "fundamento", "derecho", "citada", "citadas"]);
+    return { kind: "normativa", query: expRef(n) ? "" : query.replace(/^n\s*/, ""), ref: expRef(n) };
+  }
 
   // Número de expediente (EXP-2026-0001, exp 2026-1, 2026-0001)
   const exp = /\bexp(?:ediente)?[\s-]*(\d{4})[\s-]*(\d{1,4})\b/.exec(n) ?? /\b(20\d{2})-(\d{1,4})\b/.exec(n);

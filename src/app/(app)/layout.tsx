@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/agenda", label: "Control de plazos", icon: "agenda" },
     { href: "/formularios", label: "Formularios", icon: "formularios", also: ["/escritos"] },
     { href: "/documentos", label: "Documentos", icon: "documentos" },
+    { href: "/normativa", label: "Normativa", icon: "balanza" },
     ...(can(user, "notaria.usar") ? [{ href: "/notaria", label: "Gestor notarial", icon: "notario" } satisfies NavItem] : []),
     { href: "/horas", label: "Horas", icon: "horas" },
     ...(can(user, "facturacion.ver") ? [{ href: "/facturas", label: "Facturas", icon: "facturas" } satisfies NavItem] : []),

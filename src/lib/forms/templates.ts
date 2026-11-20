@@ -23,7 +23,18 @@ const F = {
   notificaciones: { name: "notificaciones", label: "Medio para notificaciones", type: "text", auto: "abogado.correo", hint: "Correo electrónico o fax" } as Field,
   lugar: { name: "lugar", label: "Lugar", type: "text", hint: "Ciudad donde se firma" } as Field,
   fecha: { name: "fecha", label: "Fecha", type: "date", auto: "fecha" } as Field,
+  derecho: {
+    name: "derecho",
+    label: "Fundamento de derecho",
+    type: "textarea",
+    auto: "expediente.fundamentos",
+    hint: "Se llena con la normativa citada en el expediente (pestaña «Normativa»). Puedes editarlo.",
+  } as Field,
 };
+
+/** Sección «FUNDAMENTO DE DERECHO» solo si se ha escrito algo. */
+const derechoSeccion = (v: Values): Block[] =>
+  v.derecho?.trim() ? [{ t: "seccion", text: "FUNDAMENTO DE DERECHO" }, { t: "p", text: v.derecho.trim() }] : [];
 
 const calidades = (v: Values) =>
   `${val(v, "cliente")}, mayor, ${val(v, "estadoCivil")}, ${val(v, "profesion")}, vecino(a) de ${val(v, "domicilio")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}`;
@@ -59,7 +70,7 @@ const demandaOrdinaria: FormTemplate = {
     { name: "hechos", label: "Descripción del caso: hechos", type: "list", required: true, hint: "Un hecho por línea. Se numeran solos (PRIMERO, SEGUNDO…)." },
     { name: "pretension", label: "Pretensión", type: "list", required: true, hint: "Lo que se pide al juzgado, una petición por línea." },
     { name: "prueba", label: "Prueba", type: "list", hint: "Documental, testimonial, pericial… una por línea." },
-    { name: "derecho", label: "Fundamento de derecho", type: "textarea" },
+    F.derecho,
     { name: "estimacion", label: "Estimación de la demanda", type: "text", hint: "Monto en colones" },
     F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha],
   render: (v) => [
@@ -91,6 +102,7 @@ const demandaLaboral: FormTemplate = {
     { name: "hechos", label: "Descripción del caso: hechos", type: "list", required: true, hint: "Un hecho por línea. Se numeran solos." },
     { name: "pretension", label: "Pretensiones", type: "list", required: true, hint: "Preaviso, cesantía, vacaciones, aguinaldo, salarios adeudados, intereses, costas… una por línea." },
     { name: "prueba", label: "Prueba", type: "list" },
+    F.derecho,
     F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
   ],
   render: (v) => [
@@ -101,6 +113,7 @@ const demandaLaboral: FormTemplate = {
     listOr(v, "hechos"),
     { t: "seccion", text: "PRETENSIONES" }, { t: "p", text: "Solicito que en sentencia se condene a la parte demandada al pago de:" }, listOr(v, "pretension"),
     { t: "seccion", text: "PRUEBA" }, listOr(v, "prueba"),
+    ...derechoSeccion(v),
     ...cierre(v),
   ],
 };
@@ -115,6 +128,7 @@ const contestacion: FormTemplate = {
     { name: "hechos", label: "Respuesta a los hechos", type: "list", required: true, hint: "Una respuesta por línea, en el mismo orden que la demanda: «Es cierto», «No es cierto porque…»." },
     { name: "excepciones", label: "Excepciones", type: "list", hint: "Por ejemplo: falta de derecho, prescripción… una por línea." },
     { name: "prueba", label: "Prueba", type: "list" },
+    F.derecho,
     F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha],
   render: (v) => [
     ...encabezado(v, "Ordinario"),
@@ -122,6 +136,7 @@ const contestacion: FormTemplate = {
     { t: "seccion", text: "SOBRE LOS HECHOS" }, listOr(v, "hechos"),
     { t: "seccion", text: "EXCEPCIONES" }, listOr(v, "excepciones"),
     { t: "seccion", text: "PRUEBA" }, listOr(v, "prueba"),
+    ...derechoSeccion(v),
     { t: "seccion", text: "PETITORIA" }, { t: "p", text: "Solicito que se acojan las excepciones opuestas y se declare sin lugar la demanda en todos sus extremos, con condena en costas a la parte actora." },
     ...cierre(v),
   ],
@@ -136,11 +151,13 @@ const recurso: FormTemplate = {
   fields: [F.juzgado, F.expediente, F.cliente, F.cedula,
     { name: "resolucion", label: "Resolución recurrida", type: "text", required: true, hint: "Por ejemplo: resolución de las 10:00 horas del 5 de noviembre de 2026" },
     { name: "agravios", label: "Agravios (motivos del recurso)", type: "list", required: true, hint: "Un motivo por línea." },
+    F.derecho,
     F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha],
   render: (v) => [
     ...encabezado(v, "Recurso"),
     { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en tiempo y forma interpongo RECURSO DE REVOCATORIA CON APELACIÓN EN SUBSIDIO contra la ${val(v, "resolucion")}, por los siguientes agravios:` },
     { t: "seccion", text: "AGRAVIOS" }, listOr(v, "agravios"),
+    ...derechoSeccion(v),
     { t: "seccion", text: "PETITORIA" }, { t: "p", text: "Solicito que se revoque la resolución recurrida y, en caso de no acogerse la revocatoria, se admita la apelación en subsidio y se eleven los autos al superior." },
     ...cierre(v),
   ],
@@ -170,11 +187,13 @@ const medidaCautelar: FormTemplate = {
   fields: [F.juzgado, F.expediente, F.cliente, F.cedula, F.contraparte,
     { name: "medida", label: "Medida que se solicita", type: "text", required: true, hint: "Por ejemplo: anotación de la demanda sobre la finca matrícula…" },
     { name: "motivos", label: "Motivos (apariencia de buen derecho y peligro en la demora)", type: "list", required: true },
+    F.derecho,
     F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha],
   render: (v) => [
     ...encabezado(v, "Medida cautelar"),
     { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en el proceso contra ${val(v, "contraparte")}, solicito se decrete la siguiente medida cautelar: ${val(v, "medida")}.` },
     { t: "seccion", text: "MOTIVOS" }, listOr(v, "motivos"),
+    ...derechoSeccion(v),
     ...cierre(v),
   ],
 };

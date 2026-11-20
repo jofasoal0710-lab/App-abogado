@@ -15,6 +15,7 @@ export type AutoKey =
   | "expediente.numero"
   | "expediente.contraparte"
   | "expediente.titulo"
+  | "expediente.fundamentos"
   | "abogado.nombre"
   | "abogado.carne"
   | "abogado.correo"

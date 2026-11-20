@@ -50,3 +50,14 @@ describe("asistente: formularios y notariado", () => {
     expect(parseIntent("últimas escrituras del protocolo")).toEqual({ kind: "notaria", what: "ultimas" });
   });
 });
+
+describe("asistente: normativa", () => {
+  it("leyes por número, nombre o tema, y la normativa de un expediente", () => {
+    expect(parseIntent("ley 7764")).toEqual({ kind: "normativa", query: "7764", ref: null });
+    expect(parseIntent("código de familia")).toMatchObject({ kind: "normativa", query: "codigo familia" });
+    expect(parseIntent("normativa del EXP-2026-0002")).toEqual({ kind: "normativa", query: "", ref: "EXP-2026-0002" });
+    // no roba otras intenciones
+    expect(parseIntent("genera una demanda laboral para el EXP-2026-0001").kind).toBe("generar");
+    expect(parseIntent("índice de la quincena").kind).toBe("notaria");
+  });
+});

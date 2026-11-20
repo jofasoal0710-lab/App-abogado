@@ -1,9 +1,10 @@
 import "server-only";
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, deedParties, deeds, events, invoices, matters, testimonies, timeEntries, users, writings } from "@/db/schema";
+import { clients, deedParties, deeds, events, invoices, matterCitations, matters, testimonies, timeEntries, users, writings } from "@/db/schema";
 import { getTemplate, TEMPLATES } from "./forms/templates";
 import { getNotaryProfile, nextDeedNumber, pendingIndexes } from "./notary";
+import { citationText, NORM_AREAS, normLabel, searchNorms } from "./normativa";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
@@ -56,13 +57,15 @@ export async function answer(user: CurrentUser, question: string): Promise<Assis
       return matterWritings(user, intent.ref);
     case "notaria":
       return notaryInfo(user, intent.what);
+    case "normativa":
+      return normativa(user, intent.query, intent.ref);
   }
 }
 
 function help(): AssistantAnswer {
   return {
     text:
-      "Puedo darte información del despacho con lo que tienes permiso para ver y llevarte a generar escritos. Prueba: «estado del expediente EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «genera una demanda laboral para EXP-2026-0001», «escritos del EXP-2026-0001» o «próxima escritura».",
+      "Puedo darte información del despacho con lo que tienes permiso para ver y llevarte a generar escritos. Prueba: «estado del expediente EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «genera una demanda laboral para EXP-2026-0001», «escritos del EXP-2026-0001», «próxima escritura» o «ley 7764».",
     suggestions: [...HELP_SUGGESTIONS, "Formularios"],
   };
 }
@@ -361,6 +364,23 @@ async function matterWritings(user: CurrentUser, ref: string | null): Promise<As
   return {
     text: ref ? `Escritos de ${ref}:` : "Últimos escritos:",
     items: rows.map((w) => ({ label: w.title, detail: `${w.kind === "escritura" ? "Escritura" : "Escrito"}${w.number ? ` · ${w.number}` : ""} · ${formatDateTime(w.updatedAt)}`, href: `/escritos/${w.id}` })),
+  };
+}
+
+/** Normativa: del catálogo, o la citada en un expediente al que se tiene acceso. */
+async function normativa(user: CurrentUser, query: string, ref: string | null): Promise<AssistantAnswer> {
+  if (ref) {
+    const [m] = await db.select({ id: matters.id }).from(matters).where(and(eq(matters.number, ref), matterAccessSql(user, matters.id)));
+    if (!m) return { text: `No encuentro ${ref} (o no tienes acceso).` };
+    const rows = await db.select().from(matterCitations).where(eq(matterCitations.matterId, m.id)).orderBy(asc(matterCitations.id));
+    if (rows.length === 0) return { text: `${ref} aún no tiene normativa citada.`, items: [{ label: "Citar normas en el expediente", href: `/expedientes/${m.id}?tab=normativa` }] };
+    return { text: `Fundamento de derecho de ${ref}:`, items: rows.map((c) => ({ label: citationText(c), href: `/expedientes/${m.id}?tab=normativa` })) };
+  }
+  const found = searchNorms(query).slice(0, 8);
+  if (found.length === 0) return { text: `No tengo «${query}» en el catálogo. Búscalo en el SCIJ desde Normativa.`, items: [{ label: "Abrir Normativa", href: `/normativa?q=${encodeURIComponent(query)}` }] };
+  return {
+    text: query ? `Normativa sobre «${query}»:` : "Normativa costarricense del catálogo:",
+    items: found.map((n) => ({ label: normLabel(n), detail: NORM_AREAS[n.area], href: `/normativa?q=${encodeURIComponent(n.number ?? n.name)}` })),
   };
 }
 
