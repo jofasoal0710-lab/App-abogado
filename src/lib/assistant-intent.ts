@@ -82,7 +82,7 @@ export function parseIntent(raw: string): Intent {
   if (/\bescritos\b/.test(n)) return { kind: "escritos", ref: expRef(n) };
   // Notariado
   if (/\b(proxima|siguiente) escritura\b|\btomo\b|\bfolio\b/.test(n)) return { kind: "notaria", what: "proxima" };
-  if (/\bindice\b|\bquincena\b/.test(n)) return { kind: "notaria", what: "indice" };
+  if (/\bindices?\b|\bquincena\b|\bindex\b/.test(n)) return { kind: "notaria", what: "indice" };
   if (/\btestimonios?\b/.test(n)) return { kind: "notaria", what: "testimonios" };
   if (/\b(escrituras|protocolo|ultima escritura)\b/.test(n)) return { kind: "notaria", what: "ultimas" };
 

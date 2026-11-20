@@ -17,6 +17,8 @@ import { formatDuration, formatMoney } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { qs } from "@/lib/search";
 import { Icon } from "@/components/icons";
+import { IndexAlert } from "@/components/index-alert";
+import { pendingIndexes } from "@/lib/notary";
 import { formatTime } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Panel" };
@@ -24,6 +26,7 @@ export const metadata: Metadata = { title: "Panel" };
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; mes?: string }> }) {
   const user = await requireUser();
   const seesBilling = can(user, "facturacion.ver");
+  const indexPending = can(user, "notaria.usar") ? await pendingIndexes(user.id, todayISO()) : [];
   const { error, mes } = await searchParams;
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(mes ?? "") ? mes! : currentMonth();
   const { start: monthStart, end: monthEnd } = monthRange(month);
@@ -175,6 +178,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         </div>
       </section>
+
+      {indexPending.length > 0 && <IndexAlert pending={indexPending} />}
 
       {error === "forbidden" && (
         <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

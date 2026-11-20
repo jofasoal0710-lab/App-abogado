@@ -1,15 +1,16 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { deedParties, deeds, notaryProfiles, testimonies } from "@/db/schema";
+import { deedParties, deeds, notaryIndexSubmissions, notaryProfiles, testimonies } from "@/db/schema";
 import { firstZodError, optStr, str, type ActionState } from "@/lib/actions";
 import { requirePermission } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { getNotaryProfile, getOwnDeed, nextDeedNumber } from "@/lib/notary";
+import { quincena } from "@/lib/notary-period";
 
 const user = () => requirePermission("notaria.usar");
 const isoDate = z.iso.date("La fecha no es válida");
@@ -139,4 +140,42 @@ export async function addTestimonyAction(deedId: number, _prev: ActionState, for
   await db.insert(testimonies).values({ deedId, ordinal: existing.length + 1, issuedOn: date, issuedTo: optStr(formData, "issuedTo")?.slice(0, 200) ?? null, notes: optStr(formData, "notes")?.slice(0, 1000) ?? null });
   revalidatePath(`/notaria/escrituras/${deedId}`);
   return { ok: "Testimonio registrado." };
+}
+
+/* ---------- Índice en INDEX (Archivo Nacional) ---------- */
+
+export async function markIndexSubmittedAction(period: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const u = await user();
+  const q = quincena(period);
+  if (!q) return { error: "Quincena no válida." };
+  const today = todayISO();
+  const parsed = z
+    .object({ submittedOn: isoDate, receipt: z.string().max(120).nullable() })
+    .safeParse({ submittedOn: str(formData, "submittedOn") || today, receipt: optStr(formData, "receipt") });
+  if (!parsed.success) return { error: firstZodError(parsed.error) };
+  if (parsed.data.submittedOn <= q.end) return { error: "El índice se presenta después de que cierra la quincena." };
+  if (parsed.data.submittedOn > today) return { error: "La fecha de presentación no puede ser futura." };
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(deeds)
+    .where(and(eq(deeds.notaryId, u.id), gte(deeds.grantedOn, q.start), lte(deeds.grantedOn, q.end)));
+  await db
+    .insert(notaryIndexSubmissions)
+    .values({ notaryId: u.id, period: q.key, submittedOn: parsed.data.submittedOn, receipt: parsed.data.receipt, deedCount: n })
+    .onConflictDoUpdate({
+      target: [notaryIndexSubmissions.notaryId, notaryIndexSubmissions.period],
+      set: { submittedOn: parsed.data.submittedOn, receipt: parsed.data.receipt, deedCount: n },
+    });
+  revalidatePath("/notaria/indice");
+  revalidatePath("/notaria");
+  revalidatePath("/");
+  return { ok: "Índice anotado como presentado en INDEX." };
+}
+
+export async function undoIndexSubmissionAction(period: string) {
+  const u = await user();
+  await db.delete(notaryIndexSubmissions).where(and(eq(notaryIndexSubmissions.notaryId, u.id), eq(notaryIndexSubmissions.period, period)));
+  revalidatePath("/notaria/indice");
+  revalidatePath("/notaria");
+  redirect(`/notaria/indice?q=${encodeURIComponent(period)}`);
 }

@@ -664,6 +664,28 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   invoice: one(invoices, { fields: [payments.invoiceId], references: [invoices.id] }),
 }));
 
+/**
+ * Presentación del índice notarial quincenal en INDEX (plataforma del Archivo Nacional). La plataforma no
+ * ofrece conexión para programas: aquí se anota cuándo se presentó y el acuse que dio INDEX.
+ */
+export const notaryIndexSubmissions = pgTable(
+  "notary_index_submissions",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    notaryId: integer("notary_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Quincena «AAAA-MM-1» o «AAAA-MM-2» (lib/notary-period.ts). */
+    period: text().notNull(),
+    submittedOn: date("submitted_on").notNull(),
+    /** Acuse o número de presentación que da INDEX. */
+    receipt: text(),
+    deedCount: integer("deed_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("notary_index_submissions_uq").on(t.notaryId, t.period)],
+).enableRLS();
+
 /* ---------- Factura electrónica (Hacienda, v4.4) ---------- */
 
 /**

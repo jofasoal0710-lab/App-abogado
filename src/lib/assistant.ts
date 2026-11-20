@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } f
 import { db } from "@/db";
 import { clients, deedParties, deeds, events, invoices, matters, testimonies, timeEntries, users, writings } from "@/db/schema";
 import { getTemplate, TEMPLATES } from "./forms/templates";
-import { getNotaryProfile, nextDeedNumber } from "./notary";
+import { getNotaryProfile, nextDeedNumber, pendingIndexes } from "./notary";
 import { quincenaOf } from "./notary-period";
 import { writingAccessSql } from "./writings";
 import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
@@ -378,7 +378,18 @@ async function notaryInfo(user: CurrentUser, what: "proxima" | "ultimas" | "indi
   if (what === "indice") {
     const q = quincenaOf(todayISO());
     const [r] = await db.select({ n: count() }).from(deeds).where(and(eq(deeds.notaryId, user.id), gte(deeds.grantedOn, q.start), sql`${deeds.grantedOn} <= ${q.end}`));
-    return { text: `Índice de la quincena (${q.label}): ${r.n} ${r.n === 1 ? "escritura" : "escrituras"}.`, items: [{ label: "Ver e imprimir el índice", href: `/notaria/indice?q=${q.key}` }] };
+    const pending = await pendingIndexes(user.id, todayISO());
+    const text = `Índice de la quincena (${q.label}): ${r.n} ${r.n === 1 ? "escritura" : "escrituras"}.` +
+      (pending.length
+        ? ` Pendiente de presentar en INDEX: ${pending.map((p) => `${p.q.label}${"due" in p.state ? ` (${p.state.kind === "vencido" ? "venció" : "vence"} el ${formatDate(p.state.due)})` : ""}`).join("; ")}.`
+        : " No hay índices pendientes de presentar en INDEX.");
+    return {
+      text,
+      items: [
+        ...pending.map((p) => ({ label: `Presentar ${p.q.label}`, href: `/notaria/indice?q=${p.q.key}` })),
+        { label: "Ver e imprimir el índice", href: `/notaria/indice?q=${q.key}` },
+      ],
+    };
   }
   if (what === "testimonios") {
     const rows = await db

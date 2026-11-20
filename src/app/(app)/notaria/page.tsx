@@ -6,7 +6,8 @@ import { db } from "@/db";
 import { deeds } from "@/db/schema";
 import { requirePermission } from "@/lib/auth";
 import { formatDate, todayISO } from "@/lib/dates";
-import { getNotaryProfile, nextDeedNumber } from "@/lib/notary";
+import { getNotaryProfile, nextDeedNumber, pendingIndexes } from "@/lib/notary";
+import { IndexAlert } from "@/components/index-alert";
 import { quincenaOf } from "@/lib/notary-period";
 import { pageParam } from "@/lib/search";
 import { NotaryNav } from "./notary-nav";
@@ -25,6 +26,7 @@ export default async function NotaryPage({ searchParams }: { searchParams: Promi
     nextDeedNumber(user.id),
   ]);
   const q = quincenaOf(todayISO());
+  const indexPending = profile ? await pendingIndexes(user.id, todayISO()) : [];
 
   return (
     <>
@@ -54,6 +56,7 @@ export default async function NotaryPage({ searchParams }: { searchParams: Promi
         </div>
       ) : (
         <>
+          <IndexAlert pending={indexPending} />
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
             <Stat label="Próxima escritura" value={`N.º ${next}`} icon="notario" />
             <Stat label="Tomo y folio actuales" value={`${profile.currentVolume ?? "—"} · ${profile.nextFolio}`} icon="documentos" />
