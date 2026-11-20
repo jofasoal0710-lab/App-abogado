@@ -376,6 +376,8 @@ export const invoiceItems = pgTable(
     unitPriceCents: integer("unit_price_cents").notNull(),
     /** Entrada de horas de la que procede la línea (para liberarla si se borra la línea). */
     timeEntryId: integer("time_entry_id").references(() => timeEntries.id, { onDelete: "set null" }),
+    /** Código CABYS (13 dígitos) para la factura electrónica. Si falta, se usa el predeterminado del emisor. */
+    cabys: text(),
   },
   (t) => [index("invoice_items_invoice_idx").on(t.invoiceId)],
 ).enableRLS();
@@ -650,6 +652,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   timeEntries: many(timeEntries),
   rectifies: one(invoices, { fields: [invoices.rectifiesInvoiceId], references: [invoices.id], relationName: "rectification" }),
   rectifications: many(invoices, { relationName: "rectification" }),
+  einvoices: many(einvoices),
 }));
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
@@ -659,6 +662,80 @@ export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   invoice: one(invoices, { fields: [payments.invoiceId], references: [invoices.id] }),
+}));
+
+/* ---------- Factura electrónica (Hacienda, v4.4) ---------- */
+
+/**
+ * Datos del emisor para los comprobantes electrónicos (una sola fila, id = 1).
+ * Las credenciales (usuario y clave del API, llave criptográfica .p12 y su PIN) NO se guardan aquí:
+ * van en variables de entorno del servidor.
+ */
+export const einvoiceSettings = pgTable("einvoice_settings", {
+  id: integer().primaryKey(),
+  name: text().notNull(),
+  /** 01 física, 02 jurídica, 03 DIMEX, 04 NITE. */
+  idType: text("id_type").notNull(),
+  idNumber: text("id_number").notNull(),
+  commercialName: text("commercial_name"),
+  email: text().notNull(),
+  phone: text(),
+  province: text().notNull(),
+  canton: text().notNull(),
+  district: text().notNull(),
+  otherSigns: text("other_signs").notNull(),
+  /** Código de actividad económica inscrita (6 caracteres). */
+  activityCode: text("activity_code").notNull(),
+  branch: text().notNull().default("001"),
+  terminal: text().notNull().default("00001"),
+  defaultCabys: text("default_cabys").notNull(),
+  /** Medio de pago habitual (04 transferencia, 01 efectivo, 02 tarjeta, 06 SINPE Móvil…). */
+  paymentMethod: text("payment_method").notNull().default("04"),
+  /** Cédula del proveedor de sistemas. Si está vacía, se usa la del propio emisor. */
+  providerId: text("provider_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/**
+ * enviando: se firmó y se intentó enviar, sin respuesta clara todavía (hay que consultar).
+ * no_recibido: Hacienda no lo recibió (error en el envío); se puede volver a intentar con otro consecutivo.
+ */
+export const einvoiceStatusEnum = pgEnum("einvoice_status", ["enviando", "recibido", "procesando", "aceptado", "rechazado", "no_recibido"]);
+
+export const einvoices = pgTable(
+  "einvoices",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    invoiceId: integer("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "restrict" }),
+    /** pruebas (sandbox) o produccion. */
+    environment: text().notNull(),
+    /** 01 factura, 02 nota de débito, 03 nota de crédito, 04 tiquete. */
+    docType: text("doc_type").notNull(),
+    branch: text().notNull(),
+    terminal: text().notNull(),
+    sequence: integer().notNull(),
+    consecutive: text().notNull(),
+    clave: text().notNull().unique(),
+    issuedAt: text("issued_at").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    status: einvoiceStatusEnum().notNull().default("enviando"),
+    signedXml: text("signed_xml").notNull(),
+    responseXml: text("response_xml"),
+    message: text(),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("einvoices_invoice_idx").on(t.invoiceId),
+    uniqueIndex("einvoices_sequence_uq").on(t.environment, t.docType, t.branch, t.terminal, t.sequence),
+  ],
+).enableRLS();
+
+export const einvoicesRelations = relations(einvoices, ({ one }) => ({
+  invoice: one(invoices, { fields: [einvoices.invoiceId], references: [invoices.id] }),
 }));
 
 /* ---------- Tipos ---------- */
@@ -672,6 +749,8 @@ export type Document = typeof documents.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type EinvoiceSettings = typeof einvoiceSettings.$inferSelect;
+export type Einvoice = typeof einvoices.$inferSelect;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type ReminderLog = typeof reminderLog.$inferSelect;
 export type SecurityEvent = typeof securityEvents.$inferSelect;

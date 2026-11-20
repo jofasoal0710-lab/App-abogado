@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "30mb" },
   },
-  serverExternalPackages: ["pg"],
+  serverExternalPackages: ["pg", "@dojocoding/hacienda-sdk"],
   // No anunciar el framework en cada respuesta (X-Powered-By: Next.js).
   poweredByHeader: false,
   async headers() {
