@@ -68,6 +68,7 @@ export default async function NewWritingPage({ params, searchParams }: { params:
       />
       <WritingForm
         action={createWritingAction.bind(null, tpl.key, matter?.id ?? null)}
+        templateKey={tpl.key}
         fields={tpl.fields}
         values={values}
         title={matter ? `${tpl.title} · ${matter.number}` : tpl.title}

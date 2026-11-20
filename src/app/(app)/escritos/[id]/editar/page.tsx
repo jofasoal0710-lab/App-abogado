@@ -25,6 +25,7 @@ export default async function EditWritingPage({ params }: { params: Promise<{ id
       <PageHeader title={`Corregir: ${w.title}`} subtitle="Cambia los campos y guarda: el documento se vuelve a redactar." />
       <WritingForm
         action={updateWritingAction.bind(null, w.id)}
+        templateKey={w.templateKey}
         fields={tpl.fields}
         values={values}
         title={w.title}

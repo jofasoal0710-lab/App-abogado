@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -57,6 +57,22 @@ export async function saveFile(data: Buffer, originalName: string): Promise<stri
 
 export function openFile(key: string) {
   return createReadStream(localPath(key));
+}
+
+/** Contenido completo de un documento (para verlo dentro de la app). null si falta o supera el límite. */
+export async function readStoredFile(key: string, maxBytes: number): Promise<Buffer | null> {
+  assertKey(key);
+  try {
+    if (storageDriver() === "s3") {
+      const r = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+      if ((r.ContentLength ?? 0) > maxBytes || !r.Body) return null;
+      return Buffer.from(await r.Body.transformToByteArray());
+    }
+    const data = await readFile(localPath(key));
+    return data.length > maxBytes ? null : data;
+  } catch {
+    return null;
+  }
 }
 
 /* ---------------- s3 ---------------- */

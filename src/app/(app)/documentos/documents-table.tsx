@@ -46,9 +46,9 @@ export function DocumentsTable({
           {rows.map((d) => (
             <tr key={d.id}>
               <td>
-                <a className="link" href={`/api/documentos/${d.id}`}>
+                <Link className="link" href={`/documentos/${d.id}`}>
                   {d.name}
-                </a>
+                </Link>
               </td>
               {showMatter && (
                 <td>
@@ -61,7 +61,11 @@ export function DocumentsTable({
               <td>{d.uploader ?? "—"}</td>
               <td className="whitespace-nowrap">{formatDate(d.createdAt)}</td>
               <td className="whitespace-nowrap text-right tabular-nums">{formatBytes(d.sizeBytes)}</td>
-              <td>
+              <td className="whitespace-nowrap">
+                <div className="flex items-center gap-1">
+                <a className="btn-ghost btn-sm" href={`/api/documentos/${d.id}`} aria-label={`Descargar ${d.name}`}>
+                  Descargar
+                </a>
                 {can(user, "documentos.borrar") && (
                   <form action={deleteDocumentAction.bind(null, d.id)}>
                     <ConfirmButton message={`¿Eliminar «${d.name}»? El archivo se borrará definitivamente.`} className="btn-ghost btn-sm text-red-700">
@@ -69,6 +73,7 @@ export function DocumentsTable({
                     </ConfirmButton>
                   </form>
                 )}
+                </div>
               </td>
             </tr>
           ))}
