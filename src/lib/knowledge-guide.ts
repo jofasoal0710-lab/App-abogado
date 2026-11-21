@@ -2,7 +2,8 @@
  * Guía inicial de la base de conocimiento (Costa Rica). Redactada a partir del texto vigente del
  * Código de Trabajo (versión 64) y del Código Procesal Civil (Ley 9342, versión 5), consultados en el
  * SCIJ, y del Arancel de honorarios de abogacía y notariado (Decreto 41457-JP reformado por el 41930-JP,
- * SINALEVI versión 4 de 4). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
+ * SINALEVI versión 4 de 4), del Código Procesal Penal (Ley 7594, versión 47) y del Código Penal
+ * (Ley 4573, versión 104). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
  */
 export type GuideEntry = { title: string; area: string; keywords: string; refs: string; body: string };
 
@@ -225,5 +226,74 @@ Los timbres, derechos de registro y viáticos no son honorarios: se cobran apart
 Familia: divorcio o separación por mutuo acuerdo, ₡181.500 (mitad con la homologación y mitad con la inscripción, art. 48); divorcio, unión de hecho, filiación o adopción sin gananciales, ₡181.500 (mitad al presentar y mitad con la sentencia); con gananciales, mínimo ₡242.000 (art. 49); pensión alimentaria, ₡181.500 (art. 50).
 Penal: defensa ante Tribunal Unipersonal, mínimo ₡484.000, por tercios: investigación, audiencia preliminar y juicio; abreviado o medida alterna, 75 % (art. 38). Querella por delitos de acción privada: mínimo ₡363.000 (art. 43).
 Constitucional: recurso de amparo, ₡181.500, pagado con la presentación (art. 46).`,
+  },
+  {
+    title: "Prescripción de la acción penal: plazos y cómputo",
+    area: "penal",
+    keywords: "prescripción acción penal delito prescribe cuándo prescribe plazo máximo de la pena tres diez años contravención interrupción indagatoria mitad suspensión rebeldía menor de edad",
+    refs: "ley-7594:31,32,33,34",
+    body: `Si no se ha iniciado la persecución penal, la acción prescribe (art. 31 CPP):
+- Delitos con prisión: en un plazo igual al máximo de la pena, que no puede pasar de 10 años ni bajar de 3. Si la víctima es menor de edad, corre desde que cumple la mayoría de edad.
+- Penas no privativas de libertad, faltas o contravenciones: 2 años (personas jurídicas: 10 años).
+- Delitos sexuales contra menores de edad: 25 años desde que la víctima cumple la mayoría de edad.
+- Corrupción (Ley 8422) y delitos contra los deberes de la función pública: 30 años desde la consumación.
+Corre desde la consumación; en la tentativa, desde el último acto de ejecución; en el delito continuo o permanente, desde que cesó; y para cada imputado por separado (art. 32).
+Iniciado el procedimiento, el plazo se reduce a la mitad y se interrumpe con: la indagatoria, la presentación de la querella (acción privada), la resolución que convoca a la audiencia preliminar, el señalamiento del debate, la suspensión del debate por causas atribuibles a la defensa y la sentencia aunque no esté firme (art. 33). Se suspende, entre otros, durante un criterio de oportunidad, una suspensión del proceso a prueba o la rebeldía (art. 34).
+Para calcularla: Herramientas → Prescripción penal.`,
+  },
+  {
+    title: "Recursos en el proceso penal: plazos",
+    area: "penal",
+    keywords: "recurso penal plazo revocatoria apelación apelar sentencia penal casación penal días hábiles adhesión tribunal de apelación de sentencia",
+    refs: "ley-7594:167,450,453,460,461,469",
+    body: `Los plazos corren desde el día siguiente a la notificación y, si son por días, solo cuentan los hábiles (art. 167 CPP).
+- Revocatoria: por escrito fundado dentro de los 3 días siguientes a la notificación; en las audiencias orales, en la misma audiencia (art. 450).
+- Apelación (resoluciones de las etapas previas al juicio): se interpone en la misma audiencia en que se dictó; si la resolución se dictó fuera de audiencia o por escrito, dentro de los 3 días siguientes a la notificación (art. 453). Las otras partes tienen 3 días para contestar (art. 454).
+- Apelación de sentencia: ante el tribunal que la dictó, dentro de 15 días de notificada, expresando los fundamentos, el agravio y la pretensión, y ofreciendo la prueba (art. 460). Luego se da audiencia de 5 días a los interesados, que pueden adherirse (art. 461).
+- Casación: ante el tribunal que dictó la sentencia de apelación, dentro de 15 días de notificada, bajo pena de inadmisibilidad, con cada motivo por separado (art. 469).
+Para calcular el vencimiento: Herramientas → Vencimiento de un plazo procesal (días hábiles).`,
+  },
+  {
+    title: "Medidas alternas: conciliación, suspensión del proceso a prueba y reparación integral",
+    area: "penal",
+    keywords: "medidas alternas conciliación suspensión del proceso a prueba reparación integral del daño plan de reparación cinco años extinción de la acción penal justicia restaurativa",
+    refs: "ley-7594:25,26,28,30,36",
+    body: `Todas proceden hasta antes de acordarse la apertura a juicio (la reparación integral, antes del juicio oral), y no se pueden usar si el imputado se benefició de alguna de ellas en los cinco años anteriores.
+- Conciliación (art. 36): en faltas o contravenciones, delitos de acción privada o de acción pública a instancia privada, delitos que admitan la suspensión condicional de la pena y delitos solo con penas no privativas de libertad. El tribunal homologa los acuerdos; la acción se extingue cuando se cumplen (plazo máximo de un año, prorrogable hasta seis meses por causa justa). No se aprueba en delitos contra personas menores de edad; en delitos sexuales, agresiones domésticas y Ley 8589 no se promueve salvo que la víctima lo pida.
+- Suspensión del proceso a prueba (art. 25): cuando procede la suspensión condicional de la pena o en delitos con penas no privativas de libertad; no en delitos dolosos con fuerza en las cosas o violencia sobre las personas. Requiere un plan de reparación, que el imputado admita el hecho y la conformidad de la víctima. El plazo de prueba es de 2 a 5 años con reglas de conducta (art. 26); si se incumple, puede reanudarse el proceso o ampliarse el plazo hasta 2 años más, una sola vez (art. 28). Cumplido, se extingue la acción (art. 30 f).
+- Reparación integral del daño (art. 30 j): a entera satisfacción de la víctima, en delitos patrimoniales sin fuerza en las cosas ni violencia sobre las personas y en delitos culposos, si la víctima o el Ministerio Público la admiten.`,
+  },
+  {
+    title: "Prisión preventiva: requisitos, duración y prórrogas",
+    area: "penal",
+    keywords: "prisión preventiva requisitos peligro de fuga obstaculización duración doce meses prórroga cesación medida cautelar",
+    refs: "ley-7594:239,257,258",
+    body: `Procede cuando concurren (art. 239 CPP): elementos de convicción suficientes de que el imputado es, con probabilidad, autor o partícipe; presunción razonable de peligro de fuga, de obstaculización o de que continuará la actividad delictiva; que el delito tenga pena privativa de libertad; o peligro para la víctima, la persona denunciante o el testigo.
+Duración: termina cuando excede de doce meses, cuando su duración iguala o supera la posible pena, o cuando nuevos elementos muestran que no concurren sus motivos (art. 257). Prórrogas (art. 258): a pedido del Ministerio Público, el Tribunal de Apelación de Sentencia puede prorrogarla hasta un año más, fijando el tiempo concreto; con sentencia condenatoria a prisión, puede prorrogarse seis meses más por resolución fundada.`,
+  },
+  {
+    title: "Acción penal: pública, a instancia privada y privada (querella)",
+    area: "penal",
+    keywords: "acción penal pública instancia privada acción privada querella delitos contra el honor difamación injurias calumnias lesiones leves amenazas violación de domicilio usurpación",
+    refs: "ley-7594:18,19,72",
+    body: `Delitos de acción pública perseguibles solo a instancia privada (art. 18 CPP): entre otros, el contagio de enfermedad y la violación de persona mayor de edad en pleno uso de razón; las agresiones sexuales no agravadas ni calificadas contra mayores de edad; las lesiones leves y las culposas que no vengan de un accidente de tránsito, el abandono de personas, las amenazas, la violación de domicilio y la usurpación; el incumplimiento del deber alimentario o de asistencia.
+Delitos de acción privada (art. 19): los delitos contra el honor, la propaganda desleal y los que la ley califique así. Se persiguen por querella: toda persona con capacidad civil que se pretenda ofendida puede presentarla y ejercer junto con ella la acción civil resarcitoria (art. 72). La presentación de la querella interrumpe la prescripción (art. 33 b) y el desistimiento de la querella extingue la acción (art. 30 b).`,
+  },
+  {
+    title: "Procedimiento abreviado",
+    area: "penal",
+    keywords: "procedimiento abreviado admitir los hechos rebaja de la pena un tercio acuerdo fiscal antes de la apertura a juicio",
+    refs: "ley-7594:373,374",
+    body: `Se puede proponer en cualquier momento hasta antes de acordarse la apertura a juicio, cuando el imputado admite el hecho que se le atribuye y consiente el procedimiento, y el Ministerio Público, el querellante y el actor civil están conformes (art. 373 CPP). Puede tramitarse por justicia restaurativa cuando proceda.
+El Ministerio Público y el querellante formulan la acusación y piden la pena; el mínimo de la pena del tipo penal puede disminuirse hasta en un tercio. Se escucha a la víctima de domicilio conocido, pero su criterio no es vinculante (art. 374).`,
+  },
+  {
+    title: "Ejecución condicional de la pena y prescripción de la pena",
+    area: "penal",
+    keywords: "ejecución condicional de la pena condena condicional tres años delincuente primario prescripción de la pena un tercio veinticinco años sentencia firme",
+    refs: "ley-4573:59,60,84,86",
+    body: `Ejecución condicional (Código Penal): el juez puede aplicarla cuando la pena no excede de tres años y consiste en prisión o extrañamiento (art. 59). Exige que se trate de un delincuente primario y se funda en su personalidad, su vida anterior, su comportamiento posterior al delito y su deseo de reparar; requiere un informe del Instituto de Criminología (art. 60).
+Prescripción de la pena (art. 84): la de prisión, extrañamiento o interdicción de derechos, en un tiempo igual a la condena más un tercio, sin pasar de 25 años ni bajar de 3; los días multa por delitos, en 3 años; las contravenciones, en 1 año. Corre desde que la sentencia queda firme, o desde que se revoca la ejecución condicional o la libertad condicional, o desde el quebrantamiento de la condena (art. 86).
+Para calcularla: Herramientas → Prescripción penal → De la pena impuesta.`,
   },
 ];

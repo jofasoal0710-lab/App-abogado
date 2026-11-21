@@ -30,7 +30,17 @@ export function expandQuery(question: string): string {
 }
 
 /** Plazos procesales frecuentes, para responder «¿cuánto tengo para…?» y calcular la fecha. */
+/** Materia penal: la pregunta menciona el proceso penal (los plazos son otros que en el civil). */
+const PENAL = String.raw`(penal\w*|delito|imputad\w*|fiscal\w*|querell\w*|acusad\w*|tribunal de juicio)`;
+/** El patrón y, en cualquier lugar de la pregunta, una palabra del proceso penal. */
+const both = (a: string) => new RegExp(String.raw`^(?=.*\b${PENAL}\b).*\b${a}\b`);
+
 export const PROCEDURAL_DEADLINES = [
+  // Proceso penal (CPP): los plazos por días cuentan solo días hábiles, desde el día siguiente a la notificación (art. 167).
+  { key: "casacion_penal", match: both("casacion"), days: 15, label: "recurso de casación penal", ref: "CPP art. 469" },
+  { key: "apelacion_sentencia_penal", match: both(String.raw`(apela\w*\b.*\bsentencia|sentencia\b.*\bapela\w*)`), days: 15, label: "apelar una sentencia penal", ref: "CPP art. 460" },
+  { key: "apelacion_auto_penal", match: both(String.raw`apela\w*`), days: 3, label: "apelar una resolución penal dictada por escrito (si se dictó en audiencia, se apela en la misma audiencia)", ref: "CPP art. 453" },
+  { key: "revocatoria_penal", match: both(String.raw`(revocatoria|revocar)`), days: 3, label: "recurso de revocatoria en materia penal", ref: "CPP art. 450" },
   { key: "casacion", match: /\bcasacion\b/, days: 15, label: "recurso de casación", ref: "CPC art. 69.3" },
   { key: "apelacion_sentencia", match: /\bapela\w*\b.*\bsentencia\b|\bsentencia\b.*\bapela\w*\b/, days: 5, label: "apelar una sentencia", ref: "CPC art. 67" },
   { key: "apelacion_auto", match: /\bapela\w*\b/, days: 3, label: "apelar un auto", ref: "CPC art. 67" },

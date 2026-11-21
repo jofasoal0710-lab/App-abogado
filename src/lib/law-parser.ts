@@ -73,6 +73,12 @@ export function parseLawText(text: string): ParsedArticle[] {
       pendingHeading = null;
     }
     const a = ARTICLE.exec(line);
+    // Texto futuro citado en una nota de SINALEVI («a partir de esa fecha el texto de este numeral se
+    // leerá así: “…”»): el mismo número repetido es parte de la nota, no un artículo nuevo.
+    if (a && current && normalizeArticleNumber(a[1], a[2]) === current.number && /se leer[aá] (de la siguiente manera|as[ií])/i.test(current.lines.slice(-3).join(" "))) {
+      current.lines.push(line);
+      continue;
+    }
     if (a) {
       flush();
       pendingHeading = null;

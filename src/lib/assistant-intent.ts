@@ -29,6 +29,12 @@ export type Intent =
 
 /** Palabras que identifican cada formulario (de lo más concreto a lo más general). */
 const TEMPLATE_WORDS: [RegExp, string][] = [
+  // Penales primero: «apelación de sentencia penal» no es el recurso civil.
+  [/\bdenuncia\b/, "denuncia-penal"],
+  [/\bquerella\b/, "querella-accion-privada"],
+  [/apelacion.*sentencia.*penal|apelacion de sentencia penal|apelacion penal/, "apelacion-sentencia-penal"],
+  [/medida alterna|conciliacion penal|suspension del proceso a prueba|reparacion integral/, "solicitud-medida-alterna"],
+  [/prision preventiva/, "cese-prision-preventiva"],
   [/demanda laboral|laboral/, "demanda-laboral"],
   [/contestacion|contestar/, "contestacion-demanda"],
   [/revocatoria|apelacion|recurso/, "recurso-revocatoria-apelacion"],
@@ -120,7 +126,7 @@ const FEE_TOPIC =
 
 /** Temas jurídicos: la pregunta va a la base de conocimiento y a las leyes, no a los datos del despacho. */
 const LEGAL_TOPIC =
-  /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra)\b/;
+  /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra|prision preventiva|medidas? alternas?|conciliacion|suspension del proceso|reparacion integral|procedimiento abreviado|abreviado|querella\w*|accion privada|instancia privada|delitos?|imputad\w*)\b/;
 
 export function parseIntent(raw: string): Intent {
   const text = raw.slice(0, 300);

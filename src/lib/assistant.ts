@@ -16,6 +16,7 @@ import { clientAccessSql, invoiceAccessSql, matterAccessSql } from "./access";
 import { normalize, parseIntent, type ActionEntity, type ActionVerb, type Intent } from "./assistant-intent";
 import { ARANCEL_SOURCE, arancelItem, arancelMinimum, searchArancel, timbreColegio } from "./arancel";
 import { extractAmountCents, suggestFee } from "./fees";
+import { actionPrescription, fmtYears, parsePrescriptionQuestion } from "./penal";
 import { getFeeSettings, listServices, toGuideService } from "./tariff";
 import type { CurrentUser } from "./auth";
 import { formatId } from "./cr-id";
@@ -576,7 +577,19 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
   const lines: string[] = [];
   const items: AssistantItem[] = [];
 
-  if (date && (duration || proc)) {
+  const pres = parsePrescriptionQuestion(question);
+  if (pres) {
+    if (date) {
+      const r = actionPrescription({ ...pres, committedOn: date });
+      lines.push(`Si el hecho fue el ${formatDate(date)}, la acción penal prescribe el ${formatDate(r.due)} (plazo de ${fmtYears(r.years)}).`);
+      lines.push(...r.steps.slice(0, 2));
+      lines.push("Si ya hubo indagatoria u otro acto del art. 33, el plazo se reduce a la mitad y corre desde el último: calcúlalo en Herramientas.");
+    } else {
+      const r = actionPrescription({ ...pres, committedOn: today });
+      lines.push(`${r.steps[0]} Dime la fecha del hecho y te digo cuándo prescribe.`);
+    }
+    items.push({ label: "Abrir la calculadora de prescripción penal", href: `/herramientas?calc=prescripcion&tipo=${pres.kind}${pres.maxPenaltyYears ? `&maximo=${pres.maxPenaltyYears}` : ""}${date ? `&hecho=${date}` : ""}#prescripcion` });
+  } else if (date && (duration || proc)) {
     const amount = duration?.amount ?? proc!.days;
     const unit = duration?.unit ?? "dias";
     const d = procedureDeadline({ notified: date, amount, unit });
@@ -585,7 +598,11 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
     );
     const hol = d.skipped.map((x) => holidayName(x)).filter(Boolean);
     if (hol.length) lines.push(`Se saltan feriados: ${[...new Set(hol)].join(", ")}.`);
-    lines.push("Regla: art. 30.5 del CPC (desde el día hábil siguiente; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial.");
+    lines.push(
+      proc?.key.endsWith("_penal") && !duration
+        ? "Regla: art. 167 del CPP (desde el día siguiente a la notificación; en los plazos por días solo cuentan los hábiles). No incluye cierres del Poder Judicial."
+        : "Regla: art. 30.5 del CPC (desde el día hábil siguiente; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial.",
+    );
     items.push({ label: "Abrir la calculadora de plazos", href: `/herramientas?calc=plazo&notificado=${date}&cantidad=${amount}&unidad=${unit}#plazo` });
   } else if (proc) {
     lines.push(`Para ${proc.label} el plazo es de ${proc.days} días hábiles (${proc.ref}), contados desde el día hábil siguiente a la notificación. Dime la fecha de notificación y te digo cuándo vence.`);

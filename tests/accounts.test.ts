@@ -33,7 +33,9 @@ describe("token de sesión (OWASP-A07-001)", () => {
   });
   it("rechaza tokens alterados, con otra clave o con un identificador demasiado corto", async () => {
     const token = await signSession({ userId: 7, sid: SID });
-    expect(await verifySession(token.slice(0, -2) + (token.endsWith("A") ? "BB" : "AA"))).toBeNull();
+    // Se cambia un carácter del medio de la firma (los últimos solo llevan bits de relleno en base64url).
+    const i = token.length - 20;
+    expect(await verifySession(token.slice(0, i) + (token[i] === "A" ? "B" : "A") + token.slice(i + 1))).toBeNull();
     const other = await new SignJWT({ userId: 7, sid: SID }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode("otra-clave-distinta-de-la-buena-123456"));
     expect(await verifySession(other)).toBeNull();
     expect(await verifySession(await signSession({ userId: 7, sid: "corto" }))).toBeNull();

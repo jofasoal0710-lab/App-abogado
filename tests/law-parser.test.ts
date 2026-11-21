@@ -66,3 +66,19 @@ describe("textos de leyes: números citados", () => {
     expect(articleNumbersFrom(null)).toEqual([]);
   });
 });
+
+describe("notas de SINALEVI con texto futuro", () => {
+  it("el artículo repetido dentro de la nota no es un artículo nuevo", () => {
+    const t = [
+      "Artículo 117.- Homicidio culposo",
+      "Se impondrá prisión de seis meses a ocho años.",
+      "(Nota de Sinalevi: Mediante la Ley N° 10860 se reformará este numeral; a partir de esa fecha el texto de este numeral se leerá de la siguiente manera: “Homicidio culposo",
+      "Artículo 117- Se impondrá prisión de uno a diez años.”)",
+      "Artículo 118.- Otro",
+      "Texto.",
+    ].join("\n");
+    const arts = parseLawText(t);
+    expect(arts.map((x) => x.number)).toEqual(["117", "118"]);
+    expect(arts[0].body).toContain("uno a diez años");
+  });
+});

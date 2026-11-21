@@ -302,7 +302,151 @@ const declaracionJurada: FormTemplate = {
   ],
 };
 
-export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
+
+// ---------- Escritos penales (Código Procesal Penal, Ley 7594) ----------
+
+const P = {
+  despacho: { name: "juzgado", label: "Despacho", type: "text", auto: "expediente.juzgado", required: true, hint: "Por ejemplo: Tribunal Penal del Primer Circuito Judicial de San José" } as Field,
+  expediente: { name: "expediente", label: "Número de expediente penal", type: "text", auto: "expediente.numero", hint: "Formato 26-000123-0042-PE" } as Field,
+  imputado: { name: "contraparte", label: "Persona imputada o querellada", type: "text", auto: "expediente.contraparte" } as Field,
+  ofendido: { name: "ofendido", label: "Persona ofendida", type: "text" } as Field,
+  delito: { name: "delito", label: "Delito", type: "text", required: true, hint: "Por ejemplo: estafa, difamación, lesiones culposas" } as Field,
+  hechos: { name: "hechos", label: "Hechos", type: "list", required: true, hint: "Un hecho por línea, en orden: qué pasó, cuándo y dónde." } as Field,
+  pruebas: { name: "pruebas", label: "Prueba que se ofrece", type: "list", hint: "Documental, testimonial (nombre y domicilio del testigo), pericial…" } as Field,
+};
+
+const encabezadoPenal = (v: Values, destinatario: string, asunto: string): Block[] => [
+  { t: "encabezado", text: destinatario },
+  ...(v.expediente?.trim() ? [{ t: "encabezado", text: `Expediente: ${v.expediente.trim()}` } as Block] : []),
+  ...(v.contraparte?.trim() ? [{ t: "encabezado", text: `Imputado(a): ${v.contraparte.trim()}` } as Block] : []),
+  ...(v.delito?.trim() ? [{ t: "encabezado", text: `Delito: ${v.delito.trim()}` } as Block] : []),
+  { t: "encabezado", text: asunto },
+];
+const pruebasSeccion = (v: Values): Block[] => (lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" }, listOr(v, "pruebas")] : []);
+
+const denunciaPenal: FormTemplate = {
+  key: "denuncia-penal",
+  kind: "escrito",
+  category: "Penal",
+  title: "Denuncia penal",
+  description: "Ante el Ministerio Público: hechos, prueba y solicitud de investigación.",
+  fields: [
+    { name: "juzgado", label: "Fiscalía", type: "text", auto: "expediente.juzgado", required: true, hint: "Por ejemplo: Fiscalía Adjunta de Fraudes, Primer Circuito Judicial de San José" },
+    F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio, P.imputado, P.delito, P.hechos, P.pruebas, F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoPenal(v, `SEÑOR(A) FISCAL DE LA ${val(v, "juzgado").toUpperCase()}`, "Asunto: DENUNCIA PENAL"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, interpongo formal DENUNCIA PENAL contra ${v.contraparte?.trim() || "quien resulte responsable"} por el delito de ${val(v, "delito")}, con fundamento en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...pruebasSeccion(v),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se tenga por interpuesta la presente denuncia, se ordene la investigación de los hechos y, en su oportunidad, se ejerza la acción penal. Solicito además que se me tenga como víctima, con los derechos que me confiere el artículo 71 del Código Procesal Penal, y que se me informe de las resoluciones que pongan fin al procedimiento." },
+    ...cierre(v),
+  ],
+};
+
+const querella: FormTemplate = {
+  key: "querella-accion-privada",
+  kind: "escrito",
+  category: "Penal",
+  title: "Querella por delito de acción privada",
+  description: "Delitos contra el honor y otros de acción privada, con acción civil resarcitoria (arts. 19 y 72 CPP).",
+  fields: [
+    P.despacho, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "contraparte", label: "Persona querellada (nombre, calidades y domicilio)", type: "text", auto: "expediente.contraparte", required: true },
+    P.delito, P.hechos, P.pruebas,
+    { name: "civil", label: "Acción civil resarcitoria (opcional)", type: "textarea", hint: "Daños y perjuicios que se reclaman y su estimación" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoPenal(v, `SEÑOR(A) JUEZ(A) DEL ${val(v, "juzgado").toUpperCase()}`, "Asunto: QUERELLA POR DELITO DE ACCIÓN PRIVADA"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, con fundamento en los artículos 19 y 72 del Código Procesal Penal, interpongo QUERELLA contra ${val(v, "contraparte")} por el delito de ${val(v, "delito")}${v.civil?.trim() ? ", y ejerzo conjuntamente la acción civil resarcitoria" : ""}, con base en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...pruebasSeccion(v),
+    ...(v.civil?.trim() ? [{ t: "seccion", text: "ACCIÓN CIVIL RESARCITORIA" } as Block, { t: "p", text: v.civil.trim() } as Block] : []),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: `Solicito que se admita la querella, se convoque a la audiencia de conciliación y, de no lograrse, se siga el proceso hasta dictar sentencia condenatoria contra ${val(v, "contraparte")}${v.civil?.trim() ? ", con condena al pago de los daños y perjuicios reclamados" : ""} y al pago de ambas costas.` },
+    ...cierre(v),
+  ],
+};
+
+const apelacionSentenciaPenal: FormTemplate = {
+  key: "apelacion-sentencia-penal",
+  kind: "escrito",
+  category: "Penal",
+  title: "Recurso de apelación de sentencia penal",
+  description: "Ante el tribunal que dictó la sentencia, dentro de 15 días hábiles (art. 460 CPP).",
+  fields: [
+    P.despacho, P.expediente, F.cliente, F.cedula, P.imputado, P.delito,
+    { name: "sentencia", label: "Sentencia recurrida", type: "text", required: true, hint: "Por ejemplo: sentencia N.° 123-2026 de las 14:00 horas del 3 de noviembre de 2026" },
+    { name: "agravios", label: "Motivos y agravios", type: "list", required: true, hint: "Un motivo por línea: qué se reclama, por qué es un error y qué perjuicio causa." },
+    { name: "pretension", label: "Pretensión", type: "textarea", required: true, hint: "Por ejemplo: que se anule la sentencia y se ordene el juicio de reenvío, o que se absuelva" },
+    P.pruebas, F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoPenal(v, `SEÑOR(A) JUEZ(A) DEL ${val(v, "juzgado").toUpperCase()}`, "Asunto: RECURSO DE APELACIÓN DE SENTENCIA"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en tiempo y forma, con fundamento en el artículo 460 del Código Procesal Penal, interpongo RECURSO DE APELACIÓN DE SENTENCIA contra la ${val(v, "sentencia")}, para ante el Tribunal de Apelación de Sentencia Penal, por los siguientes motivos:` },
+    { t: "seccion", text: "MOTIVOS Y AGRAVIOS" }, listOr(v, "agravios"),
+    ...pruebasSeccion(v),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PRETENSIÓN" }, { t: "p", text: val(v, "pretension") },
+    { t: "p", text: "Solicito audiencia oral para exponer los alegatos y recibir la prueba ofrecida (art. 463 del Código Procesal Penal)." },
+    ...cierre(v),
+  ],
+};
+
+const medidaAlterna: FormTemplate = {
+  key: "solicitud-medida-alterna",
+  kind: "escrito",
+  category: "Penal",
+  title: "Solicitud de medida alterna",
+  description: "Conciliación, suspensión del proceso a prueba o reparación integral del daño (arts. 25, 30 j y 36 CPP).",
+  fields: [
+    P.despacho, P.expediente, F.cliente, F.cedula, P.ofendido, P.delito,
+    { name: "medida", label: "Medida que se solicita", type: "text", required: true, hint: "conciliación · suspensión del proceso a prueba · reparación integral del daño" },
+    { name: "plan", label: "Plan de reparación o acuerdo propuesto", type: "list", required: true, hint: "Un compromiso por línea (montos, plazos, disculpa, servicio comunitario…)" },
+    { name: "condiciones", label: "Condiciones que se ofrece cumplir (suspensión a prueba)", type: "list", hint: "Reglas del art. 26: residir en un lugar, no portar armas, programas de tratamiento…" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoPenal(v, `SEÑOR(A) JUEZ(A) DEL ${val(v, "juzgado").toUpperCase()}`, `Asunto: SOLICITUD DE ${val(v, "medida").toUpperCase()}`),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en mi condición de persona imputada, antes de acordarse la apertura a juicio solicito la aplicación de la ${val(v, "medida")}${v.ofendido?.trim() ? `, con la conformidad de la persona ofendida ${v.ofendido.trim()}` : ""}. Manifiesto que durante los cinco años anteriores no me he beneficiado de la conciliación, la suspensión del proceso a prueba ni la reparación integral del daño.` },
+    { t: "seccion", text: "PLAN DE REPARACIÓN O ACUERDO" }, listOr(v, "plan"),
+    ...(lines(v, "condiciones").length ? [{ t: "seccion", text: "CONDICIONES QUE ME COMPROMETO A CUMPLIR" } as Block, listOr(v, "condiciones")] : []),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se convoque a audiencia oral para conocer esta solicitud, se escuche a la persona ofendida y al Ministerio Público, se apruebe el plan propuesto y, una vez cumplido, se declare extinguida la acción penal." },
+    ...cierre(v),
+  ],
+};
+
+const cesePrision: FormTemplate = {
+  key: "cese-prision-preventiva",
+  kind: "escrito",
+  category: "Penal",
+  title: "Solicitud de cese o sustitución de la prisión preventiva",
+  description: "Por cambio de circunstancias, por su duración o por exceder el plazo (arts. 239 y 257 CPP).",
+  fields: [
+    P.despacho, P.expediente, F.cliente, F.cedula, P.delito,
+    { name: "desde", label: "Prisión preventiva desde", type: "date", required: true },
+    { name: "motivos", label: "Motivos", type: "list", required: true, hint: "Nuevos elementos, arraigo (domicilio, trabajo, familia), duración frente a la posible pena…" },
+    { name: "sustitutiva", label: "Medida sustitutiva que se ofrece", type: "text", hint: "Por ejemplo: presentarse a firmar cada quince días, impedimento de salida, fianza" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoPenal(v, `SEÑOR(A) JUEZ(A) DEL ${val(v, "juzgado").toUpperCase()}`, "Asunto: SOLICITUD DE CESE DE LA PRISIÓN PREVENTIVA"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en prisión preventiva desde el ${longDate(v.desde ?? "")}, solicito el cese de esa medida${v.sustitutiva?.trim() ? ` y su sustitución por ${v.sustitutiva.trim()}` : ""}, con fundamento en el artículo 257 del Código Procesal Penal y por los siguientes motivos:` },
+    { t: "seccion", text: "MOTIVOS" }, listOr(v, "motivos"),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: `Solicito que se convoque a audiencia oral, se ordene el cese de la prisión preventiva${v.sustitutiva?.trim() ? " y se impongan las medidas sustitutivas ofrecidas" : ""} y se disponga mi libertad inmediata.` },
+    ...cierre(v),
+  ],
+};
+
+export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
 
 export function getTemplate(key: string): FormTemplate | null {
   return TEMPLATES.find((t) => t.key === key) ?? null;
