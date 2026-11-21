@@ -3,25 +3,27 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ActionForm, SubmitButton } from "@/components/form";
-import { Field, PageHeader } from "@/components/ui";
+import { Breadcrumbs, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clients, matters } from "@/db/schema";
 import { matterAccessSql } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
-import { articleNumbersFrom } from "@/lib/law-parser";
+import { articleNumbersFrom, joinArticleNumbers } from "@/lib/law-parser";
 import { articlesByNumber, getLaw } from "@/lib/laws";
-import { citationText, getNorm } from "@/lib/normativa";
+import { citationText, getNorm, NORM_AREAS } from "@/lib/normativa";
 import { ArticleBody, articleLabel } from "../law-text";
 import { citeArticleAction } from "../actions";
 
 export const metadata: Metadata = { title: "Citar artículo" };
 
-export default async function CitePage({ searchParams }: { searchParams: Promise<{ norma?: string; art?: string }> }) {
+export default async function CitePage({ searchParams }: { searchParams: Promise<{ norma?: string; art?: string; sel?: string | string[] }> }) {
   const user = await requireUser();
   const sp = await searchParams;
   const norm = getNorm(sp.norma);
   if (!norm) notFound();
-  const art = (sp.art ?? "").slice(0, 60);
+  // Varios artículos marcados con «Seleccionar varios» (sel=28&sel=29…) o uno solo (art=29).
+  const selected = ([] as string[]).concat(sp.sel ?? []).map((x) => x.slice(0, 20)).slice(0, 200);
+  const art = (selected.length ? joinArticleNumbers(selected) : (sp.art ?? "")).slice(0, 200);
   const law = await getLaw(norm.key);
   const text = law ? await articlesByNumber(law.id, articleNumbersFrom(art)) : [];
   const options = await db
@@ -33,7 +35,15 @@ export default async function CitePage({ searchParams }: { searchParams: Promise
     .limit(300);
   return (
     <>
-      <PageHeader title="Citar en un expediente" subtitle={citationText({ normName: norm.name, normNumber: norm.number, articles: art || null })} />
+      <Breadcrumbs
+        items={[
+          { label: "Normativa", href: "/normativa" },
+          { label: NORM_AREAS[norm.area], href: `/normativa#${norm.area}` },
+          { label: norm.name, href: law ? `/normativa/${norm.key}` : "/normativa" },
+          { label: text.length > 1 ? `Añadir ${text.length} artículos al expediente` : "Citar en un expediente" },
+        ]}
+      />
+      <PageHeader title={text.length > 1 ? `Añadir ${text.length} artículos a un expediente` : "Citar en un expediente"} subtitle={citationText({ normName: norm.name, normNumber: norm.number, articles: art || null })} />
       <div className="grid gap-6 lg:grid-cols-5">
         <ActionForm action={citeArticleAction.bind(null, norm.key, art)} className="card card-pad lg:col-span-2">
           <Field label="Expediente">
@@ -52,7 +62,7 @@ export default async function CitePage({ searchParams }: { searchParams: Promise
             <input className="input" name="note" maxLength={1000} />
           </Field>
           <div className="mt-4 flex justify-between gap-2">
-            <Link className="btn-secondary" href={law ? `/normativa/${norm.key}?art=${encodeURIComponent(art)}` : "/normativa"}>
+            <Link className="btn-secondary" href={law ? `/normativa/${norm.key}?art=${encodeURIComponent(art)}${selected.length ? "&seleccionar=1" : ""}` : "/normativa"}>
               Cancelar
             </Link>
             <SubmitButton>Citar</SubmitButton>

@@ -1,4 +1,5 @@
 import { CopyButton } from "@/components/copy-button";
+import { SelectBox } from "./selection";
 
 /** Fragmento de búsqueda con las coincidencias («[[…]]») resaltadas, sin HTML de terceros. */
 export function Snippet({ text }: { text: string }) {
@@ -42,13 +43,14 @@ export function articleLabel(number: string) {
   return /^[IVXLCDM]+$/.test(number) ? `Artículo ${number} (disposiciones finales)` : `Artículo ${number}`;
 }
 
-export function ArticleCard({ a, lawTitle, citeHref }: { a: { number: string; heading: string | null; body: string }; lawTitle: string; citeHref: string }) {
+export function ArticleCard({ a, lawTitle, citeHref, selectForm }: { a: { number: string; heading: string | null; body: string }; lawTitle: string; citeHref: string; /** En «Seleccionar varios»: el formulario de la selección. */ selectForm?: string }) {
   const id = `art-${a.number.replace(/\s+/g, "-")}`;
   const plain = `${articleLabel(a.number)} del ${lawTitle}.\n${a.body.replace(/\n{2,}/g, "\n")}`;
   return (
     <article id={id} className="scroll-mt-24 border-b border-ink-100 px-5 py-4 last:border-0">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-serif text-base font-semibold text-ink-900">
+        <h3 className="flex items-center gap-1 font-serif text-base font-semibold text-ink-900">
+          {selectForm && <SelectBox formId={selectForm} number={a.number} label={articleLabel(a.number)} />}
           <a href={`#${id}`} className="hover:underline">
             {articleLabel(a.number)}
           </a>

@@ -109,3 +109,29 @@ export function articleNumbersFrom(spec: string | null | undefined): string[] {
   }
   return [...new Set(out)];
 }
+
+/**
+ * Lista de artículos elegidos → texto corto para citar: «28 a 31, 45 y 97 bis». Los consecutivos se
+ * agrupan en rangos (que articleNumbersFrom vuelve a entender).
+ */
+export function joinArticleNumbers(numbers: string[]): string {
+  const key = (n: string) => {
+    const m = /^(\d+)\s*(.*)$/.exec(n);
+    return m ? [Number(m[1]), m[2]] as const : [Number.MAX_SAFE_INTEGER, n] as const;
+  };
+  const uniq = [...new Set(numbers.map((n) => n.trim()).filter(Boolean))].sort((a, b) => {
+    const [na, sa] = key(a), [nb, sb] = key(b);
+    return na - nb || sa.localeCompare(sb);
+  });
+  const parts: string[] = [];
+  for (let i = 0; i < uniq.length; i++) {
+    const start = uniq[i];
+    if (!/^\d+$/.test(start)) { parts.push(start); continue; }
+    let j = i;
+    while (j + 1 < uniq.length && /^\d+$/.test(uniq[j + 1]) && Number(uniq[j + 1]) === Number(uniq[j]) + 1 && Number(uniq[j + 1]) - Number(start) < 30) j++;
+    parts.push(j - i >= 2 ? `${start} a ${uniq[j]}` : uniq.slice(i, j + 1).join(", "));
+    i = j;
+  }
+  const flat = parts.join(", ").split(", ");
+  return flat.length > 1 ? `${flat.slice(0, -1).join(", ")} y ${flat[flat.length - 1]}` : flat[0] ?? "";
+}

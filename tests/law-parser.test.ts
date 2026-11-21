@@ -82,3 +82,13 @@ describe("notas de SINALEVI con texto futuro", () => {
     expect(arts[0].body).toContain("uno a diez años");
   });
 });
+
+import { joinArticleNumbers } from "../src/lib/law-parser";
+describe("varios artículos elegidos", () => {
+  it("agrupa consecutivos y vuelve a leerse igual", () => {
+    expect(joinArticleNumbers(["31", "28", "29", "30", "45", "97 bis"])).toBe("28 a 31, 45 y 97 bis");
+    expect(joinArticleNumbers(["29", "30"])).toBe("29 y 30");
+    expect(joinArticleNumbers(["7"])).toBe("7");
+    expect(articleNumbersFrom(joinArticleNumbers(["28", "29", "30", "31", "45", "97 bis"]))).toEqual(["28", "29", "30", "31", "45", "97 bis"]);
+  });
+});

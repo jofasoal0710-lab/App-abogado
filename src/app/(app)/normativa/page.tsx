@@ -77,7 +77,7 @@ export default async function NormativaPage({ searchParams }: { searchParams: Pr
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
-            <section key={g.area} className="card">
+            <section key={g.area} id={g.area} className="card scroll-mt-6">
               <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">{NORM_AREAS[g.area]}</h2>
               <ul className="divide-y divide-ink-100">
                 {g.norms.map((n) => (

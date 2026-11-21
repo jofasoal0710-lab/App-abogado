@@ -162,3 +162,36 @@ export function Pagination({
     </nav>
   );
 }
+
+export type Crumb = { label: string; href?: string; title?: string };
+
+/** Ruta de acceso («Normativa › Laboral › Código de Trabajo › Título II › Art. 29»). La última es la página actual. */
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
+  return (
+    <nav aria-label="Ruta" className="no-print mb-3 overflow-x-auto">
+      <ol className="flex items-center gap-1 whitespace-nowrap text-sm text-ink-500">
+        {items.map((c, i) => {
+          const last = i === items.length - 1;
+          return (
+            <li key={`${c.label}-${i}`} className="flex min-w-0 items-center gap-1">
+              {i > 0 && (
+                <span aria-hidden="true" className="text-ink-300">
+                  ›
+                </span>
+              )}
+              {c.href && !last ? (
+                <Link href={c.href} title={c.title} className="max-w-[16rem] truncate hover:text-brand-700 hover:underline">
+                  {c.label}
+                </Link>
+              ) : (
+                <span title={c.title} aria-current={last ? "page" : undefined} className={`max-w-[20rem] truncate ${last ? "font-medium text-ink-800" : ""}`}>
+                  {c.label}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
