@@ -3,7 +3,8 @@
  * Código de Trabajo (versión 64) y del Código Procesal Civil (Ley 9342, versión 5), consultados en el
  * SCIJ, y del Arancel de honorarios de abogacía y notariado (Decreto 41457-JP reformado por el 41930-JP,
  * SINALEVI versión 4 de 4), del Código Procesal Penal (Ley 7594, versión 47) y del Código Penal
- * (Ley 4573, versión 104). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
+ * (Ley 4573, versión 104), del Código de Familia (Ley 5476, versión 43) y del Código Procesal de Familia
+ * (Ley 9747, versión 4, vigente desde el 1 de octubre de 2024). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
  */
 export type GuideEntry = { title: string; area: string; keywords: string; refs: string; body: string };
 
@@ -295,5 +296,98 @@ El Ministerio Público y el querellante formulan la acusación y piden la pena; 
     body: `Ejecución condicional (Código Penal): el juez puede aplicarla cuando la pena no excede de tres años y consiste en prisión o extrañamiento (art. 59). Exige que se trate de un delincuente primario y se funda en su personalidad, su vida anterior, su comportamiento posterior al delito y su deseo de reparar; requiere un informe del Instituto de Criminología (art. 60).
 Prescripción de la pena (art. 84): la de prisión, extrañamiento o interdicción de derechos, en un tiempo igual a la condena más un tercio, sin pasar de 25 años ni bajar de 3; los días multa por delitos, en 3 años; las contravenciones, en 1 año. Corre desde que la sentencia queda firme, o desde que se revoca la ejecución condicional o la libertad condicional, o desde el quebrantamiento de la condena (art. 86).
 Para calcularla: Herramientas → Prescripción penal → De la pena impuesta.`,
+  },
+  {
+    title: "Divorcio: causales y divorcio por mutuo consentimiento",
+    area: "familia",
+    keywords: "divorcio causales mutuo consentimiento convenio escritura pública registro civil separación de hecho tres años incompatibilidad de caracteres adulterio sevicia daños y perjuicios",
+    refs: "ley-5476:48,48 bis",
+    body: `Causales de divorcio (art. 48 del Código de Familia): el adulterio; el atentado contra la vida del otro cónyuge o de los hijos; la tentativa de prostituir o corromper al cónyuge o la corrupción de los hijos; la sevicia; la separación judicial por un año sin reconciliación; la ausencia legalmente declarada; la separación de hecho por al menos tres años; y la incompatibilidad de caracteres.
+Mutuo consentimiento: los cónyuges, personalmente o uno por apoderado especialísimo en escritura pública, otorgan un convenio en escritura pública que diga: a) quién tiene la custodia de los hijos menores; b) quién asume su alimentación y en qué proporción; c) si hay o no obligación alimentaria entre los cónyuges y su monto; d) la propiedad y distribución de los bienes.
+- Sin hijos menores comunes ni bienes en el convenio, la escritura va directamente al Registro Civil.
+- Si hay hijos menores o bienes, se tramita judicialmente: el convenio se presenta al juzgado dentro de los tres meses siguientes a su otorgamiento, salvo que lo presenten ambos cónyuges juntos (reforma de la Ley 10650 de 2025). El tribunal puede modificar lo relativo a los hijos.
+Por las causales 2), 3) y 4), el cónyuge inocente puede pedir daños y perjuicios junto con la acción (art. 48 bis).`,
+  },
+  {
+    title: "Separación judicial: causales",
+    area: "familia",
+    keywords: "separación judicial causales abandono malicioso ofensas graves separación de hecho un año mutuo consentimiento",
+    refs: "ley-5476:58,60",
+    body: `Son causales de separación judicial (art. 58 del Código de Familia): cualquiera de las de divorcio; el abandono voluntario y malicioso; la negativa infundada a cumplir los deberes de asistencia y alimentación con el otro cónyuge o los hijos comunes; las ofensas graves; la enajenación mental de más de un año u otra enfermedad o trastorno grave que haga imposible o peligrosa la vida en común; la condena a tres o más años de prisión por delito no político, si el condenado estuvo preso al menos dos años consecutivos; y la separación de hecho durante un año consecutivo, después de dos años de matrimonio.
+También procede por mutuo consentimiento, con las mismas reglas del convenio de divorcio del art. 48 (art. 60). La separación judicial por un año sin reconciliación es, a su vez, causal de divorcio.`,
+  },
+  {
+    title: "Pensión alimentaria: qué comprende, aguinaldo, salario escolar y retroactivos",
+    area: "familia",
+    keywords: "pensión alimentaria alimentos cuota aguinaldo salario escolar inicio de lecciones quiénes deben alimentos retroactivos doce meses modificación aumento automático no tener trabajo",
+    refs: "ley-5476:164,169,172,174;ley-9747:262,265,279",
+    body: `Los alimentos comprenden sustento, habitación, vestido, asistencia médica, diversión, transporte y la educación o capacitación de los menores de edad o personas con discapacidad, según las posibilidades de quien los da y las necesidades y el nivel de vida de quien los recibe (art. 164 del Código de Familia).
+- Aguinaldo: una cuota igual a la ordinaria, en los primeros veinte días de diciembre, sin necesidad de que se ordene (art. 164).
+- Salario escolar o inicio de lecciones: una cuota igual a la ordinaria en enero, si el obligado recibe salario escolar y la persona beneficiaria tiene gastos de estudio; el juez puede fijar un monto anual (art. 164).
+- Deben alimentos: los cónyuges entre sí; padres y madres a sus hijos menores o con discapacidad y los hijos a sus padres; hermanos, abuelos, nietos y bisnietos en los casos del art. 169.
+- Alimentos pasados: solo los doce meses anteriores a la demanda y si hubo que endeudarse para vivir (art. 172); declarada la paternidad, la obligación se retrotrae a la presentación de la demanda (art. 96).
+- La cuota puede modificarse si cambian las circunstancias (art. 174); lo resuelto sobre el monto no es cosa juzgada material (art. 262 CPF).
+- No es excusa no tener trabajo, salario o ingresos, ni que el negocio no dé utilidades (art. 265 CPF).
+- Aumento automático: si el obligado es asalariado, en enero y julio según el aumento de ley; si no, cada enero según la variación del salario base (art. 279 CPF).
+La Ley de Pensiones Alimentarias (7654) está derogada: rige el Código Procesal de Familia. Para calcular: Herramientas → Familia.`,
+  },
+  {
+    title: "Proceso de pensión alimentaria: conciliación, sentencia anticipada y oposición",
+    area: "familia",
+    keywords: "proceso pensión alimentaria demanda de alimentos conciliación diez días sentencia anticipada oposición cinco días retención salarial exigible tercer día",
+    refs: "ley-9747:267,269,270,271,280",
+    body: `Demanda (art. 267 CPF): si se piden alimentos para varias personas, se indica el monto pretendido para cada una; se puede pedir la retención salarial; no es obligatorio señalar medio para notificaciones (se notifica por estrados).
+Audiencia previa de conciliación: dentro de los diez días hábiles siguientes a la presentación de la demanda (art. 269). El tribunal puede consultar antes las planillas de la CCSS o los ingresos ante el patrono.
+Sentencia anticipada: si no hay audiencia en ese plazo o no hay arreglo, se dicta en las veinticuatro horas siguientes, con la cuota de cada beneficiario, el aguinaldo y el salario escolar, el aumento automático, los retroactivos si proceden y el apercibimiento de apremio corporal (art. 270).
+Oposición: las partes pueden oponerse a la sentencia anticipada en cinco días, con referencia a los hechos, las pretensiones y la prueba; la oposición no suspende sus efectos (art. 271).
+La cuota del acuerdo o de la sentencia anticipada es exigible por los medios coercitivos después del tercer día de notificada (art. 280).`,
+  },
+  {
+    title: "Apremio corporal por deuda alimentaria",
+    area: "familia",
+    keywords: "apremio corporal deuda alimentaria cárcel por pensión seis mensualidades dos cuatro seis meses sesenta y cinco años allanamiento",
+    refs: "ley-9747:283,284",
+    body: `Si no se paga la deuda alimentaria, a petición de la parte acreedora se puede girar orden de apremio corporal contra la persona deudora mayor de edad y menor de sesenta y cinco años; cubre hasta seis mensualidades, incluida la presente, más aguinaldo, salario escolar o inicio de lecciones y gastos extraordinarios urgentes (art. 283 CPF).
+- Gradualidad: la primera orden, hasta por dos meses; la segunda, hasta por cuatro; desde la tercera, hasta por seis.
+- Se puede excluir a quien esté en estado avanzado de embarazo o en una condición de salud que el apremio agrave.
+- Agotadas otras formas, puede pedirse el allanamiento del lugar donde se oculte la persona deudora.
+Para calcular la deuda y lo que cubre el apremio: Herramientas → Familia → Pensión alimentaria.`,
+  },
+  {
+    title: "Recursos y plazos en el proceso de familia",
+    area: "familia",
+    keywords: "plazos familia recurso revocatoria apelación casación contestación demanda ocho días proceso resolutivo familiar cómputo días hábiles",
+    refs: "ley-9747:73,99,100,102,107,223",
+    body: `Los plazos corren desde el día hábil siguiente a aquel en que se notificó a todas las partes; si son por días, solo cuentan los hábiles; por meses o años, de fecha a fecha; si vencen en día inhábil, pasan al siguiente hábil; los escritos electrónicos valen hasta las 24 horas del último día (art. 73 CPF).
+- Revocatoria: dentro del tercer día; si la resolución se dictó en audiencia, en el mismo acto (art. 99).
+- Apelación: solo contra las resoluciones que la ley indica, dentro del tercer día; contra autos se interpone junto con la revocatoria o se rechaza de plano; si se dictó en audiencia, en el acto (art. 100). Admitida, las otras partes tienen tres días para expresar agravios (art. 102).
+- Casación: por escrito ante el órgano que dictó la sentencia, dentro de los diez días siguientes a la notificación; no hace falta citar normas, pero sí el derecho vulnerado (art. 107).
+- Contestación de la demanda en el proceso resolutivo familiar: ocho días hábiles (art. 223).`,
+  },
+  {
+    title: "Unión de hecho: requisitos y plazo para su reconocimiento",
+    area: "familia",
+    keywords: "unión de hecho reconocimiento convivencia dos años pública notoria única estable caducidad dos años gananciales efectos patrimoniales",
+    refs: "ley-5476:245,246",
+    body: `La unión de hecho pública, notoria, única y estable por más de dos años, entre dos personas con aptitud legal para casarse, produce todos los efectos patrimoniales del matrimonio (art. 245 del Código de Familia).
+Cualquiera de los convivientes, o la sucesión del fallecido, puede pedir su reconocimiento; la acción caduca en dos años desde la ruptura de la convivencia o la muerte del conviviente (art. 246). También puede reconocerse por mutuo consentimiento, una vez finalizada, con escritura pública como la del divorcio (art. 48), que incluya la declaración de al menos dos personas sobre la existencia de la unión.
+Para calcular el plazo: Herramientas → Familia → Plazos de familia.`,
+  },
+  {
+    title: "Bienes gananciales: qué son y cuándo se reparten",
+    area: "familia",
+    keywords: "gananciales bienes gananciales liquidación mitad del valor neto divorcio separación capitulaciones bienes propios título gratuito",
+    refs: "ley-5476:41",
+    body: `Al disolverse o anularse el matrimonio, al declararse la separación judicial o al celebrarse capitulaciones después de la boda, cada cónyuge tiene derecho a la mitad del valor neto de los bienes gananciales que haya en el patrimonio del otro; esos bienes quedan gravados de pleno derecho a las resultas de la liquidación (art. 41 del Código de Familia).
+Puede pedirse la liquidación anticipada si se demuestra que la mala gestión o los actos del otro cónyuge ponen en riesgo los intereses propios.
+No son gananciales, entre otros: los adquiridos por título gratuito (herencia, donación) o por causa aleatoria; los comprados con valores propios destinados a ello en capitulaciones; aquellos cuya causa de adquisición es anterior al matrimonio; y los que sustituyen a bienes propios.`,
+  },
+  {
+    title: "Responsabilidad parental, custodia e interrelación familiar",
+    area: "familia",
+    keywords: "responsabilidad parental patria potestad custodia compartida régimen de interrelación familiar visitas interés superior del menor divorcio hijos",
+    refs: "ley-5476:151,152",
+    body: `El padre y la madre ejercen con iguales derechos y deberes la responsabilidad parental sobre sus hijos; en caso de conflicto, el tribunal decide mediante el proceso resolutivo familiar, incluido el régimen de interrelación familiar, según el interés superior de la persona menor de edad (art. 151 del Código de Familia).
+En el divorcio, la nulidad o la separación, los cónyuges acuerdan —o el tribunal dispone— la custodia y el ejercicio de la responsabilidad parental, siendo prioritaria la custodia compartida; la alimentación, crianza y educación de los hijos en proporción a los ingresos de cada uno; y el régimen de interrelación familiar, que incluye el contacto con los parientes hasta el cuarto grado de consanguinidad y segundo de afinidad (art. 152). Debe asegurarse el derecho a la vivienda de los hijos menores.`,
   },
 ];

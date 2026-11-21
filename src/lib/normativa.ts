@@ -31,6 +31,8 @@ export type Norm = {
   area: NormArea;
   /** Palabras con las que también se busca. */
   aka?: string[];
+  /** Si ya no está vigente: qué la derogó (se muestra en el catálogo). */
+  repealed?: string;
 };
 
 export const NORMS: readonly Norm[] = [
@@ -45,7 +47,7 @@ export const NORMS: readonly Norm[] = [
 
   { key: "ley-5476", name: "Código de Familia", number: "5476", area: "familia", aka: ["divorcio", "matrimonio"] },
   { key: "ley-9747", name: "Código Procesal de Familia", number: "9747", area: "familia" },
-  { key: "ley-7654", name: "Ley de Pensiones Alimentarias", number: "7654", area: "familia", aka: ["alimentos"] },
+  { key: "ley-7654", name: "Ley de Pensiones Alimentarias", number: "7654", area: "familia", aka: ["alimentos"], repealed: "Derogada en su totalidad por la Ley 9747 (art. 4): las pensiones se rigen por el Código Procesal de Familia, vigente desde el 1 de octubre de 2024." },
   { key: "ley-7586", name: "Ley contra la Violencia Doméstica", number: "7586", area: "familia" },
   { key: "ley-7739", name: "Código de la Niñez y la Adolescencia", number: "7739", area: "familia", aka: ["menores", "pani"] },
 

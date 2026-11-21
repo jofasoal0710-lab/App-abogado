@@ -6,6 +6,7 @@ import { laborSettlement, procedureDeadline } from "@/lib/calculators";
 import { holidayName } from "@/lib/cr-holidays";
 import { formatDate, todayISO } from "@/lib/dates";
 import { formatMoney, parseMoneyToCents } from "@/lib/money";
+import { alimonyArrears, divorceAgreementDeadline, pensionYear, unionCaducity } from "@/lib/familia";
 import { actionPrescription, fmtYears, PENALTY_KIND_LABELS, penaltyPrescription, type PenaltyKind } from "@/lib/penal";
 
 export const metadata: Metadata = { title: "Herramientas" };
@@ -87,6 +88,26 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
     if (!isoOk(sp.firme)) prescriptionError = "Indica la fecha en que la sentencia quedó firme.";
     else if (kind === "prision" && (!Number.isFinite(years) || years <= 0 || years > 50)) prescriptionError = "Indica la pena impuesta en años.";
     else penalty = penaltyPrescription({ sentenceYears: years || 0, kind, firmOn: sp.firme! });
+  }
+
+  // Familia
+  let pension: ReturnType<typeof pensionYear> | null = null;
+  let arrears: ReturnType<typeof alimonyArrears> | null = null;
+  let famDeadline: { due: string; rule: string } | null = null;
+  let familyError: string | null = null;
+  if (sp.calc === "pension") {
+    const monthly = parseMoneyToCents(sp.cuota ?? "");
+    const owed = sp.adeudadas?.trim() ? Number(sp.adeudadas) : 0;
+    if (!monthly || monthly <= 0) familyError = "Indica el monto de la cuota alimentaria mensual.";
+    else if (!Number.isInteger(owed) || owed < 0 || owed > 240) familyError = "Las cuotas adeudadas deben ser un número entero de meses.";
+    else {
+      pension = pensionYear(monthly, { escolar: sp.escolar === "si" });
+      if (owed > 0) arrears = alimonyArrears({ monthlyCents: monthly, monthsOwed: owed, order: Number(sp.orden) || 1 });
+    }
+  }
+  if (sp.calc === "familia_plazo") {
+    if (!isoOk(sp.desde)) familyError = "Indica la fecha.";
+    else famDeadline = sp.tipo === "convenio" ? divorceAgreementDeadline(sp.desde!) : unionCaducity(sp.desde!);
   }
 
   return (
@@ -219,6 +240,92 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
               )}
             </div>
           )}
+        </section>
+
+        <section id="familia" className="card card-pad xl:col-span-2">
+          <h2 className="mb-1 font-serif text-lg font-semibold">Familia: pensión alimentaria y plazos</h2>
+          <p className="mb-4 text-sm text-ink-600">
+            Según el Código de Familia y el Código Procesal de Familia (vigente desde el 1 de octubre de 2024; la Ley de Pensiones Alimentarias 7654 está derogada).
+          </p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <form className="grid content-start gap-3 sm:grid-cols-2" action="/herramientas#familia">
+              <input type="hidden" name="calc" value="pension" />
+              <p className="label sm:col-span-2">Pensión alimentaria</p>
+              <Field label="Cuota mensual (₡)">
+                <input className="input" name="cuota" inputMode="decimal" defaultValue={sp.cuota ?? ""} required />
+              </Field>
+              <Field label="Cuotas adeudadas (meses)" hint="Para el apremio corporal">
+                <input className="input" name="adeudadas" inputMode="numeric" defaultValue={sp.adeudadas ?? ""} />
+              </Field>
+              <Field label="Orden de apremio n.°" hint="1.ª, 2.ª, 3.ª o siguientes">
+                <input className="input" name="orden" inputMode="numeric" defaultValue={sp.orden ?? "1"} />
+              </Field>
+              <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink-700">
+                <input type="checkbox" name="escolar" value="si" defaultChecked={sp.escolar === "si"} />
+                Incluye salario escolar
+              </label>
+              <div className="sm:col-span-2">
+                <button className="btn-primary">Calcular pensión</button>
+              </div>
+            </form>
+            <form className="grid content-start gap-3 sm:grid-cols-2" action="/herramientas#familia">
+              <input type="hidden" name="calc" value="familia_plazo" />
+              <p className="label sm:col-span-2">Plazos de familia</p>
+              <Field label="Plazo">
+                <select className="input" name="tipo" defaultValue={sp.tipo === "convenio" ? "convenio" : "union"}>
+                  <option value="union">Reconocimiento de unión de hecho (caducidad)</option>
+                  <option value="convenio">Presentar el convenio de divorcio al juzgado</option>
+                </select>
+              </Field>
+              <Field label="Desde" hint="Ruptura o muerte del conviviente · fecha de la escritura del convenio">
+                <input className="input" type="date" name="desde" defaultValue={sp.desde ?? ""} required />
+              </Field>
+              <div className="sm:col-span-2">
+                <button className="btn-secondary">Calcular plazo</button>
+              </div>
+            </form>
+          </div>
+          {familyError && <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{familyError}</p>}
+          {pension && (
+            <div className="mt-5" aria-live="polite">
+              <p className="text-lg">
+                En un año: <strong>{formatMoney(pension.totalCents)}</strong>
+              </p>
+              <p className="text-sm text-ink-600">
+                12 cuotas {formatMoney(pension.ordinaryCents)} · aguinaldo {formatMoney(pension.aguinaldoCents)}
+                {pension.escolarCents ? ` · salario escolar ${formatMoney(pension.escolarCents)}` : ""}
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-ink-600">
+                {pension.notes.map((e) => (
+                  <li key={e}>{e}</li>
+                ))}
+              </ul>
+              {arrears && (
+                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <p>
+                    Adeudado: <strong>{formatMoney(arrears.owedCents)}</strong> · con apremio corporal: <strong>{formatMoney(arrears.apremioCents)}</strong>
+                    {arrears.beyondApremioCents > 0 && <> · por otras vías: {formatMoney(arrears.beyondApremioCents)}</>}
+                  </p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {arrears.notes.map((e) => (
+                      <li key={e}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {famDeadline && (
+            <div className="mt-5" aria-live="polite">
+              <p className="text-lg">
+                Vence el <strong>{formatDate(famDeadline.due)}</strong>
+              </p>
+              <p className="mt-1 text-sm text-ink-600">{famDeadline.rule}</p>
+            </div>
+          )}
+          <p className="mt-4 text-xs text-ink-500">
+            Plazos procesales (CPF, días hábiles desde el día siguiente a la notificación a todas las partes, art. 73): revocatoria y apelación 3 días (arts. 99 y 100) · contestar la demanda del proceso resolutivo familiar 8 (art. 223) · oponerse a la sentencia anticipada de alimentos 5 (art. 271) · casación 10 (art. 107).
+          </p>
         </section>
 
         <section id="prescripcion" className="card card-pad xl:col-span-2">

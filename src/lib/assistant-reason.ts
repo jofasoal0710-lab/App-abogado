@@ -35,7 +35,17 @@ const PENAL = String.raw`(penal\w*|delito|imputad\w*|fiscal\w*|querell\w*|acusad
 /** El patrón y, en cualquier lugar de la pregunta, una palabra del proceso penal. */
 const both = (a: string) => new RegExp(String.raw`^(?=.*\b${PENAL}\b).*\b${a}\b`);
 
+/** Materia de familia: proceso resolutivo familiar, pensiones, divorcio… (Código Procesal de Familia). */
+const FAMILIA = String.raw`(familia\w*|pension\w*|alimentari\w*|alimentos|divorcio|separacion judicial|custodia|responsabilidad parental|union de hecho|interrelacion|resolutivo familiar|sentencia anticipada)`;
+const fam = (a: string) => new RegExp(String.raw`^(?=.*\b${FAMILIA}\b).*\b${a}\b`);
+
 export const PROCEDURAL_DEADLINES = [
+  // Familia (CPF): desde el día hábil siguiente a la notificación a todas las partes; solo días hábiles (art. 73).
+  { key: "oposicion_sentencia_anticipada", match: fam(String.raw`(oposicion|oponer\w*)`), days: 5, label: "oponerse a la sentencia anticipada de pensión alimentaria", ref: "CPF art. 271" },
+  { key: "casacion_familia", match: fam("casacion"), days: 10, label: "recurso de casación en familia", ref: "CPF art. 107" },
+  { key: "contestacion_familia", match: fam(String.raw`contest\w*`), days: 8, label: "contestar la demanda en el proceso resolutivo familiar", ref: "CPF art. 223" },
+  { key: "apelacion_familia", match: fam(String.raw`apela\w*`), days: 3, label: "apelar en familia (contra autos, junto con la revocatoria; si se dictó en audiencia, en el acto)", ref: "CPF art. 100" },
+  { key: "revocatoria_familia", match: fam(String.raw`(revocatoria|revocar)`), days: 3, label: "recurso de revocatoria en familia (en audiencia, en el mismo acto)", ref: "CPF art. 99" },
   // Proceso penal (CPP): los plazos por días cuentan solo días hábiles, desde el día siguiente a la notificación (art. 167).
   { key: "casacion_penal", match: both("casacion"), days: 15, label: "recurso de casación penal", ref: "CPP art. 469" },
   { key: "apelacion_sentencia_penal", match: both(String.raw`(apela\w*\b.*\bsentencia|sentencia\b.*\bapela\w*)`), days: 15, label: "apelar una sentencia penal", ref: "CPP art. 460" },

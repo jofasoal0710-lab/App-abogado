@@ -601,7 +601,9 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
     lines.push(
       proc?.key.endsWith("_penal") && !duration
         ? "Regla: art. 167 del CPP (desde el día siguiente a la notificación; en los plazos por días solo cuentan los hábiles). No incluye cierres del Poder Judicial."
-        : "Regla: art. 30.5 del CPC (desde el día hábil siguiente; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial.",
+        : proc && /familia|anticipada/.test(proc.key) && !duration
+          ? "Regla: art. 73 del CPF (desde el día hábil siguiente a la notificación a todas las partes; solo días hábiles; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial."
+          : "Regla: art. 30.5 del CPC (desde el día hábil siguiente; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial.",
     );
     items.push({ label: "Abrir la calculadora de plazos", href: `/herramientas?calc=plazo&notificado=${date}&cantidad=${amount}&unidad=${unit}#plazo` });
   } else if (proc) {

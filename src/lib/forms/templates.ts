@@ -446,7 +446,149 @@ const cesePrision: FormTemplate = {
   ],
 };
 
-export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
+// ---------- Escritos de familia (Código de Familia y Código Procesal de Familia, Ley 9747) ----------
+
+const FAM = {
+  juzgado: { name: "juzgado", label: "Juzgado", type: "text", auto: "expediente.juzgado", required: true, hint: "Por ejemplo: Juzgado de Familia del Primer Circuito Judicial de San José" } as Field,
+  expediente: { name: "expediente", label: "Número de expediente", type: "text", auto: "expediente.numero" } as Field,
+  demandado: { name: "contraparte", label: "Persona demandada (nombre, calidades y domicilio)", type: "text", auto: "expediente.contraparte", required: true } as Field,
+  hijos: { name: "hijos", label: "Hijos e hijas menores de edad o con discapacidad", type: "list", hint: "Nombre, fecha de nacimiento y cédula, uno por línea. Vacío si no hay." } as Field,
+  hechos: { name: "hechos", label: "Hechos", type: "list", required: true, hint: "Un hecho por línea, en orden." } as Field,
+  pruebas: { name: "pruebas", label: "Prueba que se ofrece", type: "list", hint: "Certificaciones del Registro Civil, testigos (nombre y domicilio), documentos…" } as Field,
+};
+const hijosSeccion = (v: Values): Block[] => (lines(v, "hijos").length ? [{ t: "seccion", text: "HIJOS E HIJAS" }, listOr(v, "hijos")] : []);
+const pruebaFam = (v: Values): Block[] => (lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" }, listOr(v, "pruebas")] : []);
+
+const demandaPension: FormTemplate = {
+  key: "demanda-pension-alimentaria",
+  kind: "escrito",
+  category: "Familia",
+  title: "Demanda de pensión alimentaria",
+  description: "Monto pretendido por cada beneficiario, retención salarial y prueba de ingresos (arts. 164 CF y 267 CPF).",
+  fields: [
+    FAM.juzgado, FAM.expediente, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio, FAM.demandado,
+    { name: "beneficiarios", label: "Personas beneficiarias y monto mensual pretendido para cada una", type: "list", required: true, hint: "Por ejemplo: María Pérez Mora, 8 años — ₡150 000 mensuales" },
+    { name: "ingresos", label: "Ingresos y patrono de la persona demandada", type: "textarea", hint: "Dónde trabaja, cuánto gana, bienes conocidos" },
+    { name: "retencion", label: "¿Se pide retención salarial?", type: "text", hint: "Sí, al patrono …; o dejar vacío" },
+    FAM.hechos, FAM.pruebas, F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Pensión alimentaria"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, en representación de las personas beneficiarias que indico, interpongo DEMANDA DE PENSIÓN ALIMENTARIA contra ${val(v, "contraparte")}, con fundamento en los artículos 164 y 169 del Código de Familia y 267 del Código Procesal de Familia, por los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    { t: "seccion", text: "PERSONAS BENEFICIARIAS Y MONTO PRETENDIDO" }, listOr(v, "beneficiarios"),
+    ...(v.ingresos?.trim() ? [{ t: "seccion", text: "INGRESOS DE LA PERSONA DEMANDADA" } as Block, { t: "p", text: v.ingresos.trim() } as Block] : []),
+    ...pruebaFam(v),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: `Solicito que se fije la cuota alimentaria pretendida para cada persona beneficiaria, con el aguinaldo y, si procede, el salario escolar (art. 164 del Código de Familia) y su aumento automático (art. 279 del Código Procesal de Familia)${v.retencion?.trim() ? `; que se ordene la retención salarial (${v.retencion.trim()})` : ""}; y que se convoque a la audiencia previa de conciliación (art. 269 del Código Procesal de Familia).` },
+    ...cierre(v),
+  ],
+};
+
+const apremio: FormTemplate = {
+  key: "solicitud-apremio-corporal",
+  kind: "escrito",
+  category: "Familia",
+  title: "Solicitud de apremio corporal",
+  description: "Por cuotas alimentarias no pagadas, hasta seis mensualidades (art. 283 CPF).",
+  fields: [
+    FAM.juzgado, FAM.expediente, F.cliente, F.cedula,
+    { name: "contraparte", label: "Persona deudora", type: "text", auto: "expediente.contraparte", required: true },
+    { name: "adeudado", label: "Cuotas y rubros adeudados", type: "list", required: true, hint: "Mes y monto, uno por línea (incluye aguinaldo o salario escolar si se deben)" },
+    { name: "total", label: "Total adeudado (₡)", type: "text", required: true },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Pensión alimentaria — apremio corporal"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, parte actora en el proceso alimentario de referencia, manifiesto que ${val(v, "contraparte")} no ha cumplido con el pago de las siguientes cuotas y rubros:` },
+    listOr(v, "adeudado"),
+    { t: "p", text: `Lo adeudado asciende a ${val(v, "total")}. Con fundamento en el artículo 283 del Código Procesal de Familia, solicito que se gire orden de apremio corporal contra la persona deudora por las sumas adeudadas, hasta por seis mensualidades incluida la presente, además del aguinaldo, el salario escolar y los gastos extraordinarios que correspondan.` },
+    ...cierre(v),
+  ],
+};
+
+const demandaDivorcio: FormTemplate = {
+  key: "demanda-divorcio",
+  kind: "escrito",
+  category: "Familia",
+  title: "Demanda de divorcio (proceso resolutivo familiar)",
+  description: "Por causal del art. 48 del Código de Familia, con custodia, alimentos, interrelación y gananciales.",
+  fields: [
+    FAM.juzgado, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio, FAM.demandado,
+    { name: "matrimonio", label: "Fecha y lugar del matrimonio", type: "text", required: true },
+    { name: "causal", label: "Causal (art. 48 del Código de Familia)", type: "text", required: true, hint: "Por ejemplo: separación de hecho por más de tres años (inciso 7)" },
+    FAM.hechos, FAM.hijos,
+    { name: "pretensiones", label: "Pretensiones", type: "list", required: true, hint: "Divorcio; custodia y responsabilidad parental; alimentos; régimen de interrelación familiar; liquidación de gananciales…" },
+    FAM.pruebas, F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Proceso resolutivo familiar — divorcio"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, interpongo DEMANDA DE DIVORCIO contra ${val(v, "contraparte")}, con quien contraje matrimonio el ${val(v, "matrimonio")}, por la causal de ${val(v, "causal")}, prevista en el artículo 48 del Código de Familia, con base en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...hijosSeccion(v),
+    ...pruebaFam(v),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PRETENSIONES" }, listOr(v, "pretensiones"),
+    ...cierre(v),
+  ],
+};
+
+const convenioDivorcio: FormTemplate = {
+  key: "aprobacion-convenio-divorcio",
+  kind: "escrito",
+  category: "Familia",
+  title: "Solicitud de aprobación del convenio de divorcio por mutuo consentimiento",
+  description: "Con hijos menores o bienes: se presenta al juzgado dentro de los tres meses de la escritura (art. 48 CF).",
+  fields: [
+    FAM.juzgado, F.cliente, F.cedula,
+    { name: "contraparte", label: "Otro cónyuge (nombre y cédula)", type: "text", auto: "expediente.contraparte", required: true },
+    { name: "escritura", label: "Escritura del convenio", type: "text", required: true, hint: "Número, notario(a) y fecha: escritura N.° 45 otorgada ante la notaria … el 10 de noviembre de 2026" },
+    FAM.hijos,
+    { name: "bienes", label: "Bienes a los que se refiere el convenio", type: "list" },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Divorcio por mutuo consentimiento"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, presento para su aprobación el convenio de divorcio por mutuo consentimiento suscrito con ${val(v, "contraparte")}, contenido en la ${val(v, "escritura")}, dentro del plazo de tres meses que señala el artículo 48 del Código de Familia.` },
+    ...hijosSeccion(v),
+    ...(lines(v, "bienes").length ? [{ t: "seccion", text: "BIENES" } as Block, listOr(v, "bienes")] : []),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se apruebe el convenio, se decrete el divorcio por mutuo consentimiento y se ordene su inscripción en el Registro Civil y en los demás registros que correspondan." },
+    ...cierre(v),
+  ],
+};
+
+const unionHecho: FormTemplate = {
+  key: "reconocimiento-union-hecho",
+  kind: "escrito",
+  category: "Familia",
+  title: "Demanda de reconocimiento de unión de hecho",
+  description: "Unión pública, notoria, única y estable por más de dos años; caduca a los dos años de la ruptura (arts. 245 y 246 CF).",
+  fields: [
+    FAM.juzgado, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "contraparte", label: "Conviviente o su sucesión (nombre y calidades)", type: "text", auto: "expediente.contraparte", required: true },
+    { name: "inicio", label: "Inicio de la convivencia", type: "date", required: true },
+    { name: "fin", label: "Ruptura de la convivencia o fallecimiento", type: "date", required: true },
+    FAM.hechos, FAM.hijos,
+    { name: "bienes", label: "Bienes adquiridos durante la unión", type: "list" },
+    FAM.pruebas, F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Proceso resolutivo familiar — reconocimiento de unión de hecho"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, interpongo DEMANDA DE RECONOCIMIENTO DE UNIÓN DE HECHO contra ${val(v, "contraparte")}, con quien mantuve una convivencia pública, notoria, única y estable desde el ${longDate(v.inicio ?? "")} hasta el ${longDate(v.fin ?? "")}, con fundamento en los artículos 245 y 246 del Código de Familia y por los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...hijosSeccion(v),
+    ...(lines(v, "bienes").length ? [{ t: "seccion", text: "BIENES ADQUIRIDOS DURANTE LA UNIÓN" } as Block, listOr(v, "bienes")] : []),
+    ...pruebaFam(v),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se declare la existencia de la unión de hecho entre las fechas indicadas, con todos sus efectos patrimoniales, incluida la liquidación de los bienes gananciales, y que se ordene la inscripción correspondiente." },
+    ...cierre(v),
+  ],
+};
+
+export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, demandaPension, apremio, demandaDivorcio, convenioDivorcio, unionHecho, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
 
 export function getTemplate(key: string): FormTemplate | null {
   return TEMPLATES.find((t) => t.key === key) ?? null;

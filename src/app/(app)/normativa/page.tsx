@@ -87,7 +87,9 @@ export default async function NormativaPage({ searchParams }: { searchParams: Pr
                       <p className="text-xs text-ink-500">
                         {n.number ? `Ley N.° ${n.number}` : "Norma suprema"}
                         {loaded.has(n.key) && <span className="badge-green ml-2">Texto en la app · {loaded.get(n.key)!.articleCount} artículos</span>}
+                        {n.repealed && <span className="badge-red ml-2">Derogada</span>}
                       </p>
+                      {n.repealed && <p className="mt-1 text-xs text-red-700">{n.repealed}</p>}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {loaded.has(n.key) && (
