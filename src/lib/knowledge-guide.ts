@@ -4,7 +4,8 @@
  * SCIJ, y del Arancel de honorarios de abogacía y notariado (Decreto 41457-JP reformado por el 41930-JP,
  * SINALEVI versión 4 de 4), del Código Procesal Penal (Ley 7594, versión 47) y del Código Penal
  * (Ley 4573, versión 104), del Código de Familia (Ley 5476, versión 43) y del Código Procesal de Familia
- * (Ley 9747, versión 4, vigente desde el 1 de octubre de 2024). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
+ * (Ley 9747, versión 4, vigente desde el 1 de octubre de 2024), del Código Civil (Ley 30 de 1885, versión
+ * 22) y de la Ley de la Jurisdicción Constitucional (Ley 7135, versión 6). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
  */
 export type GuideEntry = { title: string; area: string; keywords: string; refs: string; body: string };
 
@@ -389,5 +390,58 @@ No son gananciales, entre otros: los adquiridos por título gratuito (herencia, 
     refs: "ley-5476:151,152",
     body: `El padre y la madre ejercen con iguales derechos y deberes la responsabilidad parental sobre sus hijos; en caso de conflicto, el tribunal decide mediante el proceso resolutivo familiar, incluido el régimen de interrelación familiar, según el interés superior de la persona menor de edad (art. 151 del Código de Familia).
 En el divorcio, la nulidad o la separación, los cónyuges acuerdan —o el tribunal dispone— la custodia y el ejercicio de la responsabilidad parental, siendo prioritaria la custodia compartida; la alimentación, crianza y educación de los hijos en proporción a los ingresos de cada uno; y el régimen de interrelación familiar, que incluye el contacto con los parientes hasta el cuarto grado de consanguinidad y segundo de afinidad (art. 152). Debe asegurarse el derecho a la vivienda de los hijos menores.`,
+  },
+  {
+    title: "Prescripción civil: diez, tres y un año",
+    area: "civil",
+    keywords: "prescripción civil deuda cobro diez años tres años un año honorarios alquileres intereses interrupción reconocimiento gestión de cobro exigible",
+    refs: "ley-63:868,869,870,874,876,878,879,880",
+    body: `Regla general: todo derecho y su acción prescriben a los diez años; para daños y perjuicios a una persona menor de edad, el plazo corre desde que cumple la mayoría de edad (art. 868 del Código Civil).
+- Tres años (art. 869): intereses, alquileres, pensiones y rentas pagaderos por semestre o por un período mayor; sueldos, honorarios o emolumentos de servicios profesionales; obras por destajo; cobro por el uso de bienes muebles.
+- Un año (art. 870): intereses, alquileres o rentas pagaderos por períodos menores de un semestre; ventas de comerciantes directamente a consumidores; obras de artesanos.
+El plazo corre desde que la obligación es exigible (art. 874). Se interrumpe con el reconocimiento expreso o tácito del deudor, el emplazamiento, embargo o secuestro notificado (art. 876) y, en la prescripción negativa, con cualquier gestión judicial o extrajudicial de cobro (art. 879); el tiempo anterior se pierde (art. 878). No corre contra menores o incapaces sin representante, ni entre padres e hijos mientras dure la responsabilidad parental, entre otros casos (art. 880).
+Para calcularla: Herramientas → Civil y constitucional.`,
+  },
+  {
+    title: "Responsabilidad civil extracontractual (daños y perjuicios)",
+    area: "civil",
+    keywords: "responsabilidad civil extracontractual daños y perjuicios dolo culpa negligencia imprudencia indemnización reparar",
+    refs: "ley-63:1045,868",
+    body: `Todo aquel que por dolo, falta, negligencia o imprudencia causa a otro un daño está obligado a repararlo junto con los perjuicios (art. 1045 del Código Civil). Es la base de la responsabilidad civil extracontractual; la acción prescribe en el plazo general de diez años (art. 868) y, si el dañado es menor de edad, corre desde que cumple la mayoría de edad.
+En el divorcio por las causales de atentado, corrupción o sevicia, el cónyuge inocente puede reclamar daños y perjuicios con base en este artículo (art. 48 bis del Código de Familia).`,
+  },
+  {
+    title: "Bienes inembargables",
+    area: "civil",
+    keywords: "inembargable inembargables embargo salario pensión menaje herramientas de trabajo bienes que no se pueden embargar",
+    refs: "ley-63:984",
+    body: `No pueden ser embargados ni secuestrados, entre otros (art. 984 del Código Civil): los sueldos, en la parte que el Código de Trabajo declara inembargable; las jubilaciones, pensiones y beneficios sociales del deudor y las pensiones alimenticias; el menaje de casa, los artículos de uso doméstico y la ropa necesarios para el deudor, su cónyuge y sus hijos dependientes que vivan con él; los libros, máquinas y útiles necesarios para su profesión u oficio; y los útiles e instrumentos del artesano o agricultor, en las condiciones que indica la norma.`,
+  },
+  {
+    title: "Recurso de amparo: cuándo procede y plazo",
+    area: "constitucional",
+    keywords: "recurso de amparo sala constitucional sala cuarta derechos fundamentales plazo dos meses amparo contra particulares requisitos",
+    refs: "ley-7135:29,31,35,38,57,60",
+    body: `Plazo del amparo: se puede interponer en cualquier momento mientras subsista la violación y hasta dos meses después de que cesen totalmente sus efectos directos; si el derecho es puramente patrimonial o se puede consentir, dentro de los dos meses desde la noticia fehaciente (art. 35 de la Ley de la Jurisdicción Constitucional). Fuera de plazo es inadmisible (art. 60).
+Protege los derechos y libertades fundamentales (salvo los del hábeas corpus) contra toda disposición, acuerdo, resolución, acción, omisión o simple actuación material de servidores y órganos públicos que los haya violado, viole o amenace violar (art. 29).
+- No hace falta agotar la vía administrativa; si se usan los recursos administrativos, el plazo se suspende mientras la Administración no resuelva (art. 31).
+- Requisitos: el hecho u omisión, el derecho violado, el servidor u órgano autor y las pruebas; no hace falta citar la norma constitucional ni autenticación, y puede presentarse por memorial u otro medio escrito (art. 38).
+- Contra sujetos de derecho privado procede cuando ejercen funciones públicas o están en una posición de poder frente a la cual los remedios comunes son insuficientes o tardíos (art. 57).`,
+  },
+  {
+    title: "Hábeas corpus: libertad e integridad personales",
+    area: "constitucional",
+    keywords: "hábeas corpus habeas corpus libertad detención ilegítima integridad personal libertad de tránsito sala constitucional informe tres días",
+    refs: "ley-7135:15,16,18,19",
+    body: `Procede para garantizar la libertad e integridad personales contra actos u omisiones de cualquier autoridad, incluso judicial, contra las amenazas y las perturbaciones o restricciones indebidas, y contra las restricciones ilegítimas del derecho a trasladarse dentro del país y a permanecer, salir e ingresar en él (art. 15 de la Ley de la Jurisdicción Constitucional). También se resuelven las otras violaciones conexas con la libertad personal (art. 16).
+Lo puede interponer cualquier persona, por memorial, telegrama u otro medio escrito, sin autenticación (art. 18). Se tramita de inmediato: el magistrado pide informe a la autoridad en un plazo que no puede exceder de tres días y ordena no ejecutar actos que hagan ineficaz lo que se resuelva; si no se conoce la autoridad, se tiene por interpuesto contra el jerarca (art. 19).`,
+  },
+  {
+    title: "Acción de inconstitucionalidad: cuándo cabe",
+    area: "constitucional",
+    keywords: "acción de inconstitucionalidad leyes inconstitucionales asunto previo pendiente intereses difusos sala constitucional",
+    refs: "ley-7135:73,75",
+    body: `Cabe, entre otros supuestos, contra las leyes y disposiciones generales, incluso de sujetos privados, que infrinjan una norma o principio constitucional; contra actos subjetivos de autoridades públicas que no sean susceptibles de hábeas corpus o amparo; y cuando en la formación de las leyes se viole un trámite sustancial (art. 73 de la Ley de la Jurisdicción Constitucional).
+Requiere un asunto pendiente ante los tribunales (incluidos hábeas corpus y amparo) o en el agotamiento de la vía administrativa, en el que se invoque la inconstitucionalidad como medio razonable de amparar el derecho lesionado. No hace falta cuando no hay lesión individual y directa, cuando se defienden intereses difusos o colectivos, ni cuando la interponen el Contralor, el Procurador, el Fiscal General o el Defensor de los Habitantes (art. 75).`,
   },
 ];

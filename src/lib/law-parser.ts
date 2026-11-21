@@ -11,6 +11,7 @@ const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
 /** Pie de página de SINALEVI: a partir de aquí ya no es la ley. */
 const END = /^Ir al men[uú] de normativa$/;
 const NOISE = /^Ficha Art[ií]culo\b/;
+const REFORMS = /^\s*(reformas?\b|.{0,40}\bse (reforman|adicionan|modifican) (las|los) siguientes\b)/i;
 
 /** «CAPITULO SEGUNDO» → «Capitulo segundo»; los números romanos se quedan en mayúscula («Sección II»). */
 const titleCase = (raw: string) => {
@@ -78,6 +79,15 @@ export function parseLawText(text: string): ParsedArticle[] {
     if (a && current && normalizeArticleNumber(a[1], a[2]) === current.number && /se leer[aá] (de la siguiente manera|as[ií])/i.test(current.lines.slice(-3).join(" "))) {
       current.lines.push(line);
       continue;
+    }
+    // Artículo de reformas («Se reforman las siguientes disposiciones…»): los artículos de otras leyes
+    // que cita van dentro de él; solo el número siguiente (184 → 185) abre un artículo nuevo.
+    if (a && current && REFORMS.test(current.lines.slice(0, 4).join(" "))) {
+      const next = normalizeArticleNumber(a[1], a[2]);
+      if (!/^\d+$/.test(current.number) || next !== String(Number(current.number) + 1)) {
+        current.lines.push(line);
+        continue;
+      }
     }
     if (a) {
       flush();

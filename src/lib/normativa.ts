@@ -39,7 +39,7 @@ export const NORMS: readonly Norm[] = [
   { key: "constitucion", name: "Constitución Política de la República de Costa Rica", number: null, area: "constitucional", aka: ["constitucion"] },
   { key: "ley-7135", name: "Ley de la Jurisdicción Constitucional", number: "7135", area: "constitucional", aka: ["amparo", "habeas corpus", "sala iv"] },
 
-  { key: "ley-63", name: "Código Civil", number: "63", area: "civil" },
+  { key: "ley-63", name: "Código Civil", number: "30", area: "civil", aka: ["prescripcion", "contratos", "obligaciones", "ley 63"] },
   { key: "ley-9342", name: "Código Procesal Civil", number: "9342", area: "civil", aka: ["cpc"] },
   { key: "ley-8624", name: "Ley de Cobro Judicial", number: "8624", area: "civil", aka: ["monitorio", "cobratorio"] },
   { key: "ley-7527", name: "Ley General de Arrendamientos Urbanos y Suburbanos", number: "7527", area: "civil", aka: ["inquilinato", "alquiler"] },

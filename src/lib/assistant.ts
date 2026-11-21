@@ -17,6 +17,7 @@ import { normalize, parseIntent, type ActionEntity, type ActionVerb, type Intent
 import { ARANCEL_SOURCE, arancelItem, arancelMinimum, searchArancel, timbreColegio } from "./arancel";
 import { extractAmountCents, suggestFee } from "./fees";
 import { actionPrescription, fmtYears, parsePrescriptionQuestion } from "./penal";
+import { CIVIL_CLAIMS, civilPrescription, parseCivilPrescriptionQuestion } from "./civil";
 import { getFeeSettings, listServices, toGuideService } from "./tariff";
 import type { CurrentUser } from "./auth";
 import { formatId } from "./cr-id";
@@ -578,7 +579,19 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
   const items: AssistantItem[] = [];
 
   const pres = parsePrescriptionQuestion(question);
-  if (pres) {
+  const civ = pres ? null : parseCivilPrescriptionQuestion(question);
+  if (civ) {
+    const info = CIVIL_CLAIMS[civ];
+    if (date) {
+      const r = civilPrescription({ claim: civ, exigibleOn: date });
+      lines.push(`Si la obligación es exigible desde el ${formatDate(date)}, la acción prescribe el ${formatDate(r.due)} (${info.years} ${info.years === 1 ? "año" : "años"}).`);
+      lines.push(...r.steps.slice(0, 2));
+      lines.push("Si hubo reconocimiento de la deuda o una gestión de cobro, el plazo vuelve a correr completo desde ese acto (arts. 876, 878 y 879): calcúlalo en Herramientas.");
+    } else {
+      lines.push(`${info.rule} Corre desde que la obligación es exigible (art. 874). Dime esa fecha y te digo cuándo prescribe.`);
+    }
+    items.push({ label: "Abrir la calculadora de prescripción civil", href: `/herramientas?calc=prescripcion_civil&credito=${civ}${date ? `&exigible=${date}` : ""}#civil` });
+  } else if (pres) {
     if (date) {
       const r = actionPrescription({ ...pres, committedOn: date });
       lines.push(`Si el hecho fue el ${formatDate(date)}, la acción penal prescribe el ${formatDate(r.due)} (plazo de ${fmtYears(r.years)}).`);

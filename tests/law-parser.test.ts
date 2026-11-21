@@ -92,3 +92,12 @@ describe("varios artículos elegidos", () => {
     expect(articleNumbersFrom(joinArticleNumbers(["28", "29", "30", "31", "45", "97 bis"]))).toEqual(["28", "29", "30", "31", "45", "97 bis"]);
   });
 });
+
+describe("artículo de reformas", () => {
+  it("los artículos de otras leyes que cita quedan dentro de él", () => {
+    const t = ["Artículo 184.- Reformas", "Se reforman las siguientes disposiciones legales:", "Artículo 543.- En los asuntos del albacea…", "Artículo 55.- La Sala Segunda conocerá…", "Artículo 185.- Se autoriza a la Corte…"].join("\n");
+    const arts = parseLawText(t);
+    expect(arts.map((a) => a.number)).toEqual(["184", "185"]);
+    expect(arts[0].body).toContain("Sala Segunda");
+  });
+});

@@ -35,6 +35,10 @@ const TEMPLATE_WORDS: [RegExp, string][] = [
   [/apelacion.*sentencia.*penal|apelacion de sentencia penal|apelacion penal/, "apelacion-sentencia-penal"],
   [/medida alterna|conciliacion penal|suspension del proceso a prueba|reparacion integral/, "solicitud-medida-alterna"],
   [/prision preventiva/, "cese-prision-preventiva"],
+  // Constitucional y cobro
+  [/habeas/, "recurso-habeas-corpus"],
+  [/amparo/, "recurso-amparo"],
+  [/monitori[oa]|cobro de (una )?deuda|cobro judicial/, "demanda-monitoria"],
   // Familia
   [/apremio/, "solicitud-apremio-corporal"],
   [/pension|alimentos/, "demanda-pension-alimentaria"],
@@ -132,7 +136,7 @@ const FEE_TOPIC =
 
 /** Temas jurídicos: la pregunta va a la base de conocimiento y a las leyes, no a los datos del despacho. */
 const LEGAL_TOPIC =
-  /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra|prision preventiva|medidas? alternas?|conciliacion|suspension del proceso|reparacion integral|procedimiento abreviado|abreviado|querella\w*|accion privada|instancia privada|delitos?|imputad\w*|divorci\w*|separacion judicial|pension alimentaria|pensiones|alimentos|cuota alimentaria|apremio\w*|gananciales|union de hecho|custodia|responsabilidad parental|patria potestad|interrelacion familiar|sentencia anticipada)\b/;
+  /\b(apela\w*|recurs\w*|revocatoria|casacion|contest\w*|monitorio|sumario|proceso ordinario|prescri\w*|cesantia|preaviso|aguinaldo|vacaciones|feriados?|despid\w*|despido|liquidacion|desahucio|arrendamiento|alquiler|notificad\w*|dias habiles|cuando vence|vence el plazo|cuanto tiempo tengo|cuanto tengo para|plazo para|renuncia\w*|indemniz\w*|jornada|horas extra|prision preventiva|medidas? alternas?|conciliacion|suspension del proceso|reparacion integral|procedimiento abreviado|abreviado|querella\w*|accion privada|instancia privada|delitos?|imputad\w*|divorci\w*|separacion judicial|pension alimentaria|pensiones|alimentos|cuota alimentaria|apremio\w*|gananciales|union de hecho|custodia|responsabilidad parental|patria potestad|interrelacion familiar|sentencia anticipada|amparo|habeas corpus|inconstitucionalidad|sala constitucional|inembargables?|responsabilidad civil|danos y perjuicios)\b/;
 
 export function parseIntent(raw: string): Intent {
   const text = raw.slice(0, 300);

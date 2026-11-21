@@ -6,6 +6,7 @@ import { laborSettlement, procedureDeadline } from "@/lib/calculators";
 import { holidayName } from "@/lib/cr-holidays";
 import { formatDate, todayISO } from "@/lib/dates";
 import { formatMoney, parseMoneyToCents } from "@/lib/money";
+import { amparoDeadline, CIVIL_CLAIMS, civilPrescription, type CivilClaim } from "@/lib/civil";
 import { alimonyArrears, divorceAgreementDeadline, pensionYear, unionCaducity } from "@/lib/familia";
 import { actionPrescription, fmtYears, PENALTY_KIND_LABELS, penaltyPrescription, type PenaltyKind } from "@/lib/penal";
 
@@ -108,6 +109,21 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
   if (sp.calc === "familia_plazo") {
     if (!isoOk(sp.desde)) familyError = "Indica la fecha.";
     else famDeadline = sp.tipo === "convenio" ? divorceAgreementDeadline(sp.desde!) : unionCaducity(sp.desde!);
+  }
+
+  // Civil y constitucional
+  let civil: ReturnType<typeof civilPrescription> | null = null;
+  let amparoRes: ReturnType<typeof amparoDeadline> | null = null;
+  let civilError: string | null = null;
+  if (sp.calc === "prescripcion_civil") {
+    const claim = (Object.keys(CIVIL_CLAIMS) as CivilClaim[]).includes(sp.credito as CivilClaim) ? (sp.credito as CivilClaim) : "general";
+    if (!isoOk(sp.exigible)) civilError = "Indica desde cuándo es exigible la obligación.";
+    else if (sp.interrupcion_civil && !isoOk(sp.interrupcion_civil)) civilError = "La fecha de la interrupción no es válida.";
+    else civil = civilPrescription({ claim, exigibleOn: sp.exigible!, lastInterruptionOn: isoOk(sp.interrupcion_civil) ? sp.interrupcion_civil : null });
+  }
+  if (sp.calc === "amparo") {
+    if (!isoOk(sp.desde_amparo)) civilError = "Indica la fecha.";
+    else amparoRes = amparoDeadline({ from: sp.desde_amparo!, patrimonial: sp.patrimonial === "si" });
   }
 
   return (
@@ -238,6 +254,70 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
                     .join(", ")}
                 </p>
               )}
+            </div>
+          )}
+        </section>
+
+        <section id="civil" className="card card-pad xl:col-span-2">
+          <h2 className="mb-1 font-serif text-lg font-semibold">Civil y constitucional</h2>
+          <p className="mb-4 text-sm text-ink-600">Prescripción de acciones civiles (Código Civil, arts. 868 a 880) y plazo del recurso de amparo (Ley de la Jurisdicción Constitucional, art. 35).</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <form className="grid content-start gap-3 sm:grid-cols-2" action="/herramientas#civil">
+              <input type="hidden" name="calc" value="prescripcion_civil" />
+              <p className="label sm:col-span-2">Prescripción civil</p>
+              <Field label="Tipo de crédito o acción" className="sm:col-span-2">
+                <select className="input" name="credito" defaultValue={sp.credito ?? "general"}>
+                  {Object.entries(CIVIL_CLAIMS).map(([k, c]) => (
+                    <option key={k} value={k}>
+                      {c.label} — {c.years} {c.years === 1 ? "año" : "años"}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Exigible desde">
+                <input className="input" type="date" name="exigible" defaultValue={sp.exigible ?? ""} required />
+              </Field>
+              <Field label="Última interrupción (si la hubo)" hint="Reconocimiento, notificación de la demanda, embargo o gestión de cobro">
+                <input className="input" type="date" name="interrupcion_civil" defaultValue={sp.interrupcion_civil ?? ""} />
+              </Field>
+              <div className="sm:col-span-2">
+                <button className="btn-primary">Calcular prescripción</button>
+              </div>
+            </form>
+            <form className="grid content-start gap-3 sm:grid-cols-2" action="/herramientas#civil">
+              <input type="hidden" name="calc" value="amparo" />
+              <p className="label sm:col-span-2">Recurso de amparo</p>
+              <Field label="Cese de los efectos de la violación" hint="O fecha de la noticia, si el derecho es patrimonial" className="sm:col-span-2">
+                <input className="input" type="date" name="desde_amparo" defaultValue={sp.desde_amparo ?? ""} required />
+              </Field>
+              <label className="flex items-center gap-2 text-sm text-ink-700 sm:col-span-2">
+                <input type="checkbox" name="patrimonial" value="si" defaultChecked={sp.patrimonial === "si"} />
+                Derecho puramente patrimonial o que se puede consentir
+              </label>
+              <div className="sm:col-span-2">
+                <button className="btn-secondary">Calcular plazo del amparo</button>
+              </div>
+            </form>
+          </div>
+          {civilError && <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{civilError}</p>}
+          {civil && (
+            <div className="mt-5" aria-live="polite">
+              <p className="text-lg">
+                Prescribe el <strong>{formatDate(civil.due)}</strong> ({civil.years} {civil.years === 1 ? "año" : "años"} desde el {formatDate(civil.start)})
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-ink-600">
+                {civil.steps.map((e) => (
+                  <li key={e}>{e}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {amparoRes && (
+            <div className="mt-5" aria-live="polite">
+              <p className="text-lg">
+                Último día: <strong>{formatDate(amparoRes.due)}</strong>
+              </p>
+              <p className="mt-1 text-sm text-ink-600">{amparoRes.rule}</p>
             </div>
           )}
         </section>

@@ -588,7 +588,95 @@ const unionHecho: FormTemplate = {
   ],
 };
 
-export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, demandaPension, apremio, demandaDivorcio, convenioDivorcio, unionHecho, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
+// ---------- Cobro (Código Procesal Civil) y constitucional (Ley de la Jurisdicción Constitucional, 7135) ----------
+
+const demandaMonitoria: FormTemplate = {
+  key: "demanda-monitoria",
+  kind: "escrito",
+  category: "Civil",
+  title: "Demanda monitoria dineraria (cobro)",
+  description: "Cobro de una obligación dineraria líquida y exigible con documento, con o sin fuerza ejecutiva (art. 110.1 CPC).",
+  fields: [
+    F.juzgado, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "contraparte", label: "Persona deudora (nombre, calidades y domicilio)", type: "text", auto: "expediente.contraparte", required: true },
+    { name: "documento", label: "Documento en que consta la deuda", type: "text", required: true, hint: "Pagaré, letra de cambio, contrato, factura aceptada…" },
+    { name: "capital", label: "Capital adeudado", type: "text", required: true, hint: "₡1 500 000" },
+    { name: "exigible", label: "Exigible desde", type: "date", required: true },
+    { name: "intereses", label: "Intereses que se reclaman", type: "text", hint: "Corrientes y moratorios, tasa y desde cuándo" },
+    { name: "hechos", label: "Hechos", type: "list", required: true },
+    { name: "embargo", label: "Embargo que se solicita (opcional)", type: "text", hint: "Bienes o salario de la persona deudora" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "Proceso monitorio dinerario"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, interpongo PROCESO MONITORIO DINERARIO contra ${val(v, "contraparte")}, para el cobro de la obligación dineraria líquida y exigible que consta en ${val(v, "documento")}, con fundamento en el artículo 110 del Código Procesal Civil y en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    { t: "seccion", text: "PRETENSIÓN" },
+    { t: "p", text: `Solicito que se dicte la resolución intimatoria y se ordene a la parte demandada pagar el capital de ${val(v, "capital")}, exigible desde el ${longDate(v.exigible ?? "")}${v.intereses?.trim() ? `, más ${v.intereses.trim()}` : ", más los intereses que correspondan"}, y ambas costas.` },
+    ...(v.embargo?.trim() ? [{ t: "seccion", text: "EMBARGO" } as Block, { t: "p", text: `Solicito el embargo de ${v.embargo.trim()} en cantidad suficiente para cubrir el capital, los intereses y las costas.` } as Block] : []),
+    { t: "seccion", text: "PRUEBA" }, { t: "p", text: `Documental: ${val(v, "documento")}, que aporto con la demanda.` },
+    ...derechoSeccion(v),
+    ...cierre(v),
+  ],
+};
+
+const encabezadoSala = (asunto: string): Block[] => [
+  { t: "encabezado", text: "SEÑORES MAGISTRADOS DE LA SALA CONSTITUCIONAL DE LA CORTE SUPREMA DE JUSTICIA" },
+  { t: "encabezado", text: asunto },
+];
+
+const amparo: FormTemplate = {
+  key: "recurso-amparo",
+  kind: "escrito",
+  category: "Constitucional",
+  title: "Recurso de amparo",
+  description: "Ante la Sala Constitucional: hecho u omisión, derecho violado, autoridad y prueba (arts. 29, 35 y 38 LJC).",
+  fields: [
+    F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "recurrido", label: "Autoridad, órgano o persona recurrida", type: "text", required: true, hint: "Por ejemplo: Caja Costarricense de Seguro Social, Hospital México" },
+    { name: "hechos", label: "Hechos u omisiones", type: "list", required: true, hint: "Qué pasó, cuándo y quién lo hizo, uno por línea" },
+    { name: "derechos", label: "Derechos fundamentales violados o amenazados", type: "text", required: true, hint: "Por ejemplo: derecho a la salud y a la vida (arts. 21 y 50 de la Constitución)" },
+    { name: "pruebas", label: "Prueba", type: "list" },
+    { name: "pretension", label: "Lo que se pide", type: "textarea", required: true, hint: "Por ejemplo: que se ordene programar la cirugía en un plazo razonable" },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoSala("Asunto: RECURSO DE AMPARO"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, con fundamento en los artículos 48 de la Constitución Política y 29 y siguientes de la Ley de la Jurisdicción Constitucional, interpongo RECURSO DE AMPARO contra ${val(v, "recurrido")}, por la violación de ${val(v, "derechos")}, con base en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "PRETENSIÓN" }, { t: "p", text: val(v, "pretension") },
+    { t: "p", text: "Solicito que se declare con lugar el recurso, con condenatoria al pago de las costas, daños y perjuicios causados, que se liquidarán en ejecución de sentencia." },
+    ...cierre(v),
+  ],
+};
+
+const habeas: FormTemplate = {
+  key: "recurso-habeas-corpus",
+  kind: "escrito",
+  category: "Constitucional",
+  title: "Recurso de hábeas corpus",
+  description: "Para proteger la libertad e integridad personales y la libertad de tránsito (arts. 15 a 19 LJC). Lo puede presentar cualquier persona.",
+  fields: [
+    F.cliente, F.cedula,
+    { name: "amparado", label: "Persona a favor de quien se interpone", type: "text", required: true, hint: "Nombre y cédula; puede ser la misma persona que lo presenta" },
+    { name: "recurrido", label: "Autoridad recurrida", type: "text", required: true, hint: "Si no se conoce, se tiene por interpuesto contra el jerarca (art. 19)" },
+    { name: "hechos", label: "Hechos (detención, amenaza o restricción)", type: "list", required: true },
+    { name: "lugar_detencion", label: "Lugar donde se encuentra la persona (si está detenida)", type: "text" },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoSala("Asunto: RECURSO DE HÁBEAS CORPUS"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, con fundamento en el artículo 48 de la Constitución Política y en los artículos 15 y siguientes de la Ley de la Jurisdicción Constitucional, interpongo RECURSO DE HÁBEAS CORPUS a favor de ${val(v, "amparado")} y contra ${val(v, "recurrido")}, por los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...(v.lugar_detencion?.trim() ? [{ t: "p", text: `La persona amparada se encuentra en: ${v.lugar_detencion.trim()}.` } as Block] : []),
+    { t: "seccion", text: "PRETENSIÓN" },
+    { t: "p", text: "Solicito que se pida informe a la autoridad recurrida, se ordene no ejecutar acto alguno que haga ineficaz lo que se resuelva, y se declare con lugar el recurso, restituyendo a la persona amparada en el pleno goce de su libertad e integridad personales, con condenatoria en costas, daños y perjuicios." },
+    ...cierre(v),
+  ],
+};
+
+export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, demandaPension, apremio, demandaDivorcio, convenioDivorcio, unionHecho, demandaMonitoria, amparo, habeas, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
 
 export function getTemplate(key: string): FormTemplate | null {
   return TEMPLATES.find((t) => t.key === key) ?? null;
