@@ -41,7 +41,7 @@ export async function TimerBar({ user }: { user: CurrentUser }) {
             <ActionForm action={stopTimerAction} className="space-y-3">
               <label className="block text-sm">
                 <span className="label">Trabajo realizado</span>
-                <textarea className="input min-h-20" name="description" required minLength={3} maxLength={1000} defaultValue={t.description} />
+                <textarea className="input min-h-20" name="timerDescription" required minLength={3} maxLength={1000} defaultValue={t.description} />
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="billable" defaultChecked /> Facturable
@@ -72,7 +72,7 @@ export async function StartTimer({ user, matterId }: { user: CurrentUser; matter
         <ActionForm action={startTimerAction.bind(null, matterId)} className="space-y-3">
           <label className="block text-sm">
             <span className="label">¿En qué vas a trabajar? (opcional)</span>
-            <input className="input" name="description" maxLength={1000} placeholder="Revisión de la contestación…" />
+            <input className="input" name="timerNote" maxLength={1000} placeholder="Revisión de la contestación…" />
           </label>
           <SubmitButton pendingText="Iniciando…">Empezar a medir</SubmitButton>
         </ActionForm>

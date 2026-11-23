@@ -22,7 +22,7 @@ const refreshAll = (matterId?: number) => {
 export async function startTimerAction(matterId: number, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   if (!(await getAccessibleMatter(user, matterId))) return { error: ACCESS_DENIED };
-  const description = str(formData, "description").slice(0, 1000);
+  const description = str(formData, "timerNote").slice(0, 1000);
   const [created] = await db.insert(runningTimers).values({ userId: user.id, matterId, description, startedAt: new Date() }).onConflictDoNothing().returning({ userId: runningTimers.userId });
   if (!created) return { error: "Ya tienes un cronómetro en marcha. Detenlo (o descártalo) antes de empezar otro." };
   refreshAll(matterId);
@@ -51,7 +51,7 @@ export async function toggleTimerAction(): Promise<void> {
  */
 export async function stopTimerAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
-  const description = str(formData, "description").trim();
+  const description = str(formData, "timerDescription").trim();
   if (description.length < 3) return { error: "Describe el trabajo realizado (mínimo 3 caracteres)." };
   const billable = formData.get("billable") === "on";
   const res = await db.transaction(async (tx) => {
