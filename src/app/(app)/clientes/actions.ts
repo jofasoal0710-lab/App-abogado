@@ -30,6 +30,8 @@ const clientSchema = z.object({
   notes: z.string().max(5000).nullable(),
 });
 
+import { missingClientFields, nameLooksLikeId } from "@/lib/client-rules";
+
 function parseClient(formData: FormData) {
   const type = str(formData, "type");
   const persona = type === "persona";
@@ -46,6 +48,21 @@ function parseClient(formData: FormData) {
     address: optStr(formData, "address"),
     notes: optStr(formData, "notes"),
   });
+  // Todos los datos obligatorios a la vez, para que se vea qué falta (no solo el primero).
+  const missing = missingClientFields({
+    type: persona ? "persona" : "empresa",
+    name: str(formData, "name"),
+    taxId: optStr(formData, "taxId"),
+    birthDate: persona ? optStr(formData, "birthDate") : null,
+    maritalStatus: persona ? optStr(formData, "maritalStatus") : null,
+    email: optStr(formData, "email"),
+    phone: optStr(formData, "phone"),
+    address: optStr(formData, "address"),
+  });
+  if (missing.length) return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["form"], message: `Faltan datos obligatorios: ${missing.join(", ")}.`, input: null }]) };
+  if (nameLooksLikeId(str(formData, "name"))) {
+    return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["name"], message: "El nombre parece un número de identificación. Escribe el nombre en «Nombre completo» y la cédula en «Número de identificación».", input: null }]) };
+  }
   if (!parsed.success) return parsed;
   const d = parsed.data;
   if (d.birthDate && d.birthDate > todayISO()) return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["birthDate"], message: "La fecha de nacimiento no puede ser futura.", input: d.birthDate }]) };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ageOn, guessIdType, ID_TYPES, MARITAL_STATUS, type IdType } from "@/lib/cr-id";
 import { clientTypeLabels } from "@/lib/labels";
+import { nameLooksLikeId } from "@/lib/client-rules";
 
 type Initial = {
   type: "persona" | "empresa";
@@ -69,12 +70,22 @@ export function IdentityFields({ initial, today }: { initial: Initial; today: st
         </select>
       </label>
       <label className="block sm:col-span-2">
-        <span className="label">{type === "empresa" ? "Razón social" : "Nombre completo"}</span>
-        <input className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
+        <span className="label">{type === "empresa" ? "Razón social *" : "Nombre completo *"}</span>
+        <input
+          className="input"
+          name="name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            e.target.setCustomValidity(nameLooksLikeId(e.target.value) ? "Esto parece un número de identificación: escríbelo en «Número de identificación»." : "");
+          }}
+          required
+          maxLength={200}
+        />
       </label>
 
       <label className="block">
-        <span className="label">Tipo de identificación</span>
+        <span className="label">Tipo de identificación *</span>
         <select className="input" name="idType" value={idType} onChange={(e) => setIdType(e.target.value)}>
           {Object.entries(ID_TYPES).map(([value, label]) => (
             <option key={value} value={value}>
@@ -85,7 +96,7 @@ export function IdentityFields({ initial, today }: { initial: Initial; today: st
       </label>
       <div className="sm:col-span-2">
         <label className="block">
-          <span className="label">Número de identificación</span>
+          <span className="label">Número de identificación *</span>
           <span className="flex gap-2">
             <input
               className="input"
@@ -97,6 +108,7 @@ export function IdentityFields({ initial, today }: { initial: Initial; today: st
                 if (guess && idType !== "pasaporte") setIdType(guess);
               }}
               maxLength={40}
+              required
               inputMode={idType === "pasaporte" ? "text" : "numeric"}
               placeholder={idType === "cedula_juridica" ? "3-101-123456" : idType === "cedula_fisica" ? "1-1234-0567" : ""}
               autoComplete="off"
@@ -116,16 +128,16 @@ export function IdentityFields({ initial, today }: { initial: Initial; today: st
       {type === "persona" && (
         <>
           <label className="block">
-            <span className="label">Fecha de nacimiento</span>
-            <input className="input" type="date" name="birthDate" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} max={today} />
+            <span className="label">Fecha de nacimiento *</span>
+            <input className="input" type="date" name="birthDate" required value={birthDate} onChange={(e) => setBirthDate(e.target.value)} max={today} />
             <span className="hint block" aria-live="polite">
               {age !== null ? `Edad: ${age} ${age === 1 ? "año" : "años"}${age < 18 ? " (menor de edad)" : ""}` : "La edad se calcula sola."}
             </span>
           </label>
           <label className="block">
-            <span className="label">Estado civil</span>
-            <select className="input" name="maritalStatus" defaultValue={initial.maritalStatus ?? ""}>
-              <option value="">Sin indicar</option>
+            <span className="label">Estado civil *</span>
+            <select className="input" name="maritalStatus" defaultValue={initial.maritalStatus ?? ""} required>
+              <option value="" disabled>Elige…</option>
               {Object.entries(MARITAL_STATUS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}

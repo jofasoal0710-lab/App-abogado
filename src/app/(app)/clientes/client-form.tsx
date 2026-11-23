@@ -21,6 +21,7 @@ export function ClientForm({
 }) {
   return (
     <ActionForm action={action} className="card card-pad space-y-5">
+      <p className="text-sm text-ink-600">Los campos con <span className="font-semibold">*</span> son obligatorios.</p>
       <div className="grid gap-4 sm:grid-cols-3">
         <IdentityFields
           today={todayISO()}
@@ -33,14 +34,14 @@ export function ClientForm({
             maritalStatus: client?.maritalStatus ?? null,
           }}
         />
-        <Field label="Correo electrónico">
-          <input className="input" type="email" name="email" defaultValue={client?.email ?? ""} />
+        <Field label="Correo electrónico *">
+          <input className="input" type="email" name="email" required defaultValue={client?.email ?? ""} />
         </Field>
-        <Field label="Teléfono">
-          <input className="input" name="phone" defaultValue={client?.phone ?? ""} maxLength={40} />
+        <Field label="Teléfono *">
+          <input className="input" name="phone" required defaultValue={client?.phone ?? ""} maxLength={40} />
         </Field>
-        <Field label="Dirección" className="sm:col-span-3">
-          <input className="input" name="address" defaultValue={client?.address ?? ""} maxLength={500} />
+        <Field label="Dirección *" className="sm:col-span-3">
+          <input className="input" name="address" required defaultValue={client?.address ?? ""} maxLength={500} />
         </Field>
         {!client && canSetConfidential && (
           <Field label="Visibilidad" hint="Confidencial: solo lo verás tú y quien tenga acceso a sus expedientes." className="sm:col-span-3">
@@ -50,7 +51,7 @@ export function ClientForm({
             </select>
           </Field>
         )}
-        <Field label="Notas internas" className="sm:col-span-3">
+        <Field label="Notas internas (opcional)" className="sm:col-span-3">
           <textarea className="input min-h-24" name="notes" defaultValue={client?.notes ?? ""} maxLength={5000} />
         </Field>
       </div>
