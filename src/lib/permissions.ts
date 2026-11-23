@@ -50,6 +50,11 @@ export const PERMISSIONS = {
     label: "Gestionar el equipo y los roles",
     hint: "Dar de alta y desactivar usuarios, asignar roles, restablecer contraseñas y cerrar sesiones. Ojo: quien lo tiene puede darse cualquier otro permiso.",
   },
+  "reportes.ver": {
+    group: "Administración",
+    label: "Ver reportes y estadísticas del despacho",
+    hint: "Horas de todo el equipo, facturación, cobros, cartera pendiente y rentabilidad (solo de los expedientes a los que tiene acceso). Incluye «Ver facturas y cobros».",
+  },
   "seguridad.ver": { group: "Administración", label: "Ver el registro de seguridad" },
   "recordatorios.gestionar": { group: "Administración", label: "Gestionar los recordatorios por correo" },
 } as const;
@@ -66,6 +71,7 @@ const IMPLIES: Partial<Record<Permission, Permission[]>> = {
   "facturacion.cobros": ["facturacion.ver"],
   "facturacion.emitir": ["facturacion.ver"],
   "facturacion.exportar": ["facturacion.ver"],
+  "reportes.ver": ["facturacion.ver"],
   "clientes.gestionar_todos": ["clientes.gestionar"],
 };
 

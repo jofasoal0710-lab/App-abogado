@@ -31,6 +31,7 @@ export function commandsFor(user: CurrentUser): SearchHit[] {
     { group: "Acciones", label: "Calcular prescripción mercantil", href: "/herramientas#comercial" },
     { group: "Acciones", label: "Alquileres: vencimiento y aumento anual", href: "/herramientas#alquileres" },
     { group: "Acciones", label: "Calcular prescripción tributaria", href: "/herramientas#tributario" },
+    { group: "Acciones", label: "Reportes: horas, facturación, cartera y rentabilidad", href: "/reportes" },
     { group: "Acciones", label: "Nueva entrada de conocimiento", href: "/conocimiento/nueva" },
     { group: "Acciones", label: "Cambiar apariencia (colores, modo oscuro)", href: "/cuenta#apariencia" },
   ];

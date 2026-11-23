@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/normativa", label: "Normativa", icon: "balanza" },
         { href: "/conocimiento", label: "Conocimiento", icon: "conocimiento" },
         { href: "/herramientas", label: "Herramientas", icon: "calculadora" },
+        { href: "/reportes", label: "Reportes", icon: "actividad" },
       ],
     },
     ...(can(user, "notaria.usar") ? [{ title: "Notaría", items: [{ href: "/notaria", label: "Gestor notarial", icon: "notario" }] } satisfies NavGroup] : []),
