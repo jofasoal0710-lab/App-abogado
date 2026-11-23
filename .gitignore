@@ -13,3 +13,6 @@ coverage
 
 # Registro de auditoría de seguridad: mapa de puntos débiles, no se sube al repositorio
 .security-audit/
+
+# Grafo de graphify (se regenera con: graphify extract . --code-only)
+graphify-out/
