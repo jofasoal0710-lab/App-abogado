@@ -18,6 +18,7 @@ import { ARANCEL_SOURCE, arancelItem, arancelMinimum, searchArancel, timbreColeg
 import { extractAmountCents, suggestFee } from "./fees";
 import { actionPrescription, fmtYears, parsePrescriptionQuestion } from "./penal";
 import { CIVIL_CLAIMS, civilPrescription, parseCivilPrescriptionQuestion } from "./civil";
+import { COMMERCIAL_CLAIMS, commercialPrescription, parseOtherPrescriptionQuestion, taxPrescription, trafficTicketAppeal } from "./otras-materias";
 import { getFeeSettings, listServices, toGuideService } from "./tariff";
 import type { CurrentUser } from "./auth";
 import { formatId } from "./cr-id";
@@ -578,9 +579,36 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
   const lines: string[] = [];
   const items: AssistantItem[] = [];
 
-  const pres = parsePrescriptionQuestion(question);
-  const civ = pres ? null : parseCivilPrescriptionQuestion(question);
-  if (civ) {
+  const other = parseOtherPrescriptionQuestion(question);
+  const pres = other ? null : parsePrescriptionQuestion(question);
+  const civ = pres || other ? null : parseCivilPrescriptionQuestion(question);
+  if (other?.area === "comercial") {
+    const info = COMMERCIAL_CLAIMS[other.claim];
+    if (date) {
+      const r = commercialPrescription({ claim: other.claim, dueOn: date });
+      lines.push(`Si venció el ${formatDate(date)}, prescribe el ${formatDate(r.due)} (${info.years === 1 ? "un año" : "cuatro años"}, ${info.ref}).`);
+    } else {
+      lines.push(`${info.label}: prescribe en ${info.years === 1 ? "un año" : "cuatro años"} desde el vencimiento (${info.ref}). Dime la fecha de vencimiento y te digo cuándo prescribe.`);
+    }
+    lines.push("Se interrumpe con la demanda o el requerimiento notificados o con el reconocimiento del deudor, y entonces el plazo corre de nuevo completo (CCom arts. 977 y 981).");
+    items.push({ label: "Abrir la calculadora de prescripción mercantil", href: `/herramientas?calc=mercantil&credito_com=${other.claim}${date ? `&vence_com=${date}` : ""}#comercial` });
+  } else if (other?.area === "tributario") {
+    if (date) {
+      const r = taxPrescription({ paymentDueOn: date, tenYears: other.tenYears });
+      lines.push(`Si el tributo debía pagarse el ${formatDate(date)}, la acción de Hacienda prescribe el ${formatDate(r.due)} (${r.years} años desde el ${formatDate(r.from)}, CNPT arts. 51 y 52).`);
+    } else {
+      lines.push(
+        other.tenYears
+          ? "Si el contribuyente no estaba inscrito, no declaró o declaró de forma fraudulenta, la facultad de Hacienda para determinar y cobrar el tributo prescribe en diez años, desde el primer día del mes siguiente a la fecha de pago (CNPT arts. 51 y 52). Dime esa fecha y te digo cuándo prescribe."
+          : "La facultad de Hacienda para determinar y cobrar un tributo prescribe en cuatro años (diez si no está inscrito, no declaró o la declaración fue fraudulenta), desde el primer día del mes siguiente a la fecha de pago (CNPT arts. 51 y 52). Dime esa fecha y te digo cuándo prescribe.",
+      );
+    }
+    lines.push("Se interrumpe, entre otras causas, con la notificación del inicio de la fiscalización (art. 53).");
+    items.push({ label: "Abrir la calculadora de prescripción tributaria", href: `/herramientas?calc=tributaria${date ? `&pago_trib=${date}` : ""}${other.tenYears ? "&diez=si" : ""}#tributario` });
+  } else if (other?.area === "transito") {
+    lines.push("En multas fijas de tránsito, la acción prescribe en dos años desde la boleta y la multa firme en siete años desde su firmeza (Ley 9078 art. 190).");
+    if (date) lines.push(`Con boleta del ${formatDate(date)}, la acción prescribe el ${formatDate(trafficTicketAppeal(date).actionPrescribes)}.`);
+  } else if (civ) {
     const info = CIVIL_CLAIMS[civ];
     if (date) {
       const r = civilPrescription({ claim: civ, exigibleOn: date });
@@ -612,7 +640,9 @@ async function legalAnswer(user: CurrentUser, question: string, opts: { quiet?: 
     const hol = d.skipped.map((x) => holidayName(x)).filter(Boolean);
     if (hol.length) lines.push(`Se saltan feriados: ${[...new Set(hol)].join(", ")}.`);
     lines.push(
-      proc?.key.endsWith("_penal") && !duration
+      proc && "rule" in proc && !duration
+        ? proc.rule
+        : proc?.key.endsWith("_penal") && !duration
         ? "Regla: art. 167 del CPP (desde el día siguiente a la notificación; en los plazos por días solo cuentan los hábiles). No incluye cierres del Poder Judicial."
         : proc && /familia|anticipada/.test(proc.key) && !duration
           ? "Regla: art. 73 del CPF (desde el día hábil siguiente a la notificación a todas las partes; solo días hábiles; si vence en día inhábil, pasa al siguiente). No incluye cierres del Poder Judicial."

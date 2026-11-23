@@ -41,7 +41,7 @@ export const NORMS: readonly Norm[] = [
 
   { key: "ley-63", name: "Código Civil", number: "30", area: "civil", aka: ["prescripcion", "contratos", "obligaciones", "ley 63"] },
   { key: "ley-9342", name: "Código Procesal Civil", number: "9342", area: "civil", aka: ["cpc"] },
-  { key: "ley-8624", name: "Ley de Cobro Judicial", number: "8624", area: "civil", aka: ["monitorio", "cobratorio"] },
+  { key: "ley-8624", name: "Ley de Cobro Judicial", number: "8624", area: "civil", aka: ["monitorio", "cobratorio"], repealed: "Derogada por el Código Procesal Civil (Ley 9342, art. 183): el proceso monitorio y los cobros se rigen por ese Código, vigente desde el 8 de octubre de 2018." },
   { key: "ley-7527", name: "Ley General de Arrendamientos Urbanos y Suburbanos", number: "7527", area: "civil", aka: ["inquilinato", "alquiler"] },
   { key: "ley-8687", name: "Ley de Notificaciones Judiciales", number: "8687", area: "civil" },
 

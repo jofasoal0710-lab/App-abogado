@@ -6,6 +6,7 @@ import { laborSettlement, procedureDeadline } from "@/lib/calculators";
 import { holidayName } from "@/lib/cr-holidays";
 import { formatDate, todayISO } from "@/lib/dates";
 import { formatMoney, parseMoneyToCents } from "@/lib/money";
+import { OtherAreaTools } from "./otras-materias";
 import { amparoDeadline, CIVIL_CLAIMS, civilPrescription, type CivilClaim } from "@/lib/civil";
 import { alimonyArrears, divorceAgreementDeadline, pensionYear, unionCaducity } from "@/lib/familia";
 import { actionPrescription, fmtYears, PENALTY_KIND_LABELS, penaltyPrescription, type PenaltyKind } from "@/lib/penal";
@@ -129,6 +130,23 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader title="Herramientas" subtitle="Cálculos con la ley costarricense. Son orientativos: revisa cada caso." />
+      <nav aria-label="Calculadoras" className="mb-6 flex flex-wrap gap-2 text-sm">
+        {[
+          ["liquidacion", "Liquidación laboral"],
+          ["plazo", "Plazos procesales"],
+          ["prescripcion", "Penal"],
+          ["familia", "Familia"],
+          ["civil", "Civil y amparo"],
+          ["administrativo", "Administrativo y tránsito"],
+          ["comercial", "Comercial"],
+          ["alquileres", "Alquileres"],
+          ["tributario", "Tributario"],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="btn-secondary btn-sm">
+            {label}
+          </a>
+        ))}
+      </nav>
       <div className="grid gap-6 xl:grid-cols-2">
         <section id="liquidacion" className="card card-pad">
           <h2 className="mb-1 font-serif text-lg font-semibold">Liquidación laboral</h2>
@@ -497,6 +515,8 @@ export default async function ToolsPage({ searchParams }: { searchParams: Promis
             </div>
           )}
         </section>
+
+        <OtherAreaTools sp={sp} today={today} />
       </div>
     </>
   );

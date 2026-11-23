@@ -5,7 +5,10 @@
  * SINALEVI versión 4 de 4), del Código Procesal Penal (Ley 7594, versión 47) y del Código Penal
  * (Ley 4573, versión 104), del Código de Familia (Ley 5476, versión 43) y del Código Procesal de Familia
  * (Ley 9747, versión 4, vigente desde el 1 de octubre de 2024), del Código Civil (Ley 30 de 1885, versión
- * 22) y de la Ley de la Jurisdicción Constitucional (Ley 7135, versión 6). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
+ * 22) y de la Ley de la Jurisdicción Constitucional (Ley 7135, versión 6); y de la LGAP (Ley 6227, v22), el CPCA (Ley 8508,
+ * v8), el Código de Comercio (Ley 3284, v31), la Ley 7472 (v24), la Ley de Arrendamientos (Ley 7527, v12), el Código
+ * Notarial (Ley 7764, v17), el CNPT (Ley 4755, v22), la Ley de Tránsito (Ley 9078, v31), la Ley contra la Violencia
+ * Doméstica (Ley 7586, v7) y el Código de la Niñez (Ley 7739, v23), todos de SINALEVI (noviembre de 2026). Se carga marcada como «sin revisar»: el despacho debe revisarla y completarla.
  */
 export type GuideEntry = { title: string; area: string; keywords: string; refs: string; body: string };
 
@@ -18,6 +21,8 @@ export const KNOWLEDGE_AREAS: Record<string, string> = {
   administrativo: "Administrativo",
   comercial: "Comercial",
   tributario: "Tributario",
+  constitucional: "Constitucional",
+  transito: "Tránsito",
   despacho: "Procedimientos del despacho",
   general: "General",
 };
@@ -443,5 +448,214 @@ Lo puede interponer cualquier persona, por memorial, telegrama u otro medio escr
     refs: "ley-7135:73,75",
     body: `Cabe, entre otros supuestos, contra las leyes y disposiciones generales, incluso de sujetos privados, que infrinjan una norma o principio constitucional; contra actos subjetivos de autoridades públicas que no sean susceptibles de hábeas corpus o amparo; y cuando en la formación de las leyes se viole un trámite sustancial (art. 73 de la Ley de la Jurisdicción Constitucional).
 Requiere un asunto pendiente ante los tribunales (incluidos hábeas corpus y amparo) o en el agotamiento de la vía administrativa, en el que se invoque la inconstitucionalidad como medio razonable de amparar el derecho lesionado. No hace falta cuando no hay lesión individual y directa, cuando se defienden intereses difusos o colectivos, ni cuando la interponen el Contralor, el Procurador, el Fiscal General o el Defensor de los Habitantes (art. 75).`,
+  },
+
+  // ---------------- Administrativo (LGAP, Ley 6227, v22; CPCA, Ley 8508, v8) ----------------
+  {
+    title: "Recursos administrativos: revocatoria y apelación (plazos)",
+    area: "administrativo",
+    keywords: "recurso revocatoria apelación administrativa plazo tres días veinticuatro horas acto final jerarca vía administrativa LGAP",
+    refs: "ley-6227:345,346,347,349,350",
+    body: `Contra el acto final caben revocatoria y apelación dentro de tres días; contra los demás actos (los que inician el procedimiento o deniegan la comparecencia o una prueba), dentro de veinticuatro horas, contados desde la última notificación (LGAP art. 346).
+- Se puede usar uno solo o ambos; si se interponen juntos, la apelación se tramita después de rechazada la revocatoria (art. 347). Pasado el plazo, el recurso es inadmisible.
+- Se presentan ante el órgano director; en la apelación, este solo emplaza y remite el expediente al superior (art. 349).
+- Hay una única instancia de alzada, y el órgano de alzada es el que agota la vía administrativa (art. 350).
+- La revocatoria contra el acto final del jerarca se rige por la reposición del CPCA (art. 345).`,
+  },
+  {
+    title: "Recurso extraordinario de revisión (LGAP)",
+    area: "administrativo",
+    keywords: "recurso de revisión extraordinario acto firme error de hecho documentos nuevos falsos plazo un año tres meses",
+    refs: "ley-6227:353,354",
+    body: `Contra actos finales firmes cabe revisión ante el jerarca: dentro del año siguiente a la notificación si hubo error de hecho manifiesto; dentro de tres meses desde el descubrimiento de documentos esenciales; y en los demás casos, dentro del año posterior a la sentencia firme que lo funde (LGAP arts. 353 y 354).
+Causas (art. 353): error de hecho que resulte de los propios documentos del expediente; documentos esenciales ignorados o imposibles de aportar; documentos o testimonios declarados falsos por sentencia firme; y actos dictados por prevaricato, cohecho, violencia u otra maquinación fraudulenta declarada en sentencia.`,
+  },
+  {
+    title: "Plazo de la Administración para resolver y silencio administrativo",
+    area: "administrativo",
+    keywords: "silencio positivo negativo plazo resolver dos meses un mes permisos licencias autorizaciones procedimiento administrativo",
+    refs: "ley-6227:261,330,331",
+    body: `El procedimiento debe terminar con acto final dentro de dos meses desde que se inició o se presentó la petición; el recurso ordinario contra el acto definitivo se resuelve en un mes. Si no hay respuesta, se entiende rechazada la gestión (silencio negativo) para poder recurrir o ir a lo contencioso (LGAP art. 261).
+El silencio es positivo cuando la ley lo dice y en autorizaciones o aprobaciones de fiscalización y tutela, y en solicitudes de permisos, licencias y autorizaciones (art. 330): surge al mes de recibida la solicitud con todos los requisitos (art. 331). Producido, la Administración ya no puede denegar, salvo por las vías que prevé la ley.`,
+  },
+  {
+    title: "Nulidad absoluta en vía administrativa y prescripción de la responsabilidad",
+    area: "administrativo",
+    keywords: "nulidad absoluta evidente manifiesta dictamen procuraduría lesividad responsabilidad administración indemnización prescripción cuatro años",
+    refs: "ley-6227:173,198",
+    body: `El derecho a reclamar indemnización a la Administración prescribe en cuatro años desde el hecho que causa el daño; contra el servidor público, cuatro años desde que se conoce el hecho dañoso; si la víctima es menor de edad, corre desde que cumple la mayoría (LGAP art. 198).
+La nulidad absoluta, evidente y manifiesta de un acto declaratorio de derechos puede declararse en vía administrativa con dictamen favorable, obligatorio y vinculante de la Procuraduría (o de la Contraloría en presupuesto y contratación); si no, la Administración debe ir al proceso de lesividad (art. 173).`,
+  },
+  {
+    title: "Proceso contencioso-administrativo: plazo para demandar",
+    area: "administrativo",
+    keywords: "contencioso administrativo plazo demandar un año caducidad notificación publicación actuación material nulidad absoluta efectos continuados CPCA",
+    refs: "ley-8508:39,40",
+    body: `El plazo máximo para presentar la demanda es de un año, contado desde el día siguiente a la notificación del acto (o a la última publicación; en actuaciones materiales, desde que cesan sus efectos; en lesividad, desde la firmeza del acto) (CPCA art. 39).
+Los actos absolutamente nulos y las omisiones con efectos continuados se pueden impugnar mientras subsistan sus efectos, solo para anularlos hacia el futuro; el año corre desde que cesan esos efectos (art. 40).
+Para calcularlo: Herramientas → Plazos administrativos.`,
+  },
+  {
+    title: "Agotamiento de la vía administrativa (facultativo)",
+    area: "administrativo",
+    keywords: "agotamiento vía administrativa facultativo jerarca impropio municipal contencioso procuraduría ocho días",
+    refs: "ley-8508:31",
+    body: `Agotar la vía administrativa es facultativo: se puede ir directo a lo contencioso, salvo en lo previsto por los artículos 173 (acuerdos municipales) y 182 (contratación administrativa) de la Constitución (CPCA art. 31).
+Si se apela ante un jerarca impropio, debe resolver en un mes. Si se demanda al Estado (Procuraduría) sin agotar la vía, al dar traslado de la demanda el juez concede ocho días hábiles al jerarca supremo para que confirme, modifique, anule o revoque la conducta; si calla o la mantiene, corre automáticamente el plazo de contestación.`,
+  },
+  {
+    title: "Contencioso: contestación, medidas cautelares y casación",
+    area: "administrativo",
+    keywords: "contestación demanda contencioso quince treinta días expediente administrativo medida cautelar casación quince días hábiles sala primera",
+    refs: "ley-8508:19,21,22,63,64,139",
+    body: `Contestación: quince días hábiles si el actor aportó copia certificada del expediente administrativo, treinta si no (CPCA art. 63); ahí se oponen las defensas previas y de fondo y se ofrece la prueba (art. 64).
+Medidas cautelares: se piden antes o durante el proceso (art. 19); proceden si la conducta causa o puede causar daños graves y la pretensión no es temeraria (art. 21), ponderando el interés público y la proporcionalidad (art. 22).
+Casación: quince días hábiles desde el día hábil siguiente a la notificación a todas las partes, ante la Sala Primera o el Tribunal de Casación (art. 139).`,
+  },
+
+  // ---------------- Comercial (Código de Comercio, Ley 3284, v31; Ley 7472, v24; Ley Concursal 9957) ----------------
+  {
+    title: "Prescripción mercantil: cuatro años y excepciones de un año",
+    area: "comercial",
+    keywords: "prescripción mercantil comercial cuatro años un año intereses alquileres letra de cambio pagaré nulidad acuerdos asamblea interrupción",
+    refs: "ley-3284:968,969,977,984,986,795,802",
+    body: `En materia comercial, todo derecho y su acción prescriben en cuatro años, salvo otra regla del Código (CCom art. 984). Prescriben en un año: la nulidad de acuerdos de asambleas o juntas directivas; los reclamos por vicios de cosas vendidas con garantía de buen funcionamiento; la responsabilidad de administradores; el cobro de intereses, alquileres, arrendamientos o rentas; las obras por destajo; y el cobro por uso de derechos sobre muebles.
+- Corre desde el día siguiente al vencimiento, o desde que el derecho pudo ejercerse (art. 969).
+- Se interrumpe por demanda notificada, requerimiento judicial o notarial notificado, o reconocimiento del deudor (art. 977).
+- Letra de cambio: cuatro años desde el vencimiento (art. 795); al pagaré se le aplican las reglas de la letra (art. 802).
+- Con sentencia firme, el plazo vuelve a correr desde la firmeza (art. 986). Las hipotecas siguen la prescripción de diez años (interpretación auténtica del art. 968).
+Para calcularlo: Herramientas → Prescripción mercantil.`,
+  },
+  {
+    title: "Cheque sin fondos: indemnización del 25 %",
+    area: "comercial",
+    keywords: "cheque sin fondos indemnización veinticinco por ciento girador cobro ejecutivo contraorden",
+    refs: "ley-3284:803,817,822",
+    body: `Si el cheque no se paga por falta de fondos, el tenedor puede cobrar al girador, además del monto, una indemnización fija del 25 % de la suma no cobrada (CCom art. 817).
+El girador puede dar contraorden de pago solo por hurto, robo, pérdida o violencia, por escrito y con datos que identifiquen el cheque (art. 822). Requisitos del cheque: art. 803.`,
+  },
+  {
+    title: "Consumidor: garantía, ventas a domicilio y denuncia ante la CNC",
+    area: "comercial",
+    keywords: "consumidor garantía retracto ventas a domicilio ocho días comisión nacional del consumidor denuncia MEIC vía judicial proceso sumario",
+    refs: "ley-7472:34,40,43,46,56,64 bis",
+    body: `En las ventas a domicilio, fuera del local del comerciante, el consumidor puede rescindir el contrato sin responsabilidad dentro de ocho días desde que se perfeccionó (derecho de retracto, Ley 7472 art. 40).
+- Todo bien o servicio está garantizado implícitamente; en bienes duraderos y reparaciones, la garantía debe indicar alcance, duración y condiciones (art. 43).
+- El consumidor puede ir a la vía administrativa (Comisión Nacional del Consumidor) o a la judicial (proceso sumario del CPC); si elige la judicial, ya no puede usar la administrativa (art. 46).
+- La denuncia ante la CNC no requiere formalidades ni autenticación y la puede presentar cualquier persona (art. 56). Las sanciones y órdenes de la CNC deben cumplirse en quince días hábiles (art. 64 bis).`,
+  },
+
+  // ---------------- Arrendamientos (Ley 7527, v12) ----------------
+  {
+    title: "Alquiler: plazo mínimo de tres años, prórroga y aviso",
+    area: "civil",
+    keywords: "alquiler arrendamiento inquilinato plazo tres años prórroga tácita no renovar aviso tres meses inquilino arrendador terminar contrato",
+    refs: "ley-7527:70,71,72",
+    body: `El arrendamiento no puede durar menos de tres años; si se pactó menos o no se fijó plazo, se entiende de tres años desde que el inquilino recibió el bien (Ley 7527 art. 70).
+- Si el arrendador no notifica que no renovará al menos tres meses antes del vencimiento, hay prórroga tácita por otros tres años con las mismas cláusulas (art. 71).
+- El inquilino puede terminar el contrato avisando con tres meses de anticipación, salvo pacto escrito en contrario (art. 72).
+Para calcular la fecha límite del aviso: Herramientas → Alquileres.`,
+  },
+  {
+    title: "Aumento del alquiler de vivienda (reajuste anual)",
+    area: "civil",
+    keywords: "aumento alquiler reajuste anual vivienda casa apartamento inflación diez por ciento MIVAH INEC renta incremento inquilinato cuánto puede subir sube subida aumentar alquiler",
+    refs: "ley-7527:67,68,69,57",
+    body: `En vivienda, el alquiler se reajusta al final de cada año del contrato: si la inflación de los doce meses anteriores es del 10 % o menos, el aumento puede ser como máximo esa inflación (índice del INEC); si supera el 10 %, el MIVAH fija el porcentaje, entre el 10 % y la inflación anual (Ley 7527 art. 67).
+Es nulo todo pacto de aumentos mayores (art. 68). En locales y otros destinos, las partes pactan libremente; si no hay acuerdo, se acude al proceso sumario o a árbitros (art. 69). Si el alquiler se pactó en dólares, el inquilino puede pagar en colones al tipo de cambio de venta del BCCR del día (art. 57).
+Para calcularlo: Herramientas → Alquileres.`,
+  },
+  {
+    title: "Desahucio: causas",
+    area: "civil",
+    keywords: "desahucio causas falta de pago expiración plazo incumplimiento inquilino resolución contrato arrendamiento proceso",
+    refs: "ley-7527:113,114,121,54",
+    body: `Por el proceso de desahucio del Código Procesal Civil, el arrendador reclama el bien por: vencimiento del plazo, extinción del derecho del usufructuario o fiduciario, resolución por incumplimiento del inquilino, y necesidad de la vivienda social para uso propio o nueva construcción, entre otras (Ley 7527 art. 121).
+Incumplimientos del inquilino que permiten la resolución: falta de pago, no conservar el bien, y en condominio la violación del reglamento (art. 114); también el goce abusivo (actividades molestas, ilícitas o peligrosas, art. 54). Causas de extinción en general: art. 113.`,
+  },
+
+  // ---------------- Notarial (Código Notarial, Ley 7764, v17) ----------------
+  {
+    title: "Código Notarial: índices, testimonios y prescripción disciplinaria",
+    area: "notarial",
+    keywords: "índices quincenales cinco días hábiles testimonio primero diez días prescripción disciplinaria dos años notario suspensión",
+    refs: "ley-7764:27,117,164,165,144",
+    body: `Los índices quincenales se presentan dentro de los cinco días hábiles siguientes al 15 y al último día de cada mes (Código Notarial art. 27). La app los prepara en Notaría → Índice.
+- Primer testimonio: el expedido al firmar la escritura o dentro de los diez días hábiles siguientes; los demás son ulteriores (art. 117).
+- La acción disciplinaria contra el notario prescribe en dos años desde el hecho; se interrumpe con la notificación de la denuncia (art. 164). La reparación del daño se rige por el Código Civil (art. 165).
+- Atrasar más de seis meses la inscripción de un documento, tras prevención, se sanciona con suspensión de uno a seis meses (art. 144).`,
+  },
+  {
+    title: "Requisitos, impedimentos y prohibiciones del notario",
+    area: "notarial",
+    keywords: "requisitos notario impedimentos prohibiciones Dirección Nacional de Notariado inscripción postgrado excusa ilegítimo",
+    refs: "ley-7764:3,4,7,10,36",
+    body: `Para ser notario: buena conducta, no tener impedimento, ser licenciado en Derecho con posgrado en Derecho Notarial y Registral e incorporado al Colegio, entre otros requisitos (Código Notarial art. 3); la habilitación se pide a la Dirección Nacional de Notariado (art. 10).
+Impedimentos: art. 4. Prohibiciones (art. 7): por ejemplo, atender asuntos de particulares en oficinas públicas donde trabaja o autorizar actos de la institución que le paga.
+El notario debe excusarse si estima que la actuación es ilegítima o ineficaz, o si los interesados no se identifican bien (art. 36).`,
+  },
+
+  // ---------------- Tributario (CNPT, Ley 4755, v22) ----------------
+  {
+    title: "Prescripción tributaria: cuatro años (diez si no inscrito)",
+    area: "tributario",
+    keywords: "prescripción tributaria cuatro años diez años no inscrito fraude Hacienda cobro tributo intereses cómputo interrupción",
+    refs: "ley-4755:51,52,53,54",
+    body: `La facultad de Hacienda para determinar el tributo y para cobrarlo con sus intereses prescribe en cuatro años; en diez si el contribuyente no está inscrito, no presentó declaraciones o estas fueron fraudulentas. Se aplica a cada tributo por separado (CNPT art. 51).
+- Se cuenta desde el primer día del mes siguiente a la fecha en que debía pagarse (art. 52).
+- Se interrumpe, entre otras causas, con la notificación del inicio de la fiscalización (si empieza en un mes y no se paraliza más de dos) (art. 53).
+- Si se recurre, el nuevo plazo corre desde el 1 de enero siguiente al año en que queda firme la resolución (art. 54).
+Para calcularlo: Herramientas → Prescripción tributaria.`,
+  },
+  {
+    title: "Recursos contra la liquidación de Hacienda (revocatoria y Tribunal Fiscal)",
+    area: "tributario",
+    keywords: "recurso revocatoria tributario treinta días hábiles apelación Tribunal Fiscal Administrativo liquidación de oficio traslado de cargos",
+    refs: "ley-4755:145,146,156",
+    body: `Contra la liquidación de oficio cabe revocatoria, que es potestativa, dentro de treinta días hábiles desde la notificación, ante el órgano que la dictó; debe resolverse en treinta días hábiles (CNPT arts. 145 y 146).
+Contra lo que resuelva la revocatoria, o directamente contra la liquidación si no se usó, cabe apelación ante el Tribunal Fiscal Administrativo dentro de los treinta días siguientes a la notificación; luego se emplaza a las partes por treinta días para apersonarse (art. 156).`,
+  },
+
+  // ---------------- Tránsito (Ley 9078, v31) ----------------
+  {
+    title: "Multa de tránsito: impugnar la boleta (diez días hábiles)",
+    area: "transito",
+    keywords: "multa tránsito boleta impugnar apelar Cosevi diez días hábiles parte cámara puntos licencia prescripción",
+    refs: "ley-9078:162,163,164,165,190",
+    body: `La boleta se impugna ante la Unidad de Impugnaciones del Cosevi (o la delegación de Tránsito que corresponda) dentro del plazo improrrogable de diez días hábiles, contados desde el día siguiente a su confección (Ley 9078 art. 163). Puede presentarse por medios electrónicos.
+- Si no se impugna, la multa y sus sanciones quedan firmes y se anotan en la licencia (arts. 162 y 165).
+- El Cosevi resuelve en dos meses si no hay prueba que evacuar (art. 164).
+- La acción por multa fija prescribe en dos años desde la boleta; la multa firme, en siete años (art. 190).
+Para calcularlo: Herramientas → Plazos administrativos (boleta de tránsito).`,
+  },
+  {
+    title: "Puntos en la licencia y suspensión",
+    area: "transito",
+    keywords: "puntos licencia acumulación doce puntos seis años suspensión doce meses reacreditar sistema evaluación permanente conductores",
+    refs: "ley-9078:134,135,136,137,139",
+    body: `Con una licencia de seis años se pueden acumular como máximo doce puntos; con una de cuatro años, ocho (Ley 9078 art. 135). Los puntos se suman cuando la infracción queda firme (art. 137).
+Al llegar al máximo, pierden validez todas las licencias y no se puede reacreditar hasta pasados doce meses; seis si se demuestra que se trabaja conduciendo (art. 139). Una condena firme por homicidio culposo, lesiones culposas (no las leves) o conducción temeraria (arts. 117, 128 y 261 bis del Código Penal) suma doce puntos (art. 136).`,
+  },
+
+  // ---------------- Familia: violencia doméstica (Ley 7586, v7) y niñez (Ley 7739, v23) ----------------
+  {
+    title: "Violencia doméstica: medidas de protección",
+    area: "familia",
+    keywords: "violencia doméstica medidas de protección salir del domicilio un año duración apelación tres días comparecencia solicitud verbal",
+    refs: "ley-7586:3,4,7,8,9,12,15",
+    body: `Las medidas de protección duran un año, salvo que una resolución firme las levante o modifique antes (Ley 7586 art. 4). Entre ellas: ordenar que la persona agresora salga del domicilio y no se acerque (art. 3).
+- Se piden por escrito o de forma verbal, con independencia de cualquier otro proceso penal o de familia (la solicitud escrita solo requiere autenticación si no la presenta la persona misma); si hay peligro inminente, el juez las dicta de inmediato (art. 8). Requisitos: art. 9.
+- Pueden pedirlas la víctima y, si es menor o con discapacidad, su representante, el PANI, la policía o cualquier persona que conozca la situación (art. 7).
+- La persona agresora puede pedir comparecencia dentro de cinco días desde la notificación (art. 12). La resolución se apela en tres días hábiles y la apelación no suspende las medidas (art. 15).`,
+  },
+  {
+    title: "Niñez: proceso especial de protección ante el PANI",
+    area: "familia",
+    keywords: "PANI proceso especial de protección medidas oficina local apelación cuarenta y ocho horas cuido provisional seis meses interés superior menor",
+    refs: "ley-7739:5,130,132,133,135,138,139",
+    body: `Contra lo que resuelva la oficina local del PANI cabe apelación ante su Presidencia Ejecutiva dentro de las cuarenta y ocho horas siguientes a la notificación; no suspende la medida (Código de la Niñez art. 139).
+- El proceso puede iniciar de oficio o por denuncia de cualquier persona (art. 132); es sumario e informal y siempre se oye a la persona menor de edad (art. 133).
+- Medidas: orientación y seguimiento a la familia, matrícula escolar obligatoria, tratamientos, cuido provisional, entre otras (art. 135). El cuido en familia sustituta o el abrigo temporal no puede exceder de seis meses (art. 138).
+- Toda decisión debe atender el interés superior de la persona menor de edad (art. 5).`,
   },
 ];

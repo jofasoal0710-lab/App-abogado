@@ -39,7 +39,27 @@ const both = (a: string) => new RegExp(String.raw`^(?=.*\b${PENAL}\b).*\b${a}\b`
 const FAMILIA = String.raw`(familia\w*|pension\w*|alimentari\w*|alimentos|divorcio|separacion judicial|custodia|responsabilidad parental|union de hecho|interrelacion|resolutivo familiar|sentencia anticipada)`;
 const fam = (a: string) => new RegExp(String.raw`^(?=.*\b${FAMILIA}\b).*\b${a}\b`);
 
+/** Contencioso-administrativo y procedimiento administrativo (CPCA, LGAP). */
+const ADM = String.raw`(contencios\w*|administrativ\w*|lgap|cpca|municipalidad|ministerio|institucion publica|jerarca)`;
+const adm = (a: string) => new RegExp(String.raw`^(?=.*\b${ADM}\b).*\b${a}\b`);
+/** Violencia doméstica (Ley 7586). */
+const VD = String.raw`(violencia domestica|medidas? de proteccion|agresor\w*)`;
+const vd = (a: string) => new RegExp(String.raw`^(?=.*\b${VD}\b).*\b${a}\b`);
+/** Tributario (CNPT). */
+const TRIB = String.raw`(tribut\w*|hacienda|liquidacion de oficio|traslado de cargos|tribunal fiscal|impuestos?)`;
+const trib = (a: string) => new RegExp(String.raw`^(?=.*\b${TRIB}\b).*\b${a}\b`);
+
 export const PROCEDURAL_DEADLINES = [
+  // Tránsito: diez días hábiles desde el día siguiente a la confección de la boleta (Ley 9078 art. 163).
+  { key: "boleta_transito", match: /\b(boleta\w*|multa de transito|parte de transito|cosevi)\b/, days: 10, label: "impugnar una boleta de tránsito ante el Cosevi", ref: "Ley 9078 art. 163", rule: "Regla: art. 163 de la Ley de Tránsito (diez días hábiles improrrogables desde el día siguiente a la confección de la boleta). Pon la fecha de la boleta como fecha de notificación." },
+  // Violencia doméstica: apelación en tres días hábiles; no suspende las medidas (Ley 7586 art. 15).
+  { key: "apelacion_violencia", match: vd(String.raw`apela\w*`), days: 3, label: "apelar la resolución sobre medidas de protección (no suspende las medidas)", ref: "Ley 7586 art. 15", rule: "Regla: art. 15 de la Ley contra la Violencia Doméstica (tres días hábiles; la apelación no suspende la ejecución de las medidas)." },
+  // Tributario: revocatoria potestativa contra la liquidación de oficio en 30 días hábiles (CNPT art. 145).
+  { key: "revocatoria_tributaria", match: trib(String.raw`(revocatoria|recurr\w*|impugn\w*)`), days: 30, label: "presentar la revocatoria contra la liquidación de oficio de Hacienda", ref: "CNPT art. 145", rule: "Regla: art. 145 del CNPT (treinta días hábiles desde la notificación; luego cabe apelación ante el Tribunal Fiscal Administrativo, art. 156)." },
+  // Contencioso-administrativo (CPCA) y recursos administrativos (LGAP: días hábiles, art. 256).
+  { key: "casacion_contenciosa", match: adm("casacion"), days: 15, label: "recurso de casación en lo contencioso-administrativo", ref: "CPCA art. 139", rule: "Regla: art. 139 del CPCA (quince días hábiles desde el día hábil siguiente a la notificación a todas las partes)." },
+  { key: "contestacion_contenciosa", match: adm(String.raw`contest\w*`), days: 30, label: "contestar la demanda contencioso-administrativa (15 días hábiles si el actor aportó el expediente administrativo certificado)", ref: "CPCA art. 63", rule: "Regla: art. 63 del CPCA (treinta días hábiles; quince si se aportó copia certificada del expediente administrativo)." },
+  { key: "recurso_administrativo", match: adm(String.raw`(revocatoria|revocar|apela\w*|recurs\w*)`), days: 3, label: "revocatoria o apelación contra el acto final administrativo (contra otros actos: veinticuatro horas)", ref: "LGAP art. 346", rule: "Regla: arts. 346 y 256 de la LGAP (tres días hábiles desde el día siguiente a la última notificación)." },
   // Familia (CPF): desde el día hábil siguiente a la notificación a todas las partes; solo días hábiles (art. 73).
   { key: "oposicion_sentencia_anticipada", match: fam(String.raw`(oposicion|oponer\w*)`), days: 5, label: "oponerse a la sentencia anticipada de pensión alimentaria", ref: "CPF art. 271" },
   { key: "casacion_familia", match: fam("casacion"), days: 10, label: "recurso de casación en familia", ref: "CPF art. 107" },

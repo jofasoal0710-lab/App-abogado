@@ -676,7 +676,238 @@ const habeas: FormTemplate = {
   ],
 };
 
-export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, demandaPension, apremio, demandaDivorcio, convenioDivorcio, unionHecho, demandaMonitoria, amparo, habeas, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
+// ---------- Administrativo, tránsito, arrendamientos, consumidor, tributario y violencia doméstica ----------
+
+/** Encabezado para escritos ante una administración pública (no ante un juzgado). */
+const encabezadoAdm = (organo: string, asunto: string): Block[] => [
+  { t: "encabezado", text: organo.toUpperCase() },
+  { t: "encabezado", text: asunto },
+];
+
+const recursoAdministrativo: FormTemplate = {
+  key: "recurso-revocatoria-administrativo",
+  kind: "escrito",
+  category: "Administrativo",
+  title: "Recurso de revocatoria con apelación en subsidio (vía administrativa)",
+  description: "Contra el acto final de una administración pública: tres días hábiles desde la notificación (LGAP arts. 346 y 256).",
+  fields: [
+    F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "organo", label: "Órgano que dictó el acto", type: "text", required: true, hint: "Por ejemplo: Departamento de Patentes de la Municipalidad de San José" },
+    { name: "acto", label: "Acto que se impugna", type: "text", required: true, hint: "Resolución, número y fecha" },
+    { name: "notificado", label: "Fecha de notificación", type: "date", required: true },
+    { name: "motivos", label: "Motivos del recurso", type: "list", required: true, hint: "Uno por línea" },
+    { name: "pretension", label: "Lo que se pide", type: "textarea", required: true, hint: "Por ejemplo: que se revoque la resolución y se otorgue la patente" },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoAdm(val(v, "organo"), "Asunto: RECURSO DE REVOCATORIA CON APELACIÓN EN SUBSIDIO"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, en tiempo y forma, con fundamento en los artículos 342 a 352 de la Ley General de la Administración Pública, interpongo RECURSO DE REVOCATORIA CON APELACIÓN EN SUBSIDIO contra ${val(v, "acto")}, que me fue notificado el ${longDate(v.notificado ?? "")}, por los siguientes motivos:` },
+    { t: "seccion", text: "MOTIVOS" }, listOr(v, "motivos"),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: val(v, "pretension") },
+    { t: "p", text: "De no acogerse la revocatoria, solicito que se eleve el recurso de apelación ante el superior jerárquico, emplazando a las partes conforme al artículo 349 de la Ley General de la Administración Pública." },
+    ...cierre(v),
+  ],
+};
+
+const demandaContencioso: FormTemplate = {
+  key: "demanda-contencioso-administrativa",
+  kind: "escrito",
+  category: "Administrativo",
+  title: "Demanda contencioso-administrativa",
+  description: "Ante el Tribunal Contencioso Administrativo. Plazo: un año desde la notificación del acto (CPCA art. 39). Agotar la vía administrativa es facultativo (art. 31).",
+  fields: [
+    { ...F.juzgado, label: "Tribunal", hint: "Por ejemplo: Tribunal Contencioso Administrativo y Civil de Hacienda", required: true },
+    F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { name: "demandada", label: "Administración demandada", type: "text", required: true, hint: "Por ejemplo: el Estado (Ministerio de Hacienda) o la Municipalidad de…" },
+    { name: "conducta", label: "Conducta administrativa impugnada", type: "text", required: true, hint: "Acto, número y fecha, o la actuación u omisión" },
+    { name: "hechos", label: "Hechos", type: "list", required: true },
+    { name: "pretensiones", label: "Pretensiones", type: "list", required: true, hint: "Por ejemplo: que se anule la resolución…; que se condene al pago de daños y perjuicios…" },
+    { name: "pruebas", label: "Prueba", type: "list", hint: "Incluye la copia certificada del expediente administrativo si la tienes (art. 63)" },
+    { name: "estimacion", label: "Estimación", type: "text", hint: "Monto o «inestimable»" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    { t: "encabezado", text: `SEÑORES ${val(v, "juzgado").toUpperCase()}` },
+    { t: "encabezado", text: "Proceso: DE CONOCIMIENTO (Código Procesal Contencioso-Administrativo)" },
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, interpongo PROCESO DE CONOCIMIENTO contra ${val(v, "demandada")}, contra ${val(v, "conducta")}, con base en los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...derechoSeccion(v),
+    { t: "seccion", text: "PRETENSIONES" }, listOr(v, "pretensiones"),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "ESTIMACIÓN" }, { t: "p", text: `Estimo la demanda en ${val(v, "estimacion")}.` },
+    ...cierre(v),
+  ],
+};
+
+const boletaTransito: FormTemplate = {
+  key: "impugnacion-boleta-transito",
+  kind: "escrito",
+  category: "Tránsito",
+  title: "Impugnación de boleta de tránsito",
+  description: "Ante la Unidad de Impugnaciones del Cosevi: diez días hábiles desde el día siguiente a la confección de la boleta (Ley 9078 art. 163).",
+  fields: [
+    F.cliente, F.cedula, F.domicilio,
+    { name: "boleta", label: "Número de boleta", type: "text", required: true },
+    { name: "fecha_boleta", label: "Fecha de la boleta", type: "date", required: true },
+    { name: "placa", label: "Placa del vehículo", type: "text" },
+    { name: "motivos", label: "Motivos de la impugnación", type: "list", required: true, hint: "Qué ocurrió y por qué la boleta no procede" },
+    { name: "pruebas", label: "Prueba que se ofrece", type: "list", hint: "Testigos, fotografías, documentos…" },
+    F.notificaciones, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoAdm("Consejo de Seguridad Vial (Cosevi) · Unidad de Impugnaciones de Boletas de Citación", `Asunto: IMPUGNACIÓN DE LA BOLETA N.° ${val(v, "boleta")}`),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, vecino(a) de ${val(v, "domicilio")}, dentro del plazo del artículo 163 de la Ley de Tránsito por Vías Públicas Terrestres y Seguridad Vial (Ley 9078), impugno la boleta de citación número ${val(v, "boleta")}, confeccionada el ${longDate(v.fecha_boleta ?? "")}${v.placa?.trim() ? ` al vehículo placa ${v.placa.trim()}` : ""}, por los siguientes motivos:` },
+    { t: "seccion", text: "MOTIVOS" }, listOr(v, "motivos"),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se declare con lugar la impugnación, se deje sin efecto la boleta y las sanciones conexas, y se elimine su anotación provisional en el registro de la licencia (arts. 162 y 164)." },
+    { t: "seccion", text: "NOTIFICACIONES" },
+    { t: "p", text: `Señalo para notificaciones: ${val(v, "notificaciones")}.` },
+    { t: "p", text: `${val(v, "lugar")}, ${longDate(v.fecha ?? "")}.` },
+    { t: "firma", lines: [val(v, "cliente"), `Cédula ${val(v, "cedula")}`] },
+  ],
+};
+
+const desahucio: FormTemplate = {
+  key: "demanda-desahucio",
+  kind: "escrito",
+  category: "Arrendamientos",
+  title: "Demanda de desahucio",
+  description: "Proceso de desahucio del Código Procesal Civil por las causas del art. 121 de la Ley 7527 (falta de pago, vencimiento del plazo, incumplimiento).",
+  fields: [
+    F.juzgado, F.cliente, F.cedula, F.estadoCivil, F.profesion, F.domicilio,
+    { ...F.contraparte, label: "Inquilino(a) demandado(a)", required: true },
+    { name: "inmueble", label: "Inmueble arrendado", type: "text", required: true, hint: "Dirección y, si la tiene, matrícula de la finca" },
+    { name: "contrato", label: "Contrato", type: "text", required: true, hint: "Fecha, plazo, destino (vivienda o local) y renta mensual" },
+    { name: "causa", label: "Causa del desahucio", type: "text", required: true, hint: "Por ejemplo: falta de pago de los alquileres de agosto a octubre de 2026 (Ley 7527 arts. 114 a) y 121 c)" },
+    { name: "hechos", label: "Hechos", type: "list", required: true },
+    { name: "pruebas", label: "Prueba", type: "list" },
+    F.derecho, F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezado(v, "DESAHUCIO"),
+    { t: "p", text: `Quien suscribe, ${calidades(v)}, en mi condición de arrendador(a), interpongo PROCESO DE DESAHUCIO contra ${val(v, "contraparte")}, inquilino(a) del inmueble situado en ${val(v, "inmueble")}, por la siguiente causa: ${val(v, "causa")}.` },
+    { t: "p", text: `Contrato de arrendamiento: ${val(v, "contrato")}.` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...derechoSeccion(v),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "PRETENSIÓN" },
+    { t: "p", text: "Solicito que se declare con lugar el desahucio, se ordene al demandado desocupar y entregar el inmueble en el plazo que se fije, bajo apercibimiento de lanzamiento, y se le condene al pago de los alquileres adeudados, ambas costas, daños y perjuicios." },
+    ...cierre(v),
+  ],
+};
+
+const avisoNoRenovacion: FormTemplate = {
+  key: "aviso-no-renovacion-arrendamiento",
+  kind: "escrito",
+  category: "Arrendamientos",
+  title: "Aviso de no renovación del arrendamiento",
+  description: "Para evitar la prórroga tácita de tres años, se notifica al menos tres meses antes del vencimiento (Ley 7527 art. 71).",
+  fields: [
+    F.cliente, F.cedula,
+    { ...F.contraparte, label: "Inquilino(a)", required: true },
+    { name: "inmueble", label: "Inmueble arrendado", type: "text", required: true },
+    { name: "entrega", label: "Fecha en que el inquilino recibió el inmueble", type: "date", required: true },
+    { name: "vence", label: "Fecha de vencimiento del período en curso", type: "date", required: true, hint: "Calcúlala en Herramientas → Alquileres" },
+    F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    { t: "encabezado", text: `Señor(a) ${val(v, "contraparte")}` },
+    { t: "encabezado", text: "Asunto: AVISO DE NO RENOVACIÓN DEL CONTRATO DE ARRENDAMIENTO" },
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, en mi condición de arrendador(a) del inmueble situado en ${val(v, "inmueble")}, que usted recibió el ${longDate(v.entrega ?? "")}, le comunico, con fundamento en el artículo 71 de la Ley General de Arrendamientos Urbanos y Suburbanos (Ley 7527), mi voluntad de NO RENOVAR el contrato de arrendamiento a su vencimiento, el ${longDate(v.vence ?? "")}.` },
+    { t: "p", text: "Le ruego entregar el inmueble en esa fecha, en el estado en que lo recibió, salvo el deterioro normal por el uso (art. 55), y al día en el pago de la renta y los servicios." },
+    { t: "p", text: `${val(v, "lugar")}, ${longDate(v.fecha ?? "")}.` },
+    { t: "firma", lines: [val(v, "cliente"), `Cédula ${val(v, "cedula")}`, "", "Recibido por: ____________________   Fecha: ____________"] },
+  ],
+};
+
+const denunciaConsumidor: FormTemplate = {
+  key: "denuncia-consumidor",
+  kind: "escrito",
+  category: "Comercial",
+  title: "Denuncia ante la Comisión Nacional del Consumidor",
+  description: "Sin formalidades ni autenticación (Ley 7472 art. 56). Si se va a la vía judicial, ya no se puede usar esta vía (art. 46).",
+  fields: [
+    F.cliente, F.cedula, F.domicilio,
+    { ...F.contraparte, label: "Comercio o proveedor denunciado", required: true, hint: "Nombre comercial y, si la conoces, la cédula jurídica" },
+    { name: "hechos", label: "Hechos", type: "list", required: true, hint: "Qué compró o contrató, cuándo, por cuánto y qué incumplió" },
+    { name: "derechos", label: "Derechos o normas infringidos", type: "text", hint: "Por ejemplo: garantía (art. 43), información (art. 34 b)" },
+    { name: "pretension", label: "Lo que se pide", type: "textarea", required: true, hint: "Reparación, cambio del producto, devolución del dinero…" },
+    { name: "pruebas", label: "Prueba", type: "list", hint: "Factura, garantía, fotografías, correos…" },
+    F.notificaciones, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoAdm("Comisión Nacional del Consumidor · Ministerio de Economía, Industria y Comercio", "Asunto: DENUNCIA POR VIOLACIÓN DE LOS DERECHOS DEL CONSUMIDOR"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, vecino(a) de ${val(v, "domicilio")}, con fundamento en los artículos 46, 53 y 56 de la Ley de Promoción de la Competencia y Defensa Efectiva del Consumidor (Ley 7472), presento DENUNCIA contra ${val(v, "contraparte")}, por los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    ...(v.derechos?.trim() ? [{ t: "seccion", text: "DERECHOS INFRINGIDOS" } as Block, { t: "p", text: v.derechos.trim() } as Block] : []),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "PETITORIA" }, { t: "p", text: val(v, "pretension") },
+    { t: "seccion", text: "NOTIFICACIONES" },
+    { t: "p", text: `Señalo para notificaciones: ${val(v, "notificaciones")}.` },
+    { t: "p", text: `${val(v, "lugar")}, ${longDate(v.fecha ?? "")}.` },
+    { t: "firma", lines: [val(v, "cliente"), `Cédula ${val(v, "cedula")}`] },
+  ],
+};
+
+const revocatoriaTributaria: FormTemplate = {
+  key: "recurso-revocatoria-tributario",
+  kind: "escrito",
+  category: "Tributario",
+  title: "Recurso de revocatoria contra la liquidación de oficio",
+  description: "Ante la administración tributaria que la dictó: treinta días hábiles desde la notificación (CNPT art. 145). Luego cabe apelación ante el Tribunal Fiscal Administrativo (art. 156).",
+  fields: [
+    F.cliente, F.cedula,
+    { name: "administracion", label: "Administración tributaria", type: "text", required: true, hint: "Por ejemplo: Administración Tributaria de San José Oeste o Dirección de Grandes Contribuyentes" },
+    { name: "acto", label: "Acto de liquidación de oficio", type: "text", required: true, hint: "Número, fecha, impuesto y períodos" },
+    { name: "notificado", label: "Fecha de notificación", type: "date", required: true },
+    { name: "motivos", label: "Motivos de disconformidad", type: "list", required: true },
+    { name: "pruebas", label: "Prueba", type: "list" },
+    F.notificaciones, F.abogado, F.carne, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    ...encabezadoAdm(val(v, "administracion"), "Asunto: RECURSO DE REVOCATORIA"),
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, cédula ${val(v, "cedula")}, dentro del plazo del artículo 145 del Código de Normas y Procedimientos Tributarios, interpongo RECURSO DE REVOCATORIA contra ${val(v, "acto")}, notificado el ${longDate(v.notificado ?? "")}, por los siguientes motivos:` },
+    { t: "seccion", text: "MOTIVOS DE DISCONFORMIDAD" }, listOr(v, "motivos"),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "seccion", text: "PETITORIA" },
+    { t: "p", text: "Solicito que se revoque el acto de liquidación de oficio en los extremos impugnados. Me reservo el derecho de apelar ante el Tribunal Fiscal Administrativo (art. 146 y 156 del CNPT)." },
+    ...cierre(v),
+  ],
+};
+
+const medidasProteccion: FormTemplate = {
+  key: "solicitud-medidas-proteccion",
+  kind: "escrito",
+  category: "Familia",
+  title: "Solicitud de medidas de protección (violencia doméstica)",
+  description: "Ante el juzgado de violencia doméstica. Duran un año (Ley 7586 art. 4); también se pueden pedir de forma verbal (art. 8).",
+  fields: [
+    F.juzgado, F.cliente, F.cedula, F.domicilio,
+    { ...F.contraparte, label: "Presunta persona agresora", required: true, hint: "Nombre, apellidos y, si se conocen, sus calidades" },
+    { name: "relacion", label: "Relación con la persona agresora", type: "text", hint: "Cónyuge, excompañero(a), padre, hijo(a)…" },
+    { name: "hechos", label: "Hechos de violencia", type: "list", required: true, hint: "Qué ocurrió, cuándo y dónde, uno por línea" },
+    { name: "medidas", label: "Medidas que se solicitan", type: "list", required: true, hint: "Por ejemplo: que salga del domicilio; que no se acerque a la casa ni al trabajo (art. 3)" },
+    { name: "pruebas", label: "Prueba (si existe)", type: "list", hint: "No es indispensable (art. 9 c)" },
+    F.notificaciones, F.lugar, F.fecha,
+  ],
+  render: (v) => [
+    { t: "encabezado", text: `SEÑOR(A) JUEZ(A) DEL ${val(v, "juzgado").toUpperCase()}` },
+    { t: "encabezado", text: "Asunto: SOLICITUD DE MEDIDAS DE PROTECCIÓN (Ley contra la Violencia Doméstica)" },
+    { t: "p", text: `Quien suscribe, ${val(v, "cliente")}, portador(a) de la cédula de identidad número ${val(v, "cedula")}, vecino(a) de ${val(v, "domicilio")}, con fundamento en los artículos 3, 7, 8 y 9 de la Ley contra la Violencia Doméstica (Ley 7586), solicito medidas de protección contra ${val(v, "contraparte")}${v.relacion?.trim() ? `, ${v.relacion.trim()}` : ""}, por los siguientes hechos:` },
+    { t: "seccion", text: "HECHOS" }, listOr(v, "hechos"),
+    { t: "seccion", text: "MEDIDAS QUE SE SOLICITAN" }, listOr(v, "medidas"),
+    ...(lines(v, "pruebas").length ? [{ t: "seccion", text: "PRUEBA" } as Block, listOr(v, "pruebas")] : []),
+    { t: "p", text: "Solicito que, por existir peligro para mi integridad, las medidas se ordenen de inmediato (art. 8)." },
+    { t: "seccion", text: "NOTIFICACIONES" },
+    { t: "p", text: `Señalo para notificaciones: ${val(v, "notificaciones")}.` },
+    { t: "p", text: `${val(v, "lugar")}, ${longDate(v.fecha ?? "")}.` },
+    { t: "firma", lines: [val(v, "cliente"), `Cédula ${val(v, "cedula")}`] },
+  ],
+};
+
+export const TEMPLATES: FormTemplate[] = [demandaOrdinaria, demandaLaboral, contestacion, recurso, medidaCautelar, desistimiento, medioNotificaciones, denunciaPenal, querella, apelacionSentenciaPenal, medidaAlterna, cesePrision, demandaPension, apremio, demandaDivorcio, convenioDivorcio, unionHecho, demandaMonitoria, amparo, habeas, recursoAdministrativo, demandaContencioso, boletaTransito, desahucio, avisoNoRenovacion, denunciaConsumidor, revocatoriaTributaria, medidasProteccion, poderGeneralisimo, poderEspecial, compraventaVehiculo, declaracionJurada];
 
 export function getTemplate(key: string): FormTemplate | null {
   return TEMPLATES.find((t) => t.key === key) ?? null;

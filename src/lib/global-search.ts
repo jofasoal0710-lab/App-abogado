@@ -27,6 +27,10 @@ export function commandsFor(user: CurrentUser): SearchHit[] {
     can(user, "notaria.usar") && { group: "Acciones", label: "Registrar escritura", href: "/notaria/escrituras/nueva" },
     { group: "Acciones", label: "Calcular liquidación laboral", href: "/herramientas#liquidacion" },
     { group: "Acciones", label: "Calcular vencimiento de un plazo", href: "/herramientas#plazo" },
+    { group: "Acciones", label: "Plazos administrativos, contencioso y boletas de tránsito", href: "/herramientas#administrativo" },
+    { group: "Acciones", label: "Calcular prescripción mercantil", href: "/herramientas#comercial" },
+    { group: "Acciones", label: "Alquileres: vencimiento y aumento anual", href: "/herramientas#alquileres" },
+    { group: "Acciones", label: "Calcular prescripción tributaria", href: "/herramientas#tributario" },
     { group: "Acciones", label: "Nueva entrada de conocimiento", href: "/conocimiento/nueva" },
     { group: "Acciones", label: "Cambiar apariencia (colores, modo oscuro)", href: "/cuenta#apariencia" },
   ];
