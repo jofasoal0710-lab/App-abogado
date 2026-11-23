@@ -45,6 +45,7 @@ export const paymentMethodLabels = {
   efectivo: "Efectivo",
   cheque: "Cheque",
   otro: "Otro",
+  provision: "Provisión de fondos",
 } as const;
 
 export function entries<T extends Record<string, string>>(obj: T) {

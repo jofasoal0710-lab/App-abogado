@@ -1,3 +1,5 @@
+import { roundingStep } from "./timer";
+
 export const config = {
   currency: process.env.CURRENCY || "CRC",
   /** IVA general de Costa Rica: 13 %. */
@@ -10,4 +12,6 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? "./storage",
   maxUploadBytes: 25 * 1024 * 1024,
   locale: process.env.APP_LOCALE || "es-CR",
+  /** Tramo de redondeo del cronómetro, en minutos (6 = décimas de hora). */
+  timerRoundMinutes: roundingStep(process.env.TIMER_ROUND_MINUTES),
 } as const;

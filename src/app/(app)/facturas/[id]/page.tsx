@@ -374,7 +374,7 @@ export default async function InvoicePage({
                 </Field>
                 <Field label="Forma de pago">
                   <select className="input" name="method" defaultValue="transferencia">
-                    {entries(paymentMethodLabels).map(([value, label]) => (
+                    {entries(paymentMethodLabels).filter(([v]) => v !== "provision").map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
                       </option>

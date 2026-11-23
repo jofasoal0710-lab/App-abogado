@@ -5,7 +5,8 @@ import { todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { AGING_BUCKETS, AGING_LABELS, fmtHours, pct, PERIOD_PRESETS, resolvePeriod } from "@/lib/report-calc";
-import { aging, billing, collections, hoursByPerson, mattersByArea, profitabilityByArea } from "@/lib/reports";
+import Link from "next/link";
+import { aging, billing, collections, fundsInCustody, hoursByPerson, mattersByArea, profitabilityByArea } from "@/lib/reports";
 import { PrintButton } from "./print-button";
 
 export const metadata: Metadata = { title: "Reportes" };
@@ -62,9 +63,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const q = `desde=${p.from}&hasta=${p.to}`;
 
   const hours = await hoursByPerson(user, p, full ? undefined : user.id);
-  const [bill, cash, cartera, areas, profit] = full
-    ? await Promise.all([billing(user, p, today), collections(user, p), aging(user, today), mattersByArea(user, p), profitabilityByArea(user, p, today)])
-    : [null, null, null, null, null];
+  const [bill, cash, cartera, areas, profit, funds] = full
+    ? await Promise.all([billing(user, p, today), collections(user, p), aging(user, today), mattersByArea(user, p), profitabilityByArea(user, p, today), fundsInCustody(user)])
+    : [null, null, null, null, null, null];
 
   const totalMin = hours.reduce((s, h) => s + h.minutes, 0);
   const billMin = hours.reduce((s, h) => s + h.billableMinutes, 0);
@@ -288,6 +289,42 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <Empty />
             )}
           </Section>
+
+          {funds && (
+            <Section id="provisiones" title="Provisiones de fondos en custodia" subtitle={`Dinero de clientes que el despacho tiene hoy a cuenta de gastos y honorarios: ${formatMoney(funds.totalCents)}${funds.low ? ` · ${funds.low} con saldo bajo` : ""}.`}>
+              {funds.rows.length ? (
+                <table className="table w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Expediente</th>
+                      <th>Cliente</th>
+                      <th className="text-right">Saldo</th>
+                      <th className="text-right">Mínimo</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funds.rows.map((f) => (
+                      <tr key={f.matterId}>
+                        <td>
+                          <Link className="link" href={`/expedientes/${f.matterId}?tab=cobro#provision`}>
+                            {f.number}
+                          </Link>{" "}
+                          <span className="text-ink-500">{f.title}</span>
+                        </td>
+                        <td>{f.client}</td>
+                        <td className="text-right tabular-nums">{formatMoney(f.balanceCents)}</td>
+                        <td className="text-right tabular-nums">{f.minCents != null ? formatMoney(f.minCents) : "—"}</td>
+                        <td>{f.low ? <span className="badge-amber">Saldo bajo</span> : f.balanceCents <= 0 ? <span className="badge-gray">Agotada</span> : null}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-ink-500">Ningún expediente tiene provisión de fondos.</p>
+              )}
+            </Section>
+          )}
         </>
       )}
     </>

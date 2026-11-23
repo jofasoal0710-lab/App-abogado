@@ -4,11 +4,13 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { matterExpenses, matterFeeStages, matters } from "@/db/schema";
+import { matterExpenses, matterFeeStages, matterFunds, matters } from "@/db/schema";
 import { firstZodError, str, type ActionState } from "@/lib/actions";
 import { getAccessibleMatter } from "@/lib/access";
 import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requirePermission } from "@/lib/auth";
+import { FundError, payExpenseFromFunds } from "@/lib/funds-db";
+import { can } from "@/lib/permissions";
 import { todayISO } from "@/lib/dates";
 import { parseStages } from "@/lib/fees";
 import { parseMoneyToCents } from "@/lib/money";
@@ -52,6 +54,21 @@ export async function addExpenseAction(matterId: number, _prev: ActionState, for
   if (amount === null) return { error: "El importe no es válido." };
   const parsed = expenseSchema.safeParse({ kind: str(formData, "kind"), description: str(formData, "description"), amountCents: amount, spentOn: str(formData, "spentOn") || todayISO() });
   if (!parsed.success) return { error: firstZodError(parsed.error) };
+  if (formData.get("fromFunds") === "on") {
+    // Pagarlo con la provisión es mover dinero del cliente: exige poder registrar cobros.
+    if (!can(user, "facturacion.cobros")) return { error: "Para pagar con la provisión hace falta el permiso «Registrar cobros»." };
+    try {
+      await db.transaction(async (tx) => {
+        await stampSessionActor(tx);
+        await payExpenseFromFunds(tx, matterId, user.id, parsed.data);
+      });
+    } catch (err) {
+      if (err instanceof FundError) return { error: err.message };
+      throw err;
+    }
+    refresh(matterId);
+    return { ok: "Gasto registrado y pagado con la provisión de fondos." };
+  }
   await db.insert(matterExpenses).values({ ...parsed.data, matterId, createdById: user.id });
   refresh(matterId);
   return { ok: "Gasto registrado." };
@@ -63,6 +80,9 @@ export async function toggleExpenseAction(expenseId: number, matterId: number) {
   if (!(await getAccessibleMatter(user, matterId))) return;
   const [e] = await db.select({ reimbursedAt: matterExpenses.reimbursedAt }).from(matterExpenses).where(and(eq(matterExpenses.id, expenseId), eq(matterExpenses.matterId, matterId)));
   if (!e) return;
+  // Pagado con la provisión: no se «desmarca» (para corregirlo se borra el gasto y el dinero vuelve).
+  const [funded] = await db.select({ id: matterFunds.id }).from(matterFunds).where(eq(matterFunds.expenseId, expenseId)).limit(1);
+  if (funded) return;
   await asSessionActor((tx) => tx.update(matterExpenses).set({ reimbursedAt: e.reimbursedAt ? null : todayISO() }).where(eq(matterExpenses.id, expenseId)));
   refresh(matterId);
 }
@@ -70,6 +90,9 @@ export async function toggleExpenseAction(expenseId: number, matterId: number) {
 export async function deleteExpenseAction(expenseId: number, matterId: number) {
   const user = await requirePermission("facturacion.ver");
   if (!(await getAccessibleMatter(user, matterId))) return;
+  // Si lo pagó la provisión, borrarlo devuelve el dinero a la provisión: solo quien registra cobros.
+  const [funded] = await db.select({ id: matterFunds.id }).from(matterFunds).where(eq(matterFunds.expenseId, expenseId)).limit(1);
+  if (funded && !can(user, "facturacion.cobros")) return;
   await asActor(user.id, (tx) => tx.delete(matterExpenses).where(and(eq(matterExpenses.id, expenseId), eq(matterExpenses.matterId, matterId))));
   refresh(matterId);
 }

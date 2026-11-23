@@ -3,7 +3,8 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form";
 import { EmptyState, Field } from "@/components/ui";
 import { db } from "@/db";
-import { feeServices, invoices, matterExpenses, matterFeeStages, timeEntries, type Matter } from "@/db/schema";
+import { feeServices, invoices, matterExpenses, matterFeeStages, matterFunds, timeEntries, type Matter } from "@/db/schema";
+import { FundsSection } from "./funds-section";
 import { arancelItem, arancelMinimum, timbreColegio } from "@/lib/arancel";
 import { todayISO, formatDate } from "@/lib/dates";
 import { FEE_MODE_LABELS, profitability, stagesToText, suggestFee } from "@/lib/fees";
@@ -13,8 +14,8 @@ import { getFeeSettings, toGuideService } from "@/lib/tariff";
 import { addExpenseAction, deleteExpenseAction, setStagesAction, toggleExpenseAction } from "../billing-actions";
 
 /** Pestaña «Cobro»: cómo se cobra, etapas, rendimiento por hora y gastos (aparte de los honorarios). */
-export async function BillingTab({ matter, canEmit, defaultRateCents }: { matter: Matter; canEmit: boolean; defaultRateCents: number }) {
-  const [service, stages, expenses, hours, settings] = await Promise.all([
+export async function BillingTab({ matter, canEmit, canCollect, defaultRateCents }: { matter: Matter; canEmit: boolean; canCollect: boolean; defaultRateCents: number }) {
+  const [service, stages, expenses, hours, settings, funded] = await Promise.all([
     matter.serviceId ? db.select().from(feeServices).where(eq(feeServices.id, matter.serviceId)).then((r) => r[0] ?? null) : null,
     db
       .select({ id: matterFeeStages.id, name: matterFeeStages.name, amountCents: matterFeeStages.amountCents, invoiceId: matterFeeStages.invoiceId, number: invoices.number })
@@ -31,7 +32,9 @@ export async function BillingTab({ matter, canEmit, defaultRateCents }: { matter
       .from(timeEntries)
       .where(and(eq(timeEntries.matterId, matter.id))),
     getFeeSettings(),
+    db.select({ expenseId: matterFunds.expenseId }).from(matterFunds).where(and(eq(matterFunds.matterId, matter.id), eq(matterFunds.kind, "gasto"))),
   ]);
+  const fundedIds = new Set(funded.map((f) => f.expenseId));
   const h = hours[0];
   const perProcess = matter.billingType === "tarifa_fija";
   const fee = matter.fixedFeeCents ?? 0;
@@ -176,16 +179,26 @@ export async function BillingTab({ matter, canEmit, defaultRateCents }: { matter
                     <span className="block text-xs text-ink-500">{expenseKindLabels[e.kind]}</span>
                   </td>
                   <td className="text-right tabular-nums">{formatMoney(e.amountCents)}</td>
-                  <td>{e.reimbursedAt ? <span className="badge-green">Reembolsado {formatDate(e.reimbursedAt)}</span> : <span className="badge-amber">Pendiente</span>}</td>
+                  <td>
+                    {fundedIds.has(e.id) ? (
+                      <span className="badge-blue">Pagado con la provisión</span>
+                    ) : e.reimbursedAt ? (
+                      <span className="badge-green">Reembolsado {formatDate(e.reimbursedAt)}</span>
+                    ) : (
+                      <span className="badge-amber">Pendiente</span>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap">
-                    <form action={toggleExpenseAction.bind(null, e.id, matter.id)} className="inline">
-                      <button className="btn-ghost btn-sm">{e.reimbursedAt ? "Marcar pendiente" : "Marcar reembolsado"}</button>
-                    </form>
-                    <form action={deleteExpenseAction.bind(null, e.id, matter.id)} className="inline">
+                    {!fundedIds.has(e.id) && (
+                      <form action={toggleExpenseAction.bind(null, e.id, matter.id)} className="inline">
+                        <button className="btn-ghost btn-sm">{e.reimbursedAt ? "Marcar pendiente" : "Marcar reembolsado"}</button>
+                      </form>
+                    )}
+                    {(!fundedIds.has(e.id) || canCollect) && <form action={deleteExpenseAction.bind(null, e.id, matter.id)} className="inline">
                       <ConfirmButton message={`¿Borrar «${e.description}»?`} className="btn-ghost btn-sm text-red-700">
                         Borrar
                       </ConfirmButton>
-                    </form>
+                    </form>}
                   </td>
                 </tr>
               ))}
@@ -214,6 +227,11 @@ export async function BillingTab({ matter, canEmit, defaultRateCents }: { matter
           <div className="sm:col-span-1">
             <SubmitButton>Añadir gasto</SubmitButton>
           </div>
+          {canCollect && (
+            <label className="flex items-center gap-2 text-sm sm:col-span-6">
+              <input type="checkbox" name="fromFunds" /> Pagarlo con la provisión de fondos del cliente (queda reembolsado y se descuenta del saldo)
+            </label>
+          )}
           {timbre != null && (
             <p className="text-xs text-ink-500 sm:col-span-6">
               Timbre del Colegio de Abogados para una cuantía de {formatMoney(matter.feeBaseCents!)}: {timbre ? formatMoney(timbre) : "exento"} (arts. 107 y 108 del arancel).
@@ -221,6 +239,8 @@ export async function BillingTab({ matter, canEmit, defaultRateCents }: { matter
           )}
         </ActionForm>
       </section>
+
+      <FundsSection matter={matter} canCollect={canCollect} canEmit={canEmit} />
     </div>
   );
 }

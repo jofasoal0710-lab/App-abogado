@@ -39,6 +39,9 @@ export function buildCsp(nonce: string, env: Env = process.env): string {
     "img-src 'self' data: blob:",
     "font-src 'self'",
     `connect-src ${["'self'", ...s3Origins(env), ...(dev ? ["ws:"] : [])].join(" ")}`,
+    // Solo el service worker propio (public/sw.js), que no guarda datos privados.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

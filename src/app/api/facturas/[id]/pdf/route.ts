@@ -1,14 +1,9 @@
-import { and, asc, desc, eq } from "drizzle-orm";
-import { DOC_TYPES, type DocType } from "@/lib/einvoice/build";
-import { haciendaEnv } from "@/lib/einvoice/hacienda";
-import { einvoiceStatusLabels } from "@/lib/einvoice/labels";
-import { db } from "@/db";
+import { and, eq } from "drizzle-orm";
 import { invoices } from "@/db/schema";
 import { invoiceAccessSql } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { config } from "@/lib/config";
-import { buildInvoicePdf } from "@/lib/invoice-pdf";
+import { invoicePdfResponse, loadInvoiceForPdf } from "@/lib/invoice-pdf-response";
 import { logRead } from "@/lib/read-audit";
 
 export const dynamic = "force-dynamic";
@@ -22,58 +17,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const id = Number((await ctx.params).id);
   if (!Number.isInteger(id)) return new Response("No encontrado", { status: 404 });
 
-  const inv = await db.query.invoices.findFirst({
-    where: and(eq(invoices.id, id), invoiceAccessSql(user)),
-    with: {
-      client: true,
-      matter: true,
-      rectifies: true,
-      items: { orderBy: (i) => asc(i.id) },
-      rectifications: { where: (r) => eq(r.status, "emitida"), orderBy: (r) => asc(r.id) },
-      einvoices: { orderBy: (e) => desc(e.id) },
-    },
-  });
+  const inv = await loadInvoiceForPdf(and(eq(invoices.id, id), invoiceAccessSql(user)));
   if (!inv) return new Response("No encontrado", { status: 404 });
 
   const label = inv.number ?? `Borrador #${inv.id}`;
   // Descargar el PDF cuenta como lectura en expedientes restringidos/confidenciales y clientes confidenciales.
   await logRead(user, inv.matterId ? { matterId: inv.matterId, kind: "factura", detail: `PDF ${label}` } : { clientId: inv.clientId, kind: "factura", detail: `PDF ${label}` });
 
-  const pdf = await buildInvoicePdf({
-    firm: { name: config.firmName, taxId: config.firmTaxId, address: config.firmAddress },
-    invoice: {
-      number: inv.number,
-      status: inv.status,
-      kind: inv.kind,
-      issueDate: inv.issueDate,
-      dueDate: inv.dueDate,
-      taxRate: inv.taxRate,
-      withholdingRate: inv.withholdingRate,
-      notes: inv.notes,
-      rectificationReason: inv.rectificationReason,
-    },
-    client: { name: inv.client.name, taxId: inv.client.taxId, address: inv.client.address },
-    matter: inv.matter ? { number: inv.matter.number, title: inv.matter.title } : null,
-    items: inv.items,
-    rectifies: inv.rectifies ? { number: inv.rectifies.number, issueDate: inv.rectifies.issueDate } : null,
-    rectifiedBy: inv.rectifications.flatMap((r) => (r.number ? [r.number] : [])),
-    einvoice: (() => {
-      const env = haciendaEnv();
-      const e = inv.einvoices.find((x) => x.environment === env && x.status !== "rechazado" && x.status !== "no_recibido");
-      return e
-        ? { label: DOC_TYPES[e.docType as DocType], consecutive: e.consecutive, clave: e.clave, issuedAt: e.issuedAt, status: einvoiceStatusLabels[e.status] }
-        : null;
-    })(),
-  });
-
-  const fileName = `${(inv.number ?? `borrador-${inv.id}`).replace(/[^A-Za-z0-9._-]/g, "_")}.pdf`;
-  return new Response(Buffer.from(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName}"`,
-      "Content-Length": String(pdf.byteLength),
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return invoicePdfResponse(inv);
 }

@@ -28,6 +28,8 @@ import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction
 import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
 import { READ_VERBS } from "@/lib/read-audit";
 import { BillingTab } from "./billing-tab";
+import { toggleDocumentPortalAction } from "../../clientes/portal-actions";
+import { StartTimer } from "@/components/timer/timer-bar";
 
 export const metadata: Metadata = { title: "Expediente" };
 
@@ -51,7 +53,7 @@ export default async function MatterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; error?: string; nuevo?: string }>;
+  searchParams: Promise<{ tab?: string; error?: string; nuevo?: string; plantilla?: string }>;
 }) {
   const user = await requireUser();
   const id = Number((await params).id);
@@ -112,6 +114,7 @@ export default async function MatterPage({
         }
         actions={
           <>
+            <StartTimer user={user} matterId={id} />
             <Link href={`${base}/editar`} className="btn-secondary">
               Editar
             </Link>
@@ -126,6 +129,11 @@ export default async function MatterPage({
         }
       />
 
+      {sp.plantilla && Number(sp.plantilla) > 0 && (
+        <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Se crearon {Number(sp.plantilla)} pasos de la plantilla en el control de plazos.
+        </p>
+      )}
       {sp.error === "last_holder" && (
         <p role="alert" className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           No se puede quitar a la última persona activa con acceso a un expediente confidencial: nadie podría gestionarlo. Añade antes a otra persona.
@@ -215,7 +223,7 @@ export default async function MatterPage({
 
       {tab === "escritos" && <WritingsTab matterId={id} justCreated={sp.nuevo === "1"} />}
 
-      {tab === "documentos" && <DocumentsTab matterId={id} user={user} />}
+      {tab === "documentos" && <DocumentsTab matterId={id} user={user} portalShared={matter.portalShared} canShare={can(user, "clientes.gestionar_todos") || (can(user, "clientes.gestionar") && client.createdById === user.id)} clientId={client.id} />}
 
       {tab === "normativa" && <CitationsPanel matterId={id} />}
 
@@ -227,7 +235,7 @@ export default async function MatterPage({
 
       {tab === "acceso" && <AccessTab matter={matter} responsibleName={row.responsible} canManage={canManage} />}
 
-      {tab === "cobro" && seesBilling && <BillingTab matter={matter} canEmit={can(user, "facturacion.emitir")} defaultRateCents={user.hourlyRateCents} />}
+      {tab === "cobro" && seesBilling && <BillingTab matter={matter} canEmit={can(user, "facturacion.emitir")} canCollect={can(user, "facturacion.cobros")} defaultRateCents={user.hourlyRateCents} />}
 
       {tab === "facturas" && seesBilling && (
         <section className="card overflow-x-auto">
@@ -324,7 +332,7 @@ async function NotesTab({ matterId, userId, canDeleteAll }: { matterId: number; 
   );
 }
 
-async function DocumentsTab({ matterId, user }: { matterId: number; user: Awaited<ReturnType<typeof requireUser>> }) {
+async function DocumentsTab({ matterId, user, portalShared, canShare, clientId }: { matterId: number; user: Awaited<ReturnType<typeof requireUser>>; portalShared: boolean; canShare: boolean; clientId: number }) {
   const rows = await db
     .select({
       id: documents.id,
@@ -335,6 +343,7 @@ async function DocumentsTab({ matterId, user }: { matterId: number; user: Awaite
       uploader: users.name,
       matterId: documents.matterId,
       matterNumber: matters.number,
+      portalShared: documents.portalShared,
     })
     .from(documents)
     .innerJoin(matters, eq(matters.id, documents.matterId))
@@ -348,6 +357,29 @@ async function DocumentsTab({ matterId, user }: { matterId: number; user: Awaite
       <div className="card">
         <DocumentsTable rows={rows} user={user} showMatter={false} />
       </div>
+      {canShare && rows.length > 0 && (
+        <section className="card" id="portal-docs">
+          <div className="border-b border-ink-100 px-5 py-3">
+            <h2 className="font-serif text-lg font-semibold">Compartir con el cliente</h2>
+            <p className="text-xs text-ink-500">
+              {portalShared ? "Este expediente se ve en el portal del cliente: elige qué documentos puede descargar." : "Este expediente no está compartido en el portal: aunque marques documentos, el cliente no los verá hasta que lo compartas desde su ficha."}{" "}
+              <Link className="link" href={`/clientes/${clientId}#portal`}>
+                Portal del cliente
+              </Link>
+            </p>
+          </div>
+          <ul className="divide-y divide-ink-100">
+            {rows.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-2 text-sm">
+                <span className="min-w-0 truncate">{d.name}</span>
+                <form action={toggleDocumentPortalAction.bind(null, d.id, matterId)}>
+                  <button className={d.portalShared ? "btn-secondary btn-sm" : "btn-ghost btn-sm"}>{d.portalShared ? "Compartido · dejar de compartir" : "Compartir"}</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -396,12 +428,17 @@ async function AgendaTab({ matterId, base }: { matterId: number; base: string })
     <section className="card">
       <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
         <h2 className="font-serif text-lg font-semibold">Plazos y eventos</h2>
-        <Link
-          href={`/agenda/nuevo?expediente=${matterId}&returnTo=${encodeURIComponent(`${base}?tab=agenda`)}`}
-          className="btn-primary btn-sm"
-        >
-          Añadir
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`${base}/plantilla`} className="btn-secondary btn-sm">
+            Aplicar plantilla de proceso
+          </Link>
+          <Link
+            href={`/agenda/nuevo?expediente=${matterId}&returnTo=${encodeURIComponent(`${base}?tab=agenda`)}`}
+            className="btn-primary btn-sm"
+          >
+            Añadir
+          </Link>
+        </div>
       </div>
       <EventsList rows={rows} returnTo={`${base}?tab=agenda`} showMatter={false} empty="Este expediente no tiene eventos ni plazos" />
     </section>

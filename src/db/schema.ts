@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   bigint,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -73,7 +74,11 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "efectivo",
   "cheque",
   "otro",
+  /** Pagado con la provisión de fondos del expediente (lo registra la app, no se elige a mano). */
+  "provision",
 ]);
+/** Movimientos de la provisión de fondos: entra (depósito) o sale (gasto, aplicación a factura, devolución). */
+export const fundKindEnum = pgEnum("fund_kind", ["deposito", "gasto", "aplicacion", "devolucion"]);
 
 /* ---------- Tablas ---------- */
 // Todas las tablas llevan .enableRLS() (Row Level Security) SIN políticas. La app no se ve afectada:
@@ -194,6 +199,10 @@ export const matters = pgTable(
     suggestedFeeCents: bigint("suggested_fee_cents", { mode: "number" }),
     /** Tarifa por hora de este expediente; si falta, la de cada abogado. */
     hourlyRateCents: integer("hourly_rate_cents"),
+    /** Si el cliente lo ve en su portal (estado, audiencias, documentos compartidos, saldo). */
+    portalShared: boolean("portal_shared").notNull().default(false),
+    /** Aviso cuando la provisión de fondos baja de este saldo (céntimos). Null = sin aviso. */
+    fundsMinCents: bigint("funds_min_cents", { mode: "number" }),
     openedAt: date("opened_at").notNull().default(sql`current_date`),
     closedAt: date("closed_at"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -326,6 +335,8 @@ export const documents = pgTable(
     sizeBytes: integer("size_bytes").notNull(),
     /** Nombre del fichero dentro de UPLOAD_DIR (nunca el nombre original). */
     storageKey: text("storage_key").notNull().unique(),
+    /** Visible para el cliente en su portal (solo si además el expediente está compartido). */
+    portalShared: boolean("portal_shared").notNull().default(false),
     uploadedById: integer("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -951,6 +962,34 @@ export const matterExpenses = pgTable(
   (t) => [index("matter_expenses_matter_idx").on(t.matterId)],
 ).enableRLS();
 
+/**
+ * Provisión de fondos del expediente (dinero del cliente en custodia del despacho). Libro de movimientos:
+ * el saldo es la suma de depósitos menos gastos, aplicaciones a facturas y devoluciones; nunca puede ser
+ * negativo. Un gasto pagado con la provisión y un cobro aplicado desde ella se borran con su origen.
+ */
+export const matterFunds = pgTable(
+  "matter_funds",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    kind: fundKindEnum().notNull(),
+    /** Siempre positivo: el signo lo da el tipo. */
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    movedOn: date("moved_on").notNull().default(sql`current_date`),
+    description: text().notNull(),
+    method: paymentMethodEnum(),
+    reference: text(),
+    expenseId: integer("expense_id").references(() => matterExpenses.id, { onDelete: "cascade" }),
+    paymentId: integer("payment_id").references(() => payments.id, { onDelete: "cascade" }),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("matter_funds_matter_idx").on(t.matterId), check("matter_funds_amount_positive", sql`${t.amountCents} > 0`)],
+).enableRLS();
+export type MatterFund = typeof matterFunds.$inferSelect;
+
 export type FeeService = typeof feeServices.$inferSelect;
 export type MatterFeeStage = typeof matterFeeStages.$inferSelect;
 export type MatterExpense = typeof matterExpenses.$inferSelect;
@@ -1005,3 +1044,45 @@ export const backupRuns = pgTable(
   },
   (t) => [index("backup_runs_at_idx").on(t.at)],
 ).enableRLS();
+
+/**
+ * Cronómetro de horas en marcha (uno por persona como mucho). `startedAt` null = en pausa; lo ya medido
+ * en tramos anteriores se guarda en `accumulatedSeconds`. Al detenerlo se convierte en una entrada de horas.
+ */
+export const runningTimers = pgTable("running_timers", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  matterId: integer("matter_id")
+    .notNull()
+    .references(() => matters.id, { onDelete: "cascade" }),
+  description: text().notNull().default(""),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  accumulatedSeconds: integer("accumulated_seconds").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+export type RunningTimer = typeof runningTimers.$inferSelect;
+
+/**
+ * Enlaces de acceso al portal del cliente. Se guarda solo el hash SHA-256 del token (el enlace se muestra una
+ * vez). Caducan, se pueden revocar y cada uso se anota. El portal NO da acceso a la aplicación del despacho.
+ */
+export const portalLinks = pgTable(
+  "portal_links",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    /** Para quién es (p. ej. «Ana, gerente»): solo para reconocer el enlace en la lista. */
+    label: text().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("portal_links_client_idx").on(t.clientId)],
+).enableRLS();
+export type PortalLink = typeof portalLinks.$inferSelect;

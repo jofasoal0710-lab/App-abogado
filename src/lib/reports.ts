@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, matterExpenses, matters, payments, timeEntries, users } from "@/db/schema";
+import { clients, invoices, matterExpenses, matterFunds, matters, payments, timeEntries, users } from "@/db/schema";
 import { invoiceAccessSql, matterAccessSql } from "./access";
 import type { CurrentUser } from "./auth";
 import { loadAdjustments } from "./invoice-queries";
@@ -162,3 +162,22 @@ export async function profitabilityByArea(user: CurrentUser, p: Period, today: s
   return [...areas.values()].sort((a, b) => b.invoicedCents - a.invoicedCents || b.hoursValueCents - a.hoursValueCents);
 }
 
+
+/* ---------------- Provisión de fondos ---------------- */
+
+export type FundsRow = { matterId: number; number: string; title: string; client: string; balanceCents: number; minCents: number | null; low: boolean };
+
+/** Dinero de clientes en custodia hoy: saldo de la provisión de cada expediente con movimientos. */
+export async function fundsInCustody(user: CurrentUser): Promise<{ rows: FundsRow[]; totalCents: number; low: number }> {
+  const bal = sql<number>`coalesce(sum(case when ${matterFunds.kind} = 'deposito' then ${matterFunds.amountCents} else -${matterFunds.amountCents} end), 0)::float8`;
+  const rows = await db
+    .select({ matterId: matters.id, number: matters.number, title: matters.title, client: clients.name, minCents: matters.fundsMinCents, balanceCents: bal })
+    .from(matterFunds)
+    .innerJoin(matters, eq(matters.id, matterFunds.matterId))
+    .innerJoin(clients, eq(clients.id, matters.clientId))
+    .where(matterAccessSql(user, matters.id))
+    .groupBy(matters.id, clients.name)
+    .orderBy(sql`${bal} desc`);
+  const out = rows.map((r) => ({ ...r, balanceCents: Number(r.balanceCents), low: r.minCents != null ? Number(r.balanceCents) < r.minCents : false }));
+  return { rows: out, totalCents: out.reduce((s, r) => s + r.balanceCents, 0), low: out.filter((r) => r.low).length };
+}

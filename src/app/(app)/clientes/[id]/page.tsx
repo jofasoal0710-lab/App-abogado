@@ -11,6 +11,7 @@ import { Badge, EmptyState, Field, PageHeader } from "@/components/ui";
 import { db } from "@/db";
 import { clientAccessLog, invoices, matters, readAudit, users } from "@/db/schema";
 import { invoiceAccessSql, matterAccessSql, requireClientPage } from "@/lib/access";
+import { PortalSection } from "./portal-section";
 import { requireUser } from "@/lib/auth";
 import { formatDate, todayISO, formatDateTime } from "@/lib/dates";
 import { areaLabels, clientTypeLabels, invoiceStatusLabels, matterStatusLabels } from "@/lib/labels";
@@ -207,6 +208,8 @@ export default async function ClientPage({
             isPerson={client.type === "persona"}
           />
         </div>
+
+        {canManageClient && <PortalSection clientId={client.id} matters={clientMatters} />}
 
         {canManageClient && (
           <section className="card card-pad lg:col-span-3">

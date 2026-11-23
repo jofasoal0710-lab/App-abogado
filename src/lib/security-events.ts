@@ -24,6 +24,10 @@ export const SECURITY_EVENT_LABELS = {
   respaldo_descargado: "Copia de seguridad descargada",
   calendario_enlace_creado: "Enlace privado de calendario creado",
   calendario_enlace_revocado: "Enlace privado de calendario revocado",
+  portal_enlace_creado: "Enlace del portal del cliente creado",
+  portal_enlace_revocado: "Enlace del portal del cliente revocado",
+  portal_entrada: "Un cliente entró en su portal",
+  portal_descarga: "Un cliente descargó un documento o factura desde su portal",
 } as const;
 
 export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
