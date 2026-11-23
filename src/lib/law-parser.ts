@@ -114,6 +114,10 @@ export function articleNumbersFrom(spec: string | null | undefined): string[] {
       if (to >= from && to - from <= 30) for (let i = from; i <= to; i++) out.push(String(i));
       continue;
     }
+    // «Artículo único» (leyes de un solo artículo) y «66-C», «66-CH» (Ley del Impuesto sobre la Renta).
+    if (/^unico$/.test(part.trim())) { out.push("Único"); continue; }
+    const lettered = /^(\d+)-([a-z]{1,2})$/.exec(part.trim());
+    if (lettered) { out.push(`${lettered[1]}-${lettered[2].toUpperCase()}`); continue; }
     const one = /^(\d+|[ivxlcdm]+)\s*(bis|ter|quater|quinquies|sexies)?$/.exec(part.trim());
     if (one) out.push(normalizeArticleNumber(one[1], one[2]));
   }

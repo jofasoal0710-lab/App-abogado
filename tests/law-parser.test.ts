@@ -59,6 +59,8 @@ describe("textos de leyes: números citados", () => {
   it("interpreta listas, rangos y bis", () => {
     expect(articleNumbersFrom("29")).toEqual(["29"]);
     expect(articleNumbersFrom("28 y 29")).toEqual(["28", "29"]);
+    expect(articleNumbersFrom("Único")).toEqual(["Único"]);
+    expect(articleNumbersFrom("66-C y 66-ch")).toEqual(["66-C", "66-CH"]);
     expect(articleNumbersFrom("Artículos 1, 2 y 5")).toEqual(["1", "2", "5"]);
     expect(articleNumbersFrom("31 al 33")).toEqual(["31", "32", "33"]);
     expect(articleNumbersFrom("97 bis")).toEqual(["97 bis"]);
