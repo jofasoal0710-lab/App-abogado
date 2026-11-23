@@ -166,6 +166,9 @@ export default async function AgendaPage({
             <Link className={`px-3 py-1.5 ${weekView ? "bg-brand-600 text-white" : "bg-surface text-ink-700 hover:bg-ink-50"}`} href={`/agenda${qs({ vista: "semana", mios: mine ? "1" : "" })}`} aria-current={weekView ? "page" : undefined}>
               Semana
             </Link>
+            <Link className="bg-surface px-3 py-1.5 text-ink-700 hover:bg-ink-50" href={`/agenda/audiencias${qs({ mios: mine ? "1" : "" })}`}>
+              Audiencias
+            </Link>
           </div>
           <Link className="link text-sm" href={`/agenda${qs({ mes: month, vista: weekView ? "semana" : "", semana: weekView ? weekStart : "", mios: mine ? "" : "1" })}`}>
             {mine ? "Ver agenda de todo el equipo" : "Ver solo mi agenda"}

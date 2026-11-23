@@ -123,6 +123,8 @@ export const users = pgTable(
     mfaRecoveryHashes: jsonb("mfa_recovery_hashes").$type<string[]>(),
     /** Último intervalo de 30 s aceptado: un código ya usado no vale otra vez (anti-repetición). */
     mfaLastStep: bigint("mfa_last_step", { mode: "number" }),
+    /** Hash SHA-256 del token del enlace privado de calendario (.ics). Null = sin enlace. */
+    calendarTokenHash: text("calendar_token_hash"),
     /** Carné del Colegio de Abogados (sale en la firma de los escritos). */
     barNumber: text("bar_number"),
     /** Apariencia elegida (ver lib/theme.ts): modo claro/oscuro/sistema, paleta y estilo de la barra lateral. */
@@ -296,6 +298,10 @@ export const events = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     location: text(),
     notes: text(),
+    /** Solo audiencias: tipo (preliminar, juicio, conciliación…), modalidad y enlace de la sala virtual. */
+    hearingType: text("hearing_type"),
+    hearingMode: text("hearing_mode"),
+    meetingUrl: text("meeting_url"),
     assignedId: integer("assigned_id").references(() => users.id, { onDelete: "set null" }),
     completed: boolean().notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

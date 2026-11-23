@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Nuevo evento" };
 export default async function NewEventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ expediente?: string; returnTo?: string }>;
+  searchParams: Promise<{ expediente?: string; returnTo?: string; tipo?: string }>;
 }) {
   const user = await requireUser();
   const sp = await searchParams;
@@ -23,13 +23,14 @@ export default async function NewEventPage({
 
   return (
     <>
-      <PageHeader title="Nuevo evento o plazo" />
+      <PageHeader title={sp.tipo === "audiencia" ? "Nueva audiencia" : "Nuevo evento o plazo"} />
       <EventForm
         action={createEventAction}
         matters={options.matters}
         users={options.users}
         defaultMatterId={matterId}
         defaultAssignedId={user.id}
+        defaultKind={sp.tipo === "audiencia" || sp.tipo === "reunion" || sp.tipo === "tarea" ? sp.tipo : undefined}
         returnTo={returnTo}
       />
     </>

@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { canAccessEvent, canAccessMatterOrNone, canUserIdAccessMatter } from "@/
 import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-redirect";
+import { overlaps, safeMeetingUrl } from "@/lib/hearings";
 import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const eventSchema = z
@@ -23,6 +24,9 @@ const eventSchema = z
     assignedId: z.number().int().positive().nullable(),
     location: z.string().max(250).nullable(),
     notes: z.string().max(5000).nullable(),
+    hearingType: z.string().max(120).nullable(),
+    hearingMode: z.enum(["presencial", "virtual", "mixta"]).nullable(),
+    meetingUrl: z.string().max(1000).nullable(),
   })
   .refine((v) => !v.endsAt || v.endsAt >= v.startsAt, {
     message: "La hora de fin no puede ser anterior al inicio",
@@ -37,7 +41,16 @@ function parseDateTime(value: string): Date | undefined {
 
 function parseEvent(formData: FormData) {
   const endsRaw = str(formData, "endsAt");
+  const isHearing = str(formData, "kind") === "audiencia";
+  const rawUrl = optStr(formData, "meetingUrl");
+  const meetingUrl = isHearing ? safeMeetingUrl(rawUrl) : null;
+  if (isHearing && rawUrl && !meetingUrl) {
+    return { success: false as const, error: new z.ZodError([{ code: "custom", path: ["meetingUrl"], message: "El enlace de la sala virtual debe empezar por https://", input: rawUrl }]) };
+  }
   return eventSchema.safeParse({
+    hearingType: isHearing ? optStr(formData, "hearingType") : null,
+    hearingMode: isHearing ? optStr(formData, "hearingMode") : null,
+    meetingUrl,
     title: str(formData, "title"),
     kind: str(formData, "kind"),
     startsAt: parseDateTime(str(formData, "startsAt")),
@@ -62,6 +75,24 @@ async function checkEventAccess(
   return null;
 }
 
+/**
+ * Choque de audiencias: la misma persona no puede estar en dos audiencias a la vez. Devuelve un aviso,
+ * salvo que se haya marcado «guardar aunque choque».
+ */
+async function hearingClash(data: { kind: string; assignedId: number | null; startsAt: Date; endsAt: Date | null }, formData: FormData, exceptId?: number): Promise<string | null> {
+  if (data.kind !== "audiencia" || !data.assignedId || formData.get("ignorarChoque") === "on") return null;
+  const dayStart = new Date(data.startsAt.getTime() - 24 * 3600_000);
+  const dayEnd = new Date(data.startsAt.getTime() + 24 * 3600_000);
+  const others = await db
+    .select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt })
+    .from(events)
+    .where(and(eq(events.kind, "audiencia"), eq(events.assignedId, data.assignedId), eq(events.completed, false), gte(events.startsAt, dayStart), lt(events.startsAt, dayEnd), exceptId ? ne(events.id, exceptId) : undefined));
+  const clash = others.find((o) => overlaps(o, data));
+  if (!clash) return null;
+  const hhmm = clash.startsAt.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit" });
+  return `Choque de horario: la persona responsable ya tiene «${clash.title}» a las ${hhmm} ese día. Cambia la hora o el responsable, o marca «Guardar aunque choque».`;
+}
+
 function revalidateAgenda(matterId?: number | null) {
   revalidatePath("/agenda");
   revalidatePath("/");
@@ -74,6 +105,8 @@ export async function createEventAction(_prev: ActionState, formData: FormData):
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const denied = await checkEventAccess(user, parsed.data.matterId, parsed.data.assignedId);
   if (denied) return { error: denied };
+  const clash = await hearingClash(parsed.data, formData);
+  if (clash) return { error: clash };
 
   await db.insert(events).values(parsed.data);
   revalidateAgenda(parsed.data.matterId);
@@ -91,6 +124,8 @@ export async function updateEventAction(
   if (!parsed.success) return { error: firstZodError(parsed.error) };
   const denied = await checkEventAccess(user, parsed.data.matterId, parsed.data.assignedId);
   if (denied) return { error: denied };
+  const clash = await hearingClash(parsed.data, formData, id);
+  if (clash) return { error: clash };
 
   await asSessionActor((tx) => tx.update(events).set(parsed.data).where(eq(events.id, id)));
   revalidateAgenda(parsed.data.matterId);

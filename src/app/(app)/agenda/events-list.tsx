@@ -5,6 +5,7 @@ import type { eventKindEnum } from "@/db/schema";
 import { dayKey, daysUntil, formatDate, formatTime, todayISO } from "@/lib/dates";
 import { countdown, URGENCY, urgencyOf } from "@/lib/deadlines";
 import { eventKindLabels } from "@/lib/labels";
+import { HEARING_MODES } from "@/lib/hearings";
 import { deleteEventAction, toggleEventAction } from "./actions";
 
 export type EventRow = {
@@ -14,6 +15,9 @@ export type EventRow = {
   startsAt: Date;
   endsAt: Date | null;
   location: string | null;
+  hearingType?: string | null;
+  hearingMode?: string | null;
+  meetingUrl?: string | null;
   completed: boolean;
   matterId: number | null;
   matterNumber: string | null;
@@ -54,7 +58,11 @@ export function EventsList({
               </button>
             </form>
             <div className="min-w-0 flex-1">
-              <p className={e.completed ? "text-ink-500 line-through" : "font-medium text-ink-900"}>{e.title}</p>
+              <p className={e.completed ? "text-ink-500 line-through" : "font-medium text-ink-900"}>
+                {e.title}
+                {e.kind === "audiencia" && e.hearingType && <span className="ml-2 text-xs font-normal text-ink-600">{e.hearingType}</span>}
+                {e.kind === "audiencia" && e.hearingMode && <span className="badge-gray ml-2 align-middle">{HEARING_MODES[e.hearingMode as keyof typeof HEARING_MODES] ?? e.hearingMode}</span>}
+              </p>
               <p className="mt-0.5 text-xs text-ink-500">
                 {formatDate(e.startsAt)} · {formatTime(e.startsAt)}
                 {e.endsAt && `–${formatTime(e.endsAt)}`}
@@ -76,7 +84,15 @@ export function EventsList({
               </p>
             </div>
             <div className="flex items-center gap-1">
+              {e.meetingUrl && !e.completed && (
+                <a className="btn-primary btn-sm" href={e.meetingUrl} target="_blank" rel="noopener noreferrer">
+                  Unirse
+                </a>
+              )}
               <Badge kind="event" value={e.kind} label={eventKindLabels[e.kind]} />
+              <a className="btn-ghost btn-sm" href={`/api/agenda/${e.id}/ics`} title="Añadir a mi calendario (.ics)" aria-label={`Añadir «${e.title}» a mi calendario`}>
+                .ics
+              </a>
               <Link className="btn-ghost btn-sm" href={`/agenda/${e.id}/editar?returnTo=${encodeURIComponent(returnTo)}`}>
                 Editar
               </Link>

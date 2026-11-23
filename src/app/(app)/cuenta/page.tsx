@@ -11,6 +11,8 @@ import { closeOtherSessionsAction } from "./actions";
 import { PasswordForm } from "./password-form";
 import { AppearanceForm } from "./appearance-form";
 import { MfaSection } from "./mfa-section";
+import { CalendarLinkCreator } from "./calendar-link";
+import { revokeCalendarLinkAction } from "./calendar-actions";
 import { currentTheme } from "@/lib/theme-server";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
@@ -27,7 +29,7 @@ function browserOf(ua: string | null): string {
 
 export default async function AccountPage() {
   const user = await requireUser();
-  const [me] = await db.select({ passwordChangedAt: users.passwordChangedAt }).from(users).where(eq(users.id, user.id));
+  const [me] = await db.select({ passwordChangedAt: users.passwordChangedAt, calendar: users.calendarTokenHash }).from(users).where(eq(users.id, user.id));
   const currentHash = hashSessionId((await readSessionCookie())?.sid ?? "");
   const open = await db
     .select()
@@ -41,6 +43,29 @@ export default async function AccountPage() {
       <PageHeader title="Mi cuenta" subtitle={`${user.name} · ${user.email} · ${user.roleName}`} />
 
       <MfaSection user={user} />
+
+      <section id="calendario" className="card card-pad mb-6">
+        <h2 className="mb-1 font-serif text-lg font-semibold">
+          Calendario en tu teléfono {me?.calendar ? <span className="badge-green ml-2 align-middle">Enlace activo</span> : null}
+        </h2>
+        <p className="mb-4 text-sm text-ink-600">
+          Suscribe Google Calendar, Outlook o el calendario del iPhone a tus audiencias, plazos y reuniones asignados (se actualiza solo, cada pocas horas). De los expedientes confidenciales solo se publica el tipo y la hora. Las notas nunca salen de la app.
+        </p>
+        <CalendarLinkCreator hasLink={!!me?.calendar} />
+        {me?.calendar && (
+          <form action={revokeCalendarLinkAction} className="mt-3">
+            <button className="text-sm text-red-700 hover:underline">Revocar el enlace (deja de funcionar al instante)</button>
+          </form>
+        )}
+        <details className="mt-3 text-sm text-ink-600">
+          <summary className="cursor-pointer">Cómo añadirlo</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Google Calendar (en la computadora): Otros calendarios → «+» → Desde URL → pega el enlace.</li>
+            <li>Outlook: Agregar calendario → Suscribirse desde la web → pega el enlace.</li>
+            <li>iPhone: Ajustes → Calendario → Cuentas → Añadir cuenta → Otra → Añadir calendario suscrito.</li>
+          </ul>
+        </details>
+      </section>
 
       <section id="apariencia" className="card card-pad mb-6">
         <h2 className="mb-1 font-serif text-lg font-semibold">Apariencia</h2>

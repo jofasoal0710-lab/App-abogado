@@ -22,6 +22,8 @@ export const SECURITY_EVENT_LABELS = {
   mfa_fallido: "Código de verificación incorrecto",
   mfa_recuperacion_usada: "Entrada con un código de recuperación",
   respaldo_descargado: "Copia de seguridad descargada",
+  calendario_enlace_creado: "Enlace privado de calendario creado",
+  calendario_enlace_revocado: "Enlace privado de calendario revocado",
 } as const;
 
 export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
