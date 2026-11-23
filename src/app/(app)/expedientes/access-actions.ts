@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { stampSessionActor } from "@/lib/data-audit";
 import { db } from "@/db";
 import { clients, matterMembers, matters, users } from "@/db/schema";
 import { intOrNull, str, type ActionState } from "@/lib/actions";
@@ -58,6 +59,7 @@ export async function setVisibilityAction(matterId: number, _prev: ActionState, 
 
   // Todo o nada: el cambio, su anotación en el historial y la reasignación de eventos.
   const moved = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     await tx.update(matters).set({ visibility: target }).where(eq(matters.id, matterId));
     await logAccessChange(matterId, ctx.user.id, "visibilidad", `Visibilidad: ${describeVisibility(target)}`, tx);
     return reassignLostAccessEvents(matterId, ctx.user.id, tx);
@@ -76,6 +78,7 @@ export async function addMemberAction(matterId: number, _prev: ActionState, form
   if (!target) return { error: "Esa persona no existe o está inactiva." };
 
   const added = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     const inserted = await tx
       .insert(matterMembers)
       .values({ matterId, userId, addedById: ctx.user.id })
@@ -101,6 +104,7 @@ export async function removeMemberAction(matterId: number, userId: number) {
   }
 
   const removed = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     const [row] = await tx
       .delete(matterMembers)
       .where(and(eq(matterMembers.matterId, matterId), eq(matterMembers.userId, userId)))
@@ -132,6 +136,7 @@ export async function claimOrphanMatterAction(matterId: number, _prev: ActionSta
   if (!target) return { error: "Ese expediente no está huérfano: aún tiene alguna persona activa con acceso." };
 
   await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     await tx.update(matters).set({ responsibleId: admin.id }).where(eq(matters.id, matterId));
     await logAccessChange(matterId, admin.id, "reclamacion", `Acceso reclamado por ${admin.name} (expediente confidencial sin titular activo). Motivo: ${reason}`, tx);
   });

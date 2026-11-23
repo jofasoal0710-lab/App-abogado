@@ -155,6 +155,20 @@
       "when": 1795203246586,
       "tag": "0021_tarifario",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795401739546,
+      "tag": "0022_controles",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795402049174,
+      "tag": "0023_mfa",
+      "breakpoints": true
     }
   ]
 }

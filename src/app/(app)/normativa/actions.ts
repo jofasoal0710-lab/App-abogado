@@ -14,6 +14,7 @@ import { parseLawText } from "@/lib/law-parser";
 import { replaceLawText } from "@/lib/laws";
 import { getNorm } from "@/lib/normativa";
 import { redirect } from "next/navigation";
+import { asActor } from "@/lib/data-audit";
 
 const schema = z.object({
   normKey: z.string().nullable(),
@@ -56,7 +57,7 @@ export async function addCitationAction(matterId: number, _prev: ActionState, fo
 export async function deleteCitationAction(matterId: number, citationId: number) {
   const user = await requireUser();
   if (!(await getAccessibleMatter(user, matterId))) return;
-  await db.delete(matterCitations).where(and(eq(matterCitations.id, citationId), eq(matterCitations.matterId, matterId)));
+  await asActor(user.id, (tx) => tx.delete(matterCitations).where(and(eq(matterCitations.id, citationId), eq(matterCitations.matterId, matterId))));
   revalidatePath(`/expedientes/${matterId}`);
 }
 

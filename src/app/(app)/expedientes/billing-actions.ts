@@ -13,6 +13,7 @@ import { todayISO } from "@/lib/dates";
 import { parseStages } from "@/lib/fees";
 import { parseMoneyToCents } from "@/lib/money";
 import { replaceMatterStages } from "@/lib/tariff";
+import { stampSessionActor, asSessionActor, asActor } from "@/lib/data-audit";
 
 const refresh = (matterId: number) => revalidatePath(`/expedientes/${matterId}`);
 
@@ -24,6 +25,7 @@ export async function setStagesAction(matterId: number, _prev: ActionState, form
   const parsed = parseStages(str(formData, "stages"));
   if ("error" in parsed) return { error: parsed.error };
   return db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     // Se bloquea el expediente: dos cambios simultáneos de etapas no se mezclan.
     const [m] = await tx.select({ billingType: matters.billingType, fee: matters.fixedFeeCents }).from(matters).where(eq(matters.id, matterId)).for("update");
     if (m.billingType !== "tarifa_fija" || !m.fee) return { error: "Las etapas solo se usan cuando se cobra por proceso con un monto total." };
@@ -61,13 +63,13 @@ export async function toggleExpenseAction(expenseId: number, matterId: number) {
   if (!(await getAccessibleMatter(user, matterId))) return;
   const [e] = await db.select({ reimbursedAt: matterExpenses.reimbursedAt }).from(matterExpenses).where(and(eq(matterExpenses.id, expenseId), eq(matterExpenses.matterId, matterId)));
   if (!e) return;
-  await db.update(matterExpenses).set({ reimbursedAt: e.reimbursedAt ? null : todayISO() }).where(eq(matterExpenses.id, expenseId));
+  await asSessionActor((tx) => tx.update(matterExpenses).set({ reimbursedAt: e.reimbursedAt ? null : todayISO() }).where(eq(matterExpenses.id, expenseId)));
   refresh(matterId);
 }
 
 export async function deleteExpenseAction(expenseId: number, matterId: number) {
   const user = await requirePermission("facturacion.ver");
   if (!(await getAccessibleMatter(user, matterId))) return;
-  await db.delete(matterExpenses).where(and(eq(matterExpenses.id, expenseId), eq(matterExpenses.matterId, matterId)));
+  await asActor(user.id, (tx) => tx.delete(matterExpenses).where(and(eq(matterExpenses.id, expenseId), eq(matterExpenses.matterId, matterId))));
   refresh(matterId);
 }

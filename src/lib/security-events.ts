@@ -16,6 +16,12 @@ export const SECURITY_EVENT_LABELS = {
   rol_creado: "Rol creado",
   rol_modificado: "Permisos de un rol modificados",
   rol_eliminado: "Rol eliminado",
+  mfa_activado: "Verificación en dos pasos activada",
+  mfa_desactivado: "Verificación en dos pasos desactivada por su titular",
+  mfa_restablecido: "Verificación en dos pasos restablecida por un administrador",
+  mfa_fallido: "Código de verificación incorrecto",
+  mfa_recuperacion_usada: "Entrada con un código de recuperación",
+  respaldo_descargado: "Copia de seguridad descargada",
 } as const;
 
 export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
@@ -30,4 +36,8 @@ export const NOTABLE_EVENTS: ReadonlySet<SecurityEventKind> = new Set([
   "usuario_desactivado",
   "rol_modificado",
   "rol_eliminado",
+  "mfa_desactivado",
+  "mfa_restablecido",
+  "mfa_recuperacion_usada",
+  "respaldo_descargado",
 ]);

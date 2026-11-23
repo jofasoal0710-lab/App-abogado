@@ -206,7 +206,9 @@ La pantalla **Recordatorios** (administradores) permite enviar un correo de prue
 
 ### Riesgos aceptados (revisados en la auditoría OWASP)
 
-- **Sin verificación en dos pasos (2FA).** Mitigado con contraseñas de al menos 10 caracteres elegidas por cada persona, límites de intentos, sesiones de 12 h revocables y registro de seguridad. Recomendable añadirla para administradores en una fase futura.
+- **Verificación en dos pasos (TOTP) opcional por persona** (Mi cuenta), con códigos de recuperación y restablecimiento por un administrador. No es obligatoria: actívala al menos en las cuentas de administración.
+- **Copias de seguridad diarias** en el bucket (`respaldos/`, últimas 30), descargables por administradores, y restauración con `npm run db:restore` (ver DEPLOY-RENDER.md, sección 7).
+- **Registro de cambios y borrados** (tabla `data_audit`, por disparadores de PostgreSQL): quién cambió o borró qué y cuándo, con la fila borrada completa durante un año; no se puede modificar desde la app.
 - **`pdf-lib` sin versiones nuevas desde 2021.** Solo se usa para **generar** PDF con datos de la propia app (nunca para leer PDF de terceros), lo que deja poca superficie. Revisar si aparece una vulnerabilidad o si se amplía el uso de PDF.
 - **CSP con estilos en línea permitidos** (`style-src 'unsafe-inline'`): los estilos no ejecutan código; los scripts sí van restringidos por *nonce*.
 - **La página 404 de rutas inexistentes** es estática y no lleva *nonce*: no necesita JavaScript (sus enlaces funcionan igual).

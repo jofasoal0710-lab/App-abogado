@@ -16,6 +16,7 @@ import { getAccessibleWriting } from "@/lib/writings";
 import { getNotaryProfile } from "@/lib/notary";
 import { can } from "@/lib/permissions";
 import type { Values } from "@/lib/forms/engine";
+import { stampSessionActor, asSessionActor, asActor } from "@/lib/data-audit";
 
 /** Datos de protocolo de una escritura generada con formulario (número, tomo, folio, fecha, hora). */
 function deedData(v: Values) {
@@ -60,6 +61,7 @@ export async function createWritingAction(templateKey: string, matterId: number 
   }
 
   const row = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     const [w] = await tx.insert(writings).values({ matterId, templateKey: tpl.key, kind: tpl.kind, title, values, createdById: user.id }).returning({ id: writings.id });
     if (notary && dd.number) {
       const [d] = await tx
@@ -97,8 +99,8 @@ export async function updateWritingAction(id: number, _prev: ActionState, formDa
     const [dup] = await db.select({ id: deeds.id }).from(deeds).where(and(eq(deeds.notaryId, deed.notaryId), eq(deeds.number, dd.number)));
     if (dup && dup.id !== deed.id) return { error: `El número ${dd.number} ya lo usa otra escritura del protocolo.` };
   }
-  await db.update(writings).set({ values, title, updatedAt: new Date() }).where(eq(writings.id, id));
-  if (deed && dd.number) await db.update(deeds).set({ number: dd.number, volume: dd.volume, folioStart: dd.folioStart, grantedOn: dd.grantedOn, grantedAt: dd.grantedAt }).where(eq(deeds.id, deed.id));
+  await asSessionActor((tx) => tx.update(writings).set({ values, title, updatedAt: new Date() }).where(eq(writings.id, id)));
+  if (deed && dd.number) await asSessionActor((tx) => tx.update(deeds).set({ number: dd.number!, volume: dd.volume, folioStart: dd.folioStart, grantedOn: dd.grantedOn, grantedAt: dd.grantedAt }).where(eq(deeds.id, deed.id)));
   if (w.matterId !== null) revalidatePath(`/expedientes/${w.matterId}`);
   redirect(`/escritos/${id}?guardado=1`);
 }
@@ -110,6 +112,6 @@ export async function deleteWritingAction(id: number) {
   // Lo borra quien lo redactó o quien puede borrar documentos.
   const { can } = await import("@/lib/permissions");
   if (w.createdById !== user.id && !can(user, "documentos.borrar")) redirect(`/escritos/${id}?error=forbidden`);
-  await db.delete(writings).where(and(eq(writings.id, id)));
+  await asActor(user.id, (tx) => tx.delete(writings).where(and(eq(writings.id, id))));
   redirect(w.matterId !== null ? `/expedientes/${w.matterId}?tab=escritos` : "/formularios");
 }

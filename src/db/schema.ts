@@ -116,6 +116,13 @@ export const users = pgTable(
      */
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+    /** Segundo factor (TOTP, RFC 6238): secreto cifrado con AES-256-GCM (ver lib/mfa.ts). Null = sin activar. */
+    mfaSecret: text("mfa_secret"),
+    mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
+    /** Hashes SHA-256 de los códigos de recuperación de un solo uso que quedan. */
+    mfaRecoveryHashes: jsonb("mfa_recovery_hashes").$type<string[]>(),
+    /** Último intervalo de 30 s aceptado: un código ya usado no vale otra vez (anti-repetición). */
+    mfaLastStep: bigint("mfa_last_step", { mode: "number" }),
     /** Carné del Colegio de Abogados (sale en la firma de los escritos). */
     barNumber: text("bar_number"),
     /** Apariencia elegida (ver lib/theme.ts): modo claro/oscuro/sistema, paleta y estilo de la barra lateral. */
@@ -957,3 +964,38 @@ export type ReminderLog = typeof reminderLog.$inferSelect;
 export type SecurityEvent = typeof securityEvents.$inferSelect;
 export type MatterMember = typeof matterMembers.$inferSelect;
 export type ReadAudit = typeof readAudit.$inferSelect;
+
+/**
+ * Registro de cambios y borrados (SEC-004). Lo rellenan disparadores de PostgreSQL (migración 0022), así
+ * que cubre cualquier camino, incluidos los borrados en cascada: guarda la fila borrada completa (para
+ * poder reconstruirla) y, en las modificaciones, solo los campos que cambiaron. Nunca guarda hashes de
+ * contraseña ni secretos. Quién lo hizo: el usuario que la app fija en la transacción (lib/data-audit.ts).
+ */
+export const dataAudit = pgTable(
+  "data_audit",
+  {
+    id: bigint({ mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    tableName: text("table_name").notNull(),
+    op: text().notNull(),
+    rowId: text("row_id"),
+    actorId: integer("actor_id"),
+    data: jsonb().notNull(),
+  },
+  (t) => [index("data_audit_at_idx").on(t.at), index("data_audit_row_idx").on(t.tableName, t.rowId)],
+).enableRLS();
+
+/** Copias de seguridad automáticas de la base de datos en el almacenamiento (lib/backup.ts). */
+export const backupRuns = pgTable(
+  "backup_runs",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    storageKey: text("storage_key"),
+    bytes: bigint({ mode: "number" }),
+    rows: integer(),
+    ok: boolean().notNull(),
+    error: text(),
+  },
+  (t) => [index("backup_runs_at_idx").on(t.at)],
+).enableRLS();

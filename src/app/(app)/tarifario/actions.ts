@@ -11,6 +11,7 @@ import { ARANCEL_AREAS, arancelItem } from "@/lib/arancel";
 import { requirePermission } from "@/lib/auth";
 import { parsePercentToBp, parseStages } from "@/lib/fees";
 import { parseMoneyToCents } from "@/lib/money";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 /** Quien emite facturas define los precios del despacho. */
 const MANAGE = "facturacion.emitir" as const;
@@ -87,7 +88,7 @@ export async function updateServiceAction(id: number, _prev: ActionState, formDa
   await requirePermission(MANAGE);
   const r = parseService(formData);
   if ("error" in r) return { error: r.error };
-  const done = await db.update(feeServices).set({ ...r.data!, updatedAt: new Date() }).where(eq(feeServices.id, id)).returning({ id: feeServices.id });
+  const done = await asSessionActor((tx) => tx.update(feeServices).set({ ...r.data!, updatedAt: new Date() }).where(eq(feeServices.id, id)).returning({ id: feeServices.id }));
   if (!done.length) return { error: "El servicio ya no existe." };
   revalidatePath("/tarifario");
   redirect("/tarifario?ok=guardado");
@@ -95,8 +96,8 @@ export async function updateServiceAction(id: number, _prev: ActionState, formDa
 
 /** Borra un servicio (los expedientes que lo usaban conservan su monto pactado). */
 export async function deleteServiceAction(id: number) {
-  await requirePermission(MANAGE);
-  await db.delete(feeServices).where(eq(feeServices.id, id));
+  const admin = await requirePermission(MANAGE);
+  await asActor(admin.id, (tx) => tx.delete(feeServices).where(eq(feeServices.id, id)));
   revalidatePath("/tarifario");
   redirect("/tarifario?ok=borrado");
 }

@@ -14,6 +14,7 @@ import { isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { deleteFile, newStorageKey, objectSize, presignUpload, saveFile, storageDriver } from "@/lib/storage";
 import { signUploadToken, verifyUploadToken } from "@/lib/upload-token";
 import { can } from "@/lib/permissions";
+import { asActor } from "@/lib/data-audit";
 
 export async function uploadDocumentAction(
   matterId: number,
@@ -67,7 +68,7 @@ export async function deleteDocumentAction(documentId: number) {
   if (!can(user, "documentos.borrar")) return;
   if (!(await canAccessDocument(user, documentId))) return;
 
-  const [doc] = await db.delete(documents).where(eq(documents.id, documentId)).returning();
+  const [doc] = await asActor(user.id, (tx) => tx.delete(documents).where(eq(documents.id, documentId)).returning());
   if (!doc) return;
   await deleteFile(doc.storageKey);
   revalidatePath("/documentos");

@@ -1,5 +1,5 @@
 import "server-only";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents } from "@/db/schema";
 import { deleteFile, isAppKey, listStoredObjects, storageDriver } from "./storage";
@@ -53,10 +53,26 @@ export async function cleanupOrphanUploads(olderThanMinutes = orphanMinutes()): 
 const g = globalThis as unknown as { __lastMaintenance?: number };
 
 /** Como mucho una vez cada MAINTENANCE_INTERVAL_MINUTES (60) por proceso. Devuelve null si aún no tocaba. */
-export async function runMaintenance(): Promise<{ orphanUploads: OrphanCleanup } | null> {
+export async function runMaintenance(): Promise<{ orphanUploads: OrphanCleanup; backup: string | null } | null> {
   const n = Number(process.env.MAINTENANCE_INTERVAL_MINUTES);
   const interval = (Number.isFinite(n) && n >= 0 ? n : 60) * 60_000;
   if (Date.now() - (g.__lastMaintenance ?? 0) < interval) return null;
   g.__lastMaintenance = Date.now();
-  return { orphanUploads: await cleanupOrphanUploads() };
+  const orphanUploads = await cleanupOrphanUploads();
+  // Conservación (Ley 8968: lo justo): registro de cambios un año, historial de copias 90 días.
+  await db.execute(sql`delete from data_audit where at < now() - interval '365 days'`);
+  await db.execute(sql`delete from backup_runs where at < now() - interval '90 days'`);
+  // Copia de seguridad diaria (SEC-001). Un fallo queda en backup_runs y se ve en /seguridad/respaldos.
+  let backup: string | null = null;
+  try {
+    const { runDailyBackup } = await import("./backup");
+    const r = await runDailyBackup();
+    if (r) {
+      backup = r.key;
+      console.log(`[respaldo] copia creada: ${r.key} (${r.rows} filas, ${Math.round(r.bytes / 1024)} KB)`);
+    }
+  } catch (err) {
+    console.error("[respaldo] error:", err);
+  }
+  return { orphanUploads, backup };
 }

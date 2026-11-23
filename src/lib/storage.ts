@@ -160,3 +160,72 @@ export async function deleteFile(key: string): Promise<void> {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
 }
+
+/* ---------------- copias de seguridad ---------------- */
+
+/** Claves de las copias de seguridad: «respaldos/respaldo-AAAA-MM-DDTHH-MM-SS.json.gz» (nunca un documento). */
+export const BACKUP_KEY_PATTERN = /^respaldos\/respaldo-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json\.gz$/;
+
+function assertBackupKey(key: string) {
+  if (!BACKUP_KEY_PATTERN.test(key)) throw new Error("Clave de copia de seguridad no válida");
+}
+
+function localBackupPath(key: string) {
+  assertBackupKey(key);
+  return path.join(baseDir(), key);
+}
+
+export async function saveBackupObject(key: string, data: Buffer): Promise<void> {
+  assertBackupKey(key);
+  if (storageDriver() === "s3") {
+    await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: data, ContentType: "application/gzip" }));
+    return;
+  }
+  await mkdir(path.join(baseDir(), "respaldos"), { recursive: true });
+  await writeFile(localBackupPath(key), data);
+}
+
+export async function readBackupObject(key: string): Promise<Buffer | null> {
+  assertBackupKey(key);
+  try {
+    if (storageDriver() === "s3") {
+      const r = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+      return r.Body ? Buffer.from(await r.Body.transformToByteArray()) : null;
+    }
+    return await readFile(localBackupPath(key));
+  } catch {
+    return null;
+  }
+}
+
+export async function listBackupObjects(): Promise<string[]> {
+  if (storageDriver() === "s3") {
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await s3().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: "respaldos/", ContinuationToken: token }));
+      for (const o of page.Contents ?? []) if (o.Key && BACKUP_KEY_PATTERN.test(o.Key)) keys.push(o.Key);
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return keys.sort();
+  }
+  const { readdir } = await import("node:fs/promises");
+  try {
+    return (await readdir(path.join(baseDir(), "respaldos"))).map((f) => `respaldos/${f}`).filter((k) => BACKUP_KEY_PATTERN.test(k)).sort();
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteBackupObject(key: string): Promise<void> {
+  assertBackupKey(key);
+  if (storageDriver() === "s3") {
+    await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+    return;
+  }
+  try {
+    await unlink(localBackupPath(key));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}

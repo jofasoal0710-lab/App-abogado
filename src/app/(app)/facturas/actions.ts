@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { stampSessionActor } from "@/lib/data-audit";
 import { db } from "@/db";
 import { invoiceItems, invoices, matterFeeStages, matters, payments, timeEntries, type Invoice } from "@/db/schema";
 import { firstZodError, intOrNull, optStr, str, type ActionState } from "@/lib/actions";
@@ -77,6 +78,7 @@ export async function createInvoiceAction(_prev: ActionState, formData: FormData
   let invoiceId: number;
   try {
     invoiceId = await db.transaction(async (tx) => {
+      await stampSessionActor(tx);
       let matterTitle = "";
       if (matterId) {
         const [m] = await tx.select().from(matters).where(eq(matters.id, matterId)).limit(1);
@@ -191,6 +193,7 @@ async function requireDraft(id: number, user: CurrentUser) {
 async function editDraft(id: number, fn: (tx: Db, inv: Invoice) => Promise<unknown>): Promise<BusinessError | null> {
   try {
     await db.transaction(async (tx) => {
+      await stampSessionActor(tx);
       const [inv] = await tx.select().from(invoices).where(eq(invoices.id, id)).for("update");
       if (!inv || inv.status !== "borrador") throw new BusinessError("not_draft");
       await fn(tx, inv);
@@ -303,8 +306,10 @@ export async function emitInvoiceAction(id: number) {
   let error: string | null = null;
   try {
     await db.transaction(async (tx) => {
+      await stampSessionActor(tx);
       // Numeración correlativa sin huecos ni duplicados.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('invoice_number'))`);
+      await stampSessionActor(tx);
       const [inv] = await tx.select().from(invoices).where(eq(invoices.id, id)).for("update");
       if (!inv || inv.status !== "borrador") throw new BusinessError("not_draft");
       const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
@@ -384,6 +389,7 @@ export async function registerPaymentAction(
 
   try {
     await db.transaction(async (tx) => {
+      await stampSessionActor(tx);
       const [inv] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId)).for("update");
       if (!inv || inv.status !== "emitida") throw new BusinessError("not_emitted_pay");
       if (inv.kind === "rectificativa") throw new BusinessError("rectification_payment");
@@ -415,6 +421,7 @@ export async function deletePaymentAction(invoiceId: number, paymentId: number) 
   if (!(await canAccessInvoice(user, invoiceId))) redirect("/facturas");
   if (!can(user, "facturacion.emitir")) redirect(`/facturas/${invoiceId}?error=forbidden`);
   await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     await tx.delete(payments).where(and(eq(payments.id, paymentId), eq(payments.invoiceId, invoiceId)));
     await reconcileStatus(tx, invoiceId);
   });
@@ -442,6 +449,7 @@ export async function createRectificationAction(invoiceId: number, _prev: Action
   let newId: number;
   try {
     newId = await db.transaction(async (tx) => {
+      await stampSessionActor(tx);
       const [original] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId)).for("update");
       if (!original || !canRectify(original)) throw new BusinessError("not_rectifiable");
 

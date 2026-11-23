@@ -11,6 +11,7 @@ import { canAccessEvent, canAccessMatterOrNone, canUserIdAccessMatter } from "@/
 import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-redirect";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const eventSchema = z
   .object({
@@ -91,7 +92,7 @@ export async function updateEventAction(
   const denied = await checkEventAccess(user, parsed.data.matterId, parsed.data.assignedId);
   if (denied) return { error: denied };
 
-  await db.update(events).set(parsed.data).where(eq(events.id, id));
+  await asSessionActor((tx) => tx.update(events).set(parsed.data).where(eq(events.id, id)));
   revalidateAgenda(parsed.data.matterId);
   redirect(safeNext(str(formData, "returnTo"), "/agenda"));
 }
@@ -101,13 +102,13 @@ export async function toggleEventAction(id: number) {
   if (!(await canAccessEvent(user, id))) return;
   const [ev] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!ev) return;
-  await db.update(events).set({ completed: !ev.completed }).where(eq(events.id, id));
+  await asSessionActor((tx) => tx.update(events).set({ completed: !ev.completed }).where(eq(events.id, id)));
   revalidateAgenda(ev.matterId);
 }
 
 export async function deleteEventAction(id: number) {
   const user = await requireUser();
   if (!(await canAccessEvent(user, id))) return;
-  const [ev] = await db.delete(events).where(eq(events.id, id)).returning({ matterId: events.matterId });
+  const [ev] = await asActor(user.id, (tx) => tx.delete(events).where(eq(events.id, id)).returning({ matterId: events.matterId }));
   revalidateAgenda(ev?.matterId);
 }

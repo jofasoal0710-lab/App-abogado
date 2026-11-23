@@ -10,6 +10,7 @@ import { requirePermission } from "@/lib/auth";
 import { normalizePermissions, PERMISSIONS, type Permission } from "@/lib/permissions";
 import { countOtherActiveManagers, getRole, roleManagesTeam } from "@/lib/roles";
 import { logSecurityEvent, requestMeta } from "@/lib/security-log";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const roleSchema = z.object({
   name: z.string().trim().min(2, "El nombre del rol es obligatorio").max(60, "El nombre del rol es demasiado largo"),
@@ -66,7 +67,7 @@ export async function updateRoleAction(id: number, _prev: ActionState, formData:
     }
   }
 
-  await db.update(roles).set({ name: parsed.data.name, description: parsed.data.description || null, permissions }).where(eq(roles.id, id));
+  await asSessionActor((tx) => tx.update(roles).set({ name: parsed.data.name, description: parsed.data.description || null, permissions }).where(eq(roles.id, id)));
 
   const added = permissions.filter((p) => !before.includes(p)).map(labelOf);
   const removed = before.filter((p) => !permissions.includes(p)).map(labelOf);
@@ -91,7 +92,7 @@ export async function deleteRoleAction(id: number, _prev: ActionState): Promise<
   const [{ n }] = await db.select({ n: count() }).from(users).where(eq(users.roleId, id));
   if (n > 0) return { error: `No se puede eliminar: lo tienen asignado ${n} persona(s). Cámbiales antes el rol.` };
 
-  await db.delete(roles).where(eq(roles.id, id));
+  await asActor(actor.id, (tx) => tx.delete(roles).where(eq(roles.id, id)));
   const { ip } = await requestMeta();
   await logSecurityEvent("rol_eliminado", { actorId: actor.id, ip, detail: role.name });
   revalidatePath("/equipo");

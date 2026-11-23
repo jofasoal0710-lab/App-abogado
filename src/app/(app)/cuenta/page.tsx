@@ -10,6 +10,7 @@ import { hashSessionId, readSessionCookie } from "@/lib/session";
 import { closeOtherSessionsAction } from "./actions";
 import { PasswordForm } from "./password-form";
 import { AppearanceForm } from "./appearance-form";
+import { MfaSection } from "./mfa-section";
 import { currentTheme } from "@/lib/theme-server";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
@@ -38,6 +39,8 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader title="Mi cuenta" subtitle={`${user.name} · ${user.email} · ${user.roleName}`} />
+
+      <MfaSection user={user} />
 
       <section id="apariencia" className="card card-pad mb-6">
         <h2 className="mb-1 font-serif text-lg font-semibold">Apariencia</h2>

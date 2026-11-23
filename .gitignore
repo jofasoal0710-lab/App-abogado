@@ -10,3 +10,6 @@ storage/*
 coverage
 .DS_Store
 .netlify
+
+# Registro de auditoría de seguridad: mapa de puntos débiles, no se sube al repositorio
+.security-audit/

@@ -18,6 +18,7 @@ import { parseMoneyToCents } from "@/lib/money";
 import { formatNumber, nextSequence } from "@/lib/numbering";
 import { deleteFile } from "@/lib/storage";
 import { can } from "@/lib/permissions";
+import { stampSessionActor, asSessionActor, asActor } from "@/lib/data-audit";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha no es válida");
 
@@ -104,6 +105,7 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
   const year = new Date().getFullYear();
   const prefix = "EXP";
   const row = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     // Bloqueo por transacción: dos altas simultáneas no pueden obtener el mismo número.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('matter_number'))`);
     const [last] = await tx
@@ -173,6 +175,7 @@ export async function updateMatterAction(
   }
   // Todo o nada: los datos, las anotaciones en el historial y la reasignación de eventos.
   await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     await tx.update(matters).set({ ...data, visibility }).where(eq(matters.id, id));
     // Etapas de cobro: si ninguna está facturada, se rehacen según el servicio y el monto nuevos.
     const feeChanged = data.billingType !== current.billingType || data.fixedFeeCents !== current.fixedFeeCents || data.serviceId !== current.serviceId;
@@ -216,10 +219,10 @@ export async function changeStatusAction(id: number, formData: FormData) {
   if (!status.success) redirect(`/expedientes/${id}`);
 
   const closing = status.data === "cerrado" || status.data === "archivado";
-  await db
+  await asSessionActor((tx) => tx
     .update(matters)
     .set({ status: status.data, closedAt: closing ? todayISO() : null })
-    .where(eq(matters.id, id));
+    .where(eq(matters.id, id)));
   revalidatePath("/expedientes");
   revalidatePath(`/expedientes/${id}`);
   redirect(`/expedientes/${id}`);
@@ -249,7 +252,7 @@ export async function deleteNoteAction(noteId: number, matterId: number) {
     can(user, "notas.borrar_todas")
       ? eq(matterNotes.id, noteId)
       : and(eq(matterNotes.id, noteId), eq(matterNotes.authorId, user.id));
-  await db.delete(matterNotes).where(condition);
+  await asActor(user.id, (tx) => tx.delete(matterNotes).where(condition));
   revalidatePath(`/expedientes/${matterId}`);
 }
 
@@ -262,7 +265,7 @@ export async function deleteMatterAction(id: number) {
   if (n > 0) redirect(`/expedientes/${id}?error=has_invoices`);
 
   const docs = await db.select({ key: documents.storageKey }).from(documents).where(eq(documents.matterId, id));
-  await db.delete(matters).where(eq(matters.id, id));
+  await asActor(user.id, (tx) => tx.delete(matters).where(eq(matters.id, id)));
   await Promise.all(docs.map((d) => deleteFile(d.key)));
 
   revalidatePath("/expedientes");

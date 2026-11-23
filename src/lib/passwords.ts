@@ -17,3 +17,12 @@ export function newPasswordProblem(current: string, next: string, confirm: strin
   if (next === current) return "La nueva contraseña debe ser distinta de la actual.";
   return null;
 }
+
+/** Días que vale una contraseña provisional (la pone el administrador al crear o restablecer la cuenta). */
+export const PROVISIONAL_PASSWORD_DAYS = 7;
+
+/** ¿Caducó la contraseña provisional asignada en `setAt`? */
+export function provisionalExpired(setAt: Date | null, now: Date = new Date()): boolean {
+  if (!setAt) return false;
+  return now.getTime() - setAt.getTime() > PROVISIONAL_PASSWORD_DAYS * 86_400_000;
+}

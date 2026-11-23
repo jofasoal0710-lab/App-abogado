@@ -3,7 +3,9 @@ import { appLocale } from "@/lib/locale";
 import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui";
+import { can } from "@/lib/permissions";
 import { db } from "@/db";
 import { securityEvents, users } from "@/db/schema";
 import { requirePermission } from "@/lib/auth";
@@ -19,7 +21,7 @@ const LIMIT = 300;
 const IP_HEADERS = ["true-client-ip", "cf-connecting-ip", "x-real-ip", "x-forwarded-for", "x-nf-client-connection-ip", "fly-client-ip", "x-client-ip", "forwarded"];
 
 export default async function SecurityLogPage({ searchParams }: { searchParams: Promise<{ usuario?: string; tipo?: string }> }) {
-  await requirePermission("seguridad.ver");
+  const viewer = await requirePermission("seguridad.ver");
   const sp = await searchParams;
   const userId = Number(sp.usuario);
   const onlyNotable = sp.tipo === "importantes";
@@ -59,6 +61,12 @@ export default async function SecurityLogPage({ searchParams }: { searchParams: 
       <PageHeader
         title="Registro de seguridad"
         subtitle={`Inicios de sesión, contraseñas y cambios en las cuentas. Se conservan ${SECURITY_LOG_RETENTION_DAYS} días; nunca incluye contraseñas.`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/seguridad/cambios" className="btn-secondary">Cambios y borrados</Link>
+            {can(viewer, "equipo.gestionar") && <Link href="/seguridad/respaldos" className="btn-secondary">Copias de seguridad</Link>}
+          </div>
+        }
       />
 
       <details className="card mb-6 text-sm" open={!isClientIpTrusted()}>

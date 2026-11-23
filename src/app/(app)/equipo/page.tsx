@@ -1,3 +1,4 @@
+import { resetMfaAction } from "../cuenta/mfa-actions";
 import type { Metadata } from "next";
 import { PasswordInput } from "@/components/password-input";
 import Link from "next/link";
@@ -103,6 +104,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     <p className="font-medium text-ink-900">
                       {u.name} {!u.active && <span className="badge-gray ml-1">Inactivo</span>}
                       {u.active && u.mustChangePassword && <span className="badge-amber ml-1">Debe elegir su contraseña</span>}
+                      {u.mfaEnabledAt ? <span className="badge-green ml-1">Dos pasos</span> : u.active && <span className="badge-gray ml-1">Sin verificación en dos pasos</span>}
                     </p>
                     <p className="text-xs text-ink-500">{u.email}</p>
                   </div>
@@ -118,6 +120,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   <UserForm action={updateUserAction.bind(null, u.id)} user={u} roles={roleList} />
                   <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-ink-100 pt-3 text-sm text-ink-600">
                     <span>Sesiones abiertas: {openSessions.get(u.id) ?? 0}</span>
+                    {u.mfaEnabledAt && (
+                      <form action={resetMfaAction.bind(null, u.id)}>
+                        <button className="btn-secondary btn-sm">Quitar su verificación en dos pasos (perdió el móvil)</button>
+                      </form>
+                    )}
                     {(openSessions.get(u.id) ?? 0) > 0 && (
                       <ActionForm action={revokeUserSessionsAction.bind(null, u.id)}>
                         <SubmitButton className="btn-secondary btn-sm">Cerrar sus sesiones</SubmitButton>

@@ -14,6 +14,7 @@ import { clearFailures, isRateLimited, registerFailure } from "@/lib/rate-limit"
 import { safeNext } from "@/lib/safe-redirect";
 import { logSecurityEvent, requestMeta } from "@/lib/security-log";
 import { readSessionCookie, revokeSessions } from "@/lib/session";
+import { asSessionActor } from "@/lib/data-audit";
 
 /** Intentos con una contraseña actual incorrecta antes de bloquear el cambio 15 minutos. */
 const MAX_WRONG_CURRENT = 5;
@@ -45,10 +46,10 @@ export async function changePasswordAction(_prev: ActionState, formData: FormDat
   const problem = newPasswordProblem(current, next, confirm);
   if (problem) return { error: problem };
 
-  await db
+  await asSessionActor(async (tx) => tx
     .update(users)
     .set({ passwordHash: await bcrypt.hash(next, 12), mustChangePassword: false, passwordChangedAt: new Date() })
-    .where(eq(users.id, user.id));
+    .where(eq(users.id, user.id)));
   // Se conserva la sesión desde la que se cambia; las demás (quizá robadas) dejan de valer.
   const closed = await revokeSessions(user.id, (await readSessionCookie())?.sid);
   await clearFailures(key);

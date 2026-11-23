@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { lawArticles, lawTexts } from "@/db/schema";
 import { anyWordsQuery } from "./knowledge";
 import type { ParsedArticle } from "./law-parser";
+import { stampSessionActor } from "@/lib/data-audit";
 
 export type LoadedLaw = typeof lawTexts.$inferSelect;
 
@@ -92,6 +93,7 @@ export async function replaceLawText(input: {
   userId: number | null;
 }) {
   return db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     const [law] = await tx
       .insert(lawTexts)
       .values({

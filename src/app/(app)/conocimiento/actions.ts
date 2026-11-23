@@ -11,6 +11,7 @@ import { requirePermission, requireUser, type CurrentUser } from "@/lib/auth";
 import { KNOWLEDGE_AREAS } from "@/lib/knowledge-guide";
 import { loadGuide } from "@/lib/knowledge";
 import { can } from "@/lib/permissions";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const schema = z.object({
   title: z.string().trim().min(3, "Escribe un título").max(200),
@@ -56,7 +57,7 @@ export async function updateKnowledgeAction(id: number, _prev: ActionState, form
   if (!(await editable(user, id))) return { error: "Solo quien la escribió o quien gestiona el equipo puede corregirla." };
   const p = parse(formData);
   if (!p.success) return { error: firstZodError(p.error) };
-  await db.update(knowledgeEntries).set({ ...p.data, updatedById: user.id, updatedAt: new Date() }).where(eq(knowledgeEntries.id, id));
+  await asSessionActor((tx) => tx.update(knowledgeEntries).set({ ...p.data, updatedById: user.id, updatedAt: new Date() }).where(eq(knowledgeEntries.id, id)));
   revalidatePath("/conocimiento");
   redirect(`/conocimiento?ok=guardada#k${id}`);
 }
@@ -64,13 +65,13 @@ export async function updateKnowledgeAction(id: number, _prev: ActionState, form
 export async function deleteKnowledgeAction(id: number) {
   const user = await requireUser();
   if (!(await editable(user, id))) return;
-  await db.delete(knowledgeEntries).where(eq(knowledgeEntries.id, id));
+  await asActor(user.id, (tx) => tx.delete(knowledgeEntries).where(eq(knowledgeEntries.id, id)));
   revalidatePath("/conocimiento");
 }
 
 export async function markReviewedAction(id: number) {
   const user = await requirePermission("equipo.gestionar");
-  await db.update(knowledgeEntries).set({ reviewed: true, updatedById: user.id, updatedAt: new Date() }).where(and(eq(knowledgeEntries.id, id)));
+  await asSessionActor((tx) => tx.update(knowledgeEntries).set({ reviewed: true, updatedById: user.id, updatedAt: new Date() }).where(and(eq(knowledgeEntries.id, id))));
   revalidatePath("/conocimiento");
 }
 

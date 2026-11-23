@@ -11,6 +11,7 @@ import { requirePermission } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { getNotaryProfile, getOwnDeed, nextDeedNumber } from "@/lib/notary";
 import { quincena } from "@/lib/notary-period";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const user = () => requirePermission("notaria.usar");
 const isoDate = z.iso.date("La fecha no es válida");
@@ -85,7 +86,7 @@ export async function createDeedAction(_prev: ActionState, formData: FormData): 
   if (dup) return { error: `Ya existe la escritura número ${d.number} en tu protocolo. El siguiente libre es el ${await nextDeedNumber(u.id)}.` };
   const [row] = await db.insert(deeds).values({ ...d, notaryId: u.id }).returning({ id: deeds.id });
   // El perfil avanza al folio siguiente al último usado.
-  if (d.folioEnd) await db.update(notaryProfiles).set({ nextFolio: d.folioEnd + 1, currentVolume: d.volume ?? undefined }).where(eq(notaryProfiles.userId, u.id));
+  if (d.folioEnd) await asSessionActor((tx) => tx.update(notaryProfiles).set({ nextFolio: d.folioEnd! + 1, currentVolume: d.volume ?? undefined }).where(eq(notaryProfiles.userId, u.id)));
   revalidatePath("/notaria");
   redirect(`/notaria/escrituras/${row.id}`);
 }
@@ -98,7 +99,7 @@ export async function updateDeedAction(id: number, _prev: ActionState, formData:
   const status = str(formData, "status") === "no_paso" ? "no_paso" : "otorgada";
   const [dup] = await db.select({ id: deeds.id }).from(deeds).where(and(eq(deeds.notaryId, u.id), eq(deeds.number, parsed.data.number)));
   if (dup && dup.id !== id) return { error: `El número ${parsed.data.number} ya lo usa otra escritura de tu protocolo.` };
-  await db.update(deeds).set({ ...parsed.data, status }).where(eq(deeds.id, id));
+  await asSessionActor((tx) => tx.update(deeds).set({ ...parsed.data, status }).where(eq(deeds.id, id)));
   revalidatePath(`/notaria/escrituras/${id}`);
   return { ok: "Escritura actualizada." };
 }
@@ -119,14 +120,14 @@ export async function toggleSignatureAction(deedId: number, partyId: number) {
   if (!(await getOwnDeed(u.id, deedId))) return;
   const [p] = await db.select().from(deedParties).where(and(eq(deedParties.id, partyId), eq(deedParties.deedId, deedId)));
   if (!p) return;
-  await db.update(deedParties).set({ signedOn: p.signedOn ? null : todayISO() }).where(eq(deedParties.id, partyId));
+  await asSessionActor((tx) => tx.update(deedParties).set({ signedOn: p.signedOn ? null : todayISO() }).where(eq(deedParties.id, partyId)));
   revalidatePath(`/notaria/escrituras/${deedId}`);
 }
 
 export async function deletePartyAction(deedId: number, partyId: number) {
   const u = await user();
   if (!(await getOwnDeed(u.id, deedId))) return;
-  await db.delete(deedParties).where(and(eq(deedParties.id, partyId), eq(deedParties.deedId, deedId)));
+  await asActor(u.id, (tx) => tx.delete(deedParties).where(and(eq(deedParties.id, partyId), eq(deedParties.deedId, deedId))));
   revalidatePath(`/notaria/escrituras/${deedId}`);
 }
 
@@ -174,7 +175,7 @@ export async function markIndexSubmittedAction(period: string, _prev: ActionStat
 
 export async function undoIndexSubmissionAction(period: string) {
   const u = await user();
-  await db.delete(notaryIndexSubmissions).where(and(eq(notaryIndexSubmissions.notaryId, u.id), eq(notaryIndexSubmissions.period, period)));
+  await asActor(u.id, (tx) => tx.delete(notaryIndexSubmissions).where(and(eq(notaryIndexSubmissions.notaryId, u.id), eq(notaryIndexSubmissions.period, period))));
   revalidatePath("/notaria/indice");
   revalidatePath("/notaria");
   redirect(`/notaria/indice?q=${encodeURIComponent(period)}`);

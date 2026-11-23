@@ -13,7 +13,9 @@
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
     "build:netlify": "node scripts/deploy-build.mjs",
     "build:deploy": "node scripts/deploy-build.mjs",
-    "start:render": "next start -H 0.0.0.0 -p ${PORT:-10000}"
+    "start:render": "next start -H 0.0.0.0 -p ${PORT:-10000}",
+    "db:restore": "tsx --env-file-if-exists=.env scripts/restaurar-respaldo.ts",
+    "db:backup": "tsx --env-file-if-exists=.env scripts/crear-respaldo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1169.0",
@@ -29,6 +31,7 @@
     "nspell": "2.1.5",
     "pdf-lib": "^1.17.1",
     "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sanitize-html": "2.18.1",
@@ -41,6 +44,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/nspell": "2.1.6",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/sanitize-html": "2.16.0",

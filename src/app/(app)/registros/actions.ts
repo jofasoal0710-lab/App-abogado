@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/auth";
 import { MARITAL_STATUS, type MaritalStatus } from "@/lib/cr-id";
 import { todayISO } from "@/lib/dates";
 import { isRegistryKind, isRegistrySource } from "@/lib/registries";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const schema = z.object({
   source: z.string().refine(isRegistrySource, "Elige el registro consultado"),
@@ -53,7 +54,7 @@ export async function applyCheckToClientAction(checkId: number, clientId: number
   const set: Partial<typeof clients.$inferInsert> = {};
   if (c.birthDate) set.birthDate = c.birthDate;
   if (c.maritalStatus) set.maritalStatus = c.maritalStatus;
-  if (Object.keys(set).length) await db.update(clients).set(set).where(eq(clients.id, clientId));
+  if (Object.keys(set).length) await asSessionActor((tx) => tx.update(clients).set(set).where(eq(clients.id, clientId)));
   revalidatePath(`/clientes/${clientId}`);
 }
 
@@ -61,8 +62,8 @@ export async function deleteRegistryCheckAction(checkId: number, target: { clien
   const user = await requireUser();
   if (target.clientId && !(await getAccessibleClient(user, target.clientId))) return;
   if (target.matterId && !(await getAccessibleMatter(user, target.matterId))) return;
-  await db
+  await asActor(user.id, (tx) => tx
     .delete(registryChecks)
-    .where(and(eq(registryChecks.id, checkId), target.clientId ? eq(registryChecks.clientId, target.clientId) : eq(registryChecks.matterId, target.matterId!), eq(registryChecks.createdById, user.id)));
+    .where(and(eq(registryChecks.id, checkId), target.clientId ? eq(registryChecks.clientId, target.clientId) : eq(registryChecks.matterId, target.matterId!), eq(registryChecks.createdById, user.id))));
   revalidatePath(target.clientId ? `/clientes/${target.clientId}` : `/expedientes/${target.matterId}`);
 }

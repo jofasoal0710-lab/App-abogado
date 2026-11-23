@@ -15,6 +15,7 @@ import { PASSWORD_MAX, PASSWORD_MIN } from "@/lib/passwords";
 import { logSecurityEvent, requestMeta } from "@/lib/security-log";
 import { revokeSessions } from "@/lib/session";
 import { countOtherActiveManagers, getRole, roleManagesTeam } from "@/lib/roles";
+import { asSessionActor } from "@/lib/data-audit";
 
 const passwordSchema = z
   .string()
@@ -68,6 +69,7 @@ export async function createUserAction(_prev: ActionState, formData: FormData): 
       passwordHash: await bcrypt.hash(password.data, 12),
       // Es una contraseña provisional: al entrar por primera vez tendrá que elegir la suya.
       mustChangePassword: true,
+      passwordChangedAt: new Date(), // la provisional caduca a los PROVISIONAL_PASSWORD_DAYS días
     })
     .returning({ id: users.id });
   const { ip } = await requestMeta();
@@ -132,7 +134,7 @@ export async function updateUserAction(id: number, _prev: ActionState, formData:
     set.passwordChangedAt = new Date();
   }
 
-  await db.update(users).set(set).where(eq(users.id, id));
+  await asSessionActor((tx) => tx.update(users).set(set).where(eq(users.id, id)));
 
   // Efectos de seguridad y registro de cada cambio sensible.
   const { ip } = await requestMeta();

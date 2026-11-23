@@ -15,6 +15,7 @@ import { CLIENT_ACCESS_DENIED, describeVisibility } from "@/lib/access-rules";
 import { firstZodError, optStr, str, type ActionState } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { stampSessionActor, asSessionActor, asActor } from "@/lib/data-audit";
 
 const clientSchema = z.object({
   type: z.enum(["persona", "empresa"]),
@@ -65,6 +66,7 @@ export async function createClientAction(_prev: ActionState, formData: FormData)
   // Solo con el permiso «gestionar clientes» se puede dar de alta un cliente confidencial.
   const visibility = str(formData, "visibility") === "confidencial" && can(user, "clientes.gestionar") ? "confidencial" : "abierto";
   const row = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     const [created] = await tx.insert(clients).values({ ...parsed.data, visibility, createdById: user.id }).returning({ id: clients.id });
     if (visibility === "confidencial") await logClientAccessChange(created.id, user.id, "Cliente creado como confidencial", tx);
     return created;
@@ -83,7 +85,7 @@ export async function updateClientAction(
   const parsed = parseClient(formData);
   if (!parsed.success) return { error: firstZodError(parsed.error) };
 
-  await db.update(clients).set(parsed.data).where(eq(clients.id, id));
+  await asSessionActor((tx) => tx.update(clients).set(parsed.data).where(eq(clients.id, id)));
   revalidatePath("/clientes");
   redirect(`/clientes/${id}`);
 }
@@ -97,7 +99,7 @@ export async function deleteClientAction(id: number) {
   const [{ i }] = await db.select({ i: count() }).from(invoices).where(eq(invoices.clientId, id));
   if (m > 0 || i > 0) redirect(`/clientes/${id}?error=in_use`);
 
-  await db.delete(clients).where(eq(clients.id, id));
+  await asActor(user.id, (tx) => tx.delete(clients).where(eq(clients.id, id)));
   revalidatePath("/clientes");
   redirect("/clientes");
 }
@@ -119,6 +121,7 @@ export async function setClientVisibilityAction(clientId: number, _prev: ActionS
 
   // Todo o nada: el cliente, sus expedientes abiertos, el historial y la reasignación de eventos.
   const converted = await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
     await tx.update(clients).set({ visibility: target }).where(eq(clients.id, clientId));
     await logClientAccessChange(clientId, user.id, target === "confidencial" ? "Cliente marcado como confidencial" : "Cliente ya no es confidencial", tx);
     let n = 0;

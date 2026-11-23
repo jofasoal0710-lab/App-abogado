@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseDurationToMinutes, parseMoneyToCents } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const entrySchema = z.object({
   matterId: z.number({ error: "Selecciona un expediente" }).int().positive("Selecciona un expediente"),
@@ -88,10 +89,10 @@ export async function deleteTimeEntryAction(entryId: number) {
   if (!(await canAccessTimeEntry(user, entryId))) return;
   // Solo se pueden borrar entradas no facturadas; el autor o quien pueda «borrar horas de otras personas».
   const own = can(user, "horas.borrar_todas") ? undefined : eq(timeEntries.userId, user.id);
-  const [deleted] = await db
+  const [deleted] = await asActor(user.id, (tx) => tx
     .delete(timeEntries)
     .where(and(eq(timeEntries.id, entryId), isNull(timeEntries.invoiceId), own))
-    .returning({ matterId: timeEntries.matterId });
+    .returning({ matterId: timeEntries.matterId }));
   if (deleted) {
     revalidatePath("/horas");
     revalidatePath(`/expedientes/${deleted.matterId}`);
@@ -108,11 +109,11 @@ export async function updateTimeEntryAction(entryId: number, _prev: ActionState,
   if (!(await getAccessibleMatter(user, entry.data.matterId))) return { error: ACCESS_DENIED };
 
   const [before] = await db.select({ matterId: timeEntries.matterId }).from(timeEntries).where(eq(timeEntries.id, entryId));
-  const [updated] = await db
+  const [updated] = await asSessionActor((tx) => tx
     .update(timeEntries)
     .set(entry.data)
     .where(and(eq(timeEntries.id, entryId), editableBy(user)))
-    .returning({ matterId: timeEntries.matterId });
+    .returning({ matterId: timeEntries.matterId }));
   if (!updated) return { error: "No se puede modificar: ya está facturada o no es tuya." };
   revalidateHours([updated.matterId, ...(before ? [before.matterId] : [])]);
   return { ok: "Cambios guardados." };
@@ -127,10 +128,10 @@ export async function deleteTimeEntriesAction(_prev: ActionState, formData: Form
   const ids = [...new Set(formData.getAll("ids").map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
   if (ids.length === 0) return { error: "Marca al menos una entrada." };
 
-  const allowed = [];
+  const allowed: number[] = [];
   for (const id of ids) if (await canAccessTimeEntry(user, id)) allowed.push(id);
   const deleted = allowed.length
-    ? await db.delete(timeEntries).where(and(inArray(timeEntries.id, allowed), editableBy(user))).returning({ matterId: timeEntries.matterId })
+    ? await asActor(user.id, (tx) => tx.delete(timeEntries).where(and(inArray(timeEntries.id, allowed), editableBy(user))).returning({ matterId: timeEntries.matterId }))
     : [];
   revalidateHours(deleted.map((d) => d.matterId));
   const skipped = ids.length - deleted.length;
