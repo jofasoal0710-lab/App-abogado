@@ -12,6 +12,9 @@ import { entries, paymentMethodLabels } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
 import { applyFundsToInvoiceAction, deleteFundMovementAction, depositFundsAction, refundFundsAction, setFundsMinAction } from "../funds-actions";
 
+/** Importe para un campo de formulario, con coma decimal como el resto de la app («1179,75»). */
+const centsToInput = (c: number) => (c % 100 ? (c / 100).toFixed(2).replace(".", ",") : String(c / 100));
+
 const MANUAL_METHODS = entries(paymentMethodLabels).filter(([v]) => v !== "provision");
 
 /** Facturas emitidas del expediente con algo pendiente de cobro. */
@@ -59,7 +62,42 @@ export async function FundsSection({ matter, canCollect, canEmit }: { matter: Ma
       {ledger.length === 0 ? (
         <EmptyState title="Sin provisión de fondos">Registra el depósito del cliente para pagar con él gastos, timbres y facturas.</EmptyState>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <ul className="divide-y divide-ink-100 sm:hidden" aria-label="Movimientos de la provisión">
+          {ledger.map((m) => (
+            <li key={m.id} className="px-5 py-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-medium">{m.description}</span>
+                <span className={`tabular-nums font-semibold ${fundSign(m.kind) > 0 ? "text-emerald-700" : "text-ink-800"}`}>
+                  {fundSign(m.kind) > 0 ? "+" : "−"}
+                  {formatMoney(m.amountCents)}
+                </span>
+              </div>
+              <div className="mt-0.5 flex items-baseline justify-between gap-3 text-xs text-ink-500">
+                <span>
+                  {formatDate(m.movedOn)} · {FUND_KINDS[m.kind]}
+                  {m.reference ? ` · ${m.reference}` : ""}
+                </span>
+                <span className="tabular-nums">Saldo {formatMoney(m.balanceCents)}</span>
+              </div>
+              {(m.kind === "deposito" || m.kind === "devolucion") && (
+                <div className="mt-1 flex gap-2">
+                  <Link href={`/expedientes/${matter.id}/provision/${m.id}`} className="btn-ghost btn-sm">
+                    Recibo
+                  </Link>
+                  {canEmit && (
+                    <ActionForm action={deleteFundMovementAction.bind(null, m.id, matter.id)} className="inline">
+                      <ConfirmButton message={`¿Borrar «${m.description}» (${formatMoney(m.amountCents)})?`} className="btn-ghost btn-sm text-red-700">
+                        Borrar
+                      </ConfirmButton>
+                    </ActionForm>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="table">
             <thead>
               <tr>
@@ -105,18 +143,29 @@ export async function FundsSection({ matter, canCollect, canEmit }: { matter: Ma
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {canCollect && (
         <div className="grid gap-4 border-t border-ink-100 px-5 py-4 lg:grid-cols-2">
-          <ActionForm action={depositFundsAction.bind(null, matter.id)} resetOnSuccess className="space-y-3 rounded-lg border border-ink-100 p-4">
-            <h3 className="font-semibold">Registrar depósito del cliente</h3>
+          <ActionForm action={depositFundsAction.bind(null, matter.id)} resetOnSuccess className="rounded-lg border border-ink-100">
+            <details className="group" open={ledger.length === 0}>
+              <summary className="cursor-pointer list-none px-4 py-3 font-semibold">
+                <span className="mr-1 inline-block transition-transform group-open:rotate-90" aria-hidden>›</span> Registrar depósito del cliente
+              </summary>
+              <div className="space-y-3 px-4 pb-4">
             <MovementFields defaultDescription="Provisión de fondos" />
             <SubmitButton>Registrar depósito</SubmitButton>
+              </div>
+            </details>
           </ActionForm>
 
-          <ActionForm action={applyFundsToInvoiceAction.bind(null, matter.id)} resetOnSuccess className="space-y-3 rounded-lg border border-ink-100 p-4">
-            <h3 className="font-semibold">Pagar una factura con la provisión</h3>
+          <ActionForm action={applyFundsToInvoiceAction.bind(null, matter.id)} resetOnSuccess className="rounded-lg border border-ink-100">
+            <details className="group" open={false}>
+              <summary className="cursor-pointer list-none px-4 py-3 font-semibold">
+                <span className="mr-1 inline-block transition-transform group-open:rotate-90" aria-hidden>›</span> Pagar una factura con la provisión
+              </summary>
+              <div className="space-y-3 px-4 pb-4">
             {pending.length === 0 ? (
               <p className="text-sm text-ink-500">No hay facturas emitidas de este expediente pendientes de cobro.</p>
             ) : (
@@ -131,25 +180,39 @@ export async function FundsSection({ matter, canCollect, canEmit }: { matter: Ma
                   </select>
                 </Field>
                 <Field label="Importe (₡)" hint="Lo que falte por cobrar, sin pasar del saldo de la provisión.">
-                  <input className="input" name="amount" required inputMode="decimal" defaultValue={pending[0] ? String(maxApplicable(balance, pending[0].outstanding) / 100) : ""} />
+                  <input className="input" name="amount" required inputMode="decimal" defaultValue={pending[0] ? centsToInput(maxApplicable(balance, pending[0].outstanding)) : ""} />
                 </Field>
                 <SubmitButton>Aplicar a la factura</SubmitButton>
               </>
             )}
+              </div>
+            </details>
           </ActionForm>
 
-          <ActionForm action={refundFundsAction.bind(null, matter.id)} resetOnSuccess className="space-y-3 rounded-lg border border-ink-100 p-4">
-            <h3 className="font-semibold">Devolver saldo al cliente</h3>
-            <MovementFields defaultDescription="Devolución del saldo al cliente" amount={balance > 0 ? String(balance / 100) : ""} />
+          <ActionForm action={refundFundsAction.bind(null, matter.id)} resetOnSuccess className="rounded-lg border border-ink-100">
+            <details className="group" open={false}>
+              <summary className="cursor-pointer list-none px-4 py-3 font-semibold">
+                <span className="mr-1 inline-block transition-transform group-open:rotate-90" aria-hidden>›</span> Devolver saldo al cliente
+              </summary>
+              <div className="space-y-3 px-4 pb-4">
+            <MovementFields defaultDescription="Devolución del saldo al cliente" amount={balance > 0 ? centsToInput(balance) : ""} />
             <SubmitButton className="btn-secondary">Registrar devolución</SubmitButton>
+              </div>
+            </details>
           </ActionForm>
 
-          <ActionForm action={setFundsMinAction.bind(null, matter.id)} className="space-y-3 rounded-lg border border-ink-100 p-4">
-            <h3 className="font-semibold">Aviso de saldo bajo</h3>
+          <ActionForm action={setFundsMinAction.bind(null, matter.id)} className="rounded-lg border border-ink-100">
+            <details className="group" open={false}>
+              <summary className="cursor-pointer list-none px-4 py-3 font-semibold">
+                <span className="mr-1 inline-block transition-transform group-open:rotate-90" aria-hidden>›</span> Aviso de saldo bajo
+              </summary>
+              <div className="space-y-3 px-4 pb-4">
             <Field label="Saldo mínimo (₡)" hint="Por debajo, el expediente y los reportes avisan para pedir otro depósito. Vacío = sin aviso.">
-              <input className="input" name="min" inputMode="decimal" defaultValue={matter.fundsMinCents != null ? String(matter.fundsMinCents / 100) : ""} />
+              <input className="input" name="min" inputMode="decimal" defaultValue={matter.fundsMinCents != null ? centsToInput(matter.fundsMinCents) : ""} />
             </Field>
             <SubmitButton className="btn-secondary">Guardar</SubmitButton>
+              </div>
+            </details>
           </ActionForm>
         </div>
       )}

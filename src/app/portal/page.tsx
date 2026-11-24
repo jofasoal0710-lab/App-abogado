@@ -100,7 +100,25 @@ export default async function PortalPage() {
         {data.invoices.length > 0 && (
           <section className="card">
             <h2 className="border-b border-ink-100 px-5 py-3 font-serif text-lg font-semibold">Facturas</h2>
-            <div className="overflow-x-auto">
+            <ul className="divide-y divide-ink-100 sm:hidden">
+              {data.invoices.map((i) => (
+                <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                  <div>
+                    <p className="font-medium">
+                      {i.number} <span className={i.status === "pagada" ? "badge-green" : "badge-amber"}>{invoiceStatusLabels[i.status]}</span>
+                    </p>
+                    <p className="text-xs text-ink-500">
+                      {formatDate(i.issueDate)} · Total {formatMoney(i.totalCents)}
+                      {i.outstandingCents > 0 ? ` · Pendiente ${formatMoney(i.outstandingCents)}` : ""}
+                    </p>
+                  </div>
+                  <a className="btn-secondary btn-sm" href={`/api/portal/facturas/${i.id}`}>
+                    PDF
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto sm:block">
               <table className="table">
                 <thead>
                   <tr>

@@ -66,36 +66,27 @@ export default async function TemplatePage({ params, searchParams }: { params: P
               {t.baseLabel}: {formatDate(base)}. Los plazos se cuentan en días hábiles desde el día siguiente, sin fines de semana ni feriados de Costa Rica. Revisa y corrige antes de crear.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th className="w-px">Crear</th>
-                  <th>Paso</th>
-                  <th>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.map((s) => (
-                  <tr key={s.index} className={s.type === "plazo" ? "bg-amber-50/50" : undefined}>
-                    <td>
-                      <input type="checkbox" name={`inc_${s.index}`} defaultChecked aria-label={`Crear «${s.title}»`} />
-                    </td>
-                    <td>
-                      <span className={s.type === "plazo" ? "badge-red" : "badge-gray"}>{s.type === "plazo" ? "Plazo" : "Tarea"}</span>
-                      <input className="input mt-1" name={`title_${s.index}`} defaultValue={s.title} maxLength={250} />
-                      {s.note && <span className="mt-1 block text-xs text-ink-500">{s.note}</span>}
-                      {s.past && <span className="mt-1 block text-xs font-medium text-red-700">¡Este plazo ya venció!</span>}
-                      <input type="hidden" name={`note_${s.index}`} value={s.ref ? `Fundamento: ${s.ref}.` : ""} />
-                    </td>
-                    <td>
-                      <input className="input" type="date" name={`date_${s.index}`} defaultValue={s.date} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ol className="divide-y divide-ink-100">
+            {plan.map((s) => (
+              <li key={s.index} className={`grid gap-2 px-5 py-3 sm:grid-cols-[auto_1fr_11rem] sm:items-start ${s.type === "plazo" ? "bg-amber-50/50" : ""}`}>
+                <label className="flex items-center gap-2 sm:pt-7">
+                  <input type="checkbox" name={`inc_${s.index}`} defaultChecked aria-label={`Crear «${s.title}»`} />
+                  <span className={s.type === "plazo" ? "badge-red" : "badge-gray"}>{s.type === "plazo" ? "Plazo" : "Tarea"}</span>
+                </label>
+                <div>
+                  <span className="label">Paso {s.index + 1}</span>
+                  <input className="input" name={`title_${s.index}`} defaultValue={s.title} maxLength={250} aria-label={`Título del paso ${s.index + 1}`} />
+                  {s.note && <span className="mt-1 block text-xs text-ink-500">{s.note}</span>}
+                  {s.past && <span className="mt-1 block text-xs font-medium text-red-700">¡Este plazo ya venció!</span>}
+                  <input type="hidden" name={`note_${s.index}`} value={s.ref ? `Fundamento: ${s.ref}.` : ""} />
+                </div>
+                <div>
+                  <span className="label">Fecha</span>
+                  <input className="input" type="date" name={`date_${s.index}`} defaultValue={s.date} aria-label={`Fecha del paso ${s.index + 1}`} />
+                </div>
+              </li>
+            ))}
+          </ol>
           <div className="flex flex-wrap items-end gap-3 border-t border-ink-100 px-5 py-4">
             <Field label="Responsable">
               <select className="input" name="assignedId" defaultValue={String(user.id)}>

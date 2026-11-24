@@ -330,6 +330,7 @@ export default async function InvoicePage({
             {inv.payments.length === 0 ? (
               <p className="px-5 py-6 text-sm text-ink-500">Todavía no se ha registrado ningún cobro.</p>
             ) : (
+              <div className="overflow-x-auto">
               <table className="table">
                 <tbody>
                   {inv.payments.map((p) => (
@@ -353,6 +354,7 @@ export default async function InvoicePage({
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
