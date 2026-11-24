@@ -28,6 +28,8 @@ import { addNoteAction, changeStatusAction, deleteMatterAction, deleteNoteAction
 import { addMemberAction, removeMemberAction, setVisibilityAction } from "../access-actions";
 import { READ_VERBS } from "@/lib/read-audit";
 import { BillingTab } from "./billing-tab";
+import { MatterTabs } from "./matter-tabs";
+import type { IconName } from "@/components/icons";
 import { toggleDocumentPortalAction } from "../../clientes/portal-actions";
 import { StartTimer } from "@/components/timer/timer-bar";
 
@@ -38,15 +40,28 @@ const TABS = [
   ["notas", "Notas"],
   ["escritos", "Escritos"],
   ["documentos", "Documentos"],
+  ["agenda", "Agenda"],
   ["normativa", "Normativa"],
   ["registros", "Registros"],
   ["horas", "Horas"],
-  ["agenda", "Agenda"],
   ["cobro", "Cobro"],
   ["facturas", "Facturas"],
   ["acceso", "Acceso"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
+const TAB_META: Record<Tab, { icon: IconName; group: string }> = {
+  resumen: { icon: "panel", group: "Expediente" },
+  notas: { icon: "nota", group: "Expediente" },
+  escritos: { icon: "formularios", group: "Expediente" },
+  documentos: { icon: "documentos", group: "Expediente" },
+  agenda: { icon: "agenda", group: "Expediente" },
+  normativa: { icon: "balanza", group: "Consulta" },
+  registros: { icon: "registro", group: "Consulta" },
+  horas: { icon: "horas", group: "Economía" },
+  cobro: { icon: "cobro", group: "Economía" },
+  facturas: { icon: "facturas", group: "Economía" },
+  acceso: { icon: "llave", group: "Acceso" },
+};
 
 export default async function MatterPage({
   params,
@@ -72,6 +87,18 @@ export default async function MatterPage({
   if (!row) notFound(); // 404 también si existe pero no tienes acceso
   const { matter, client } = row;
   const canManage = canManageMatterAccess(user, matter);
+  // Contadores de las pestañas (una sola consulta).
+  type Counts = { notas: number; escritos: number; documentos: number; agenda: number; overdue: number; facturas: number };
+  const tabCounts = (
+    await db.execute(sql`
+    select
+      (select count(*)::int from "matter_notes" where matter_id = ${id}) as notas,
+      (select count(*)::int from "writings" where matter_id = ${id}) as escritos,
+      (select count(*)::int from "documents" where matter_id = ${id}) as documentos,
+      (select count(*)::int from "events" where matter_id = ${id} and not completed) as agenda,
+      (select count(*)::int from "events" where matter_id = ${id} and not completed and starts_at < now()) as overdue,
+      (select count(*)::int from "invoices" where matter_id = ${id}) as facturas`)
+  ).rows[0] as Counts;
 
   // Estadísticas económicas (siempre visibles en la cabecera).
   const [pending] = await db
@@ -180,20 +207,19 @@ export default async function MatterPage({
         )}
       </div>
 
-      <nav className="no-print mb-5 flex gap-1 overflow-x-auto border-b border-ink-200" aria-label="Secciones del expediente">
-        {TABS.filter(([key]) => (key !== "facturas" && key !== "cobro") || seesBilling).map(([key, label]) => (
-          <Link
-            key={key}
-            href={key === "resumen" ? base : `${base}?tab=${key}`}
-            aria-current={tab === key ? "page" : undefined}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-              tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-ink-500 hover:text-ink-800"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <MatterTabs
+        base={base}
+        active={tab}
+        tabs={TABS.filter(([key]) => (key !== "facturas" && key !== "cobro") || seesBilling).map(([key, label]) => ({
+          key,
+          label,
+          icon: TAB_META[key].icon,
+          group: TAB_META[key].group,
+          count: tabCounts[key as keyof typeof tabCounts],
+          alert: key === "agenda" && tabCounts.overdue > 0,
+          secondary: key === "normativa" || key === "registros" || key === "acceso",
+        }))}
+      />
 
       {tab === "resumen" && (
         <section className="card card-pad">

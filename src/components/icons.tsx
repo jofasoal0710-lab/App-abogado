@@ -161,6 +161,24 @@ const paths = {
       <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </>
   ),
+  nota: (
+    <>
+      <path d="M5 4h10l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+      <path d="M14 4v5h5M8 13h8M8 17h5" />
+    </>
+  ),
+  registro: (
+    <>
+      <path d="M4 21V9l8-5 8 5v12" />
+      <path d="M9 21v-6h6v6M4 21h16" />
+    </>
+  ),
+  llave: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 9-9M17 6l2 2M15 8l2 2" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof paths;
