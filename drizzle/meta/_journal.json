@@ -211,6 +211,13 @@
       "when": 1795542676018,
       "tag": "0029_plantillas_word",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795556187621,
+      "tag": "0030_panel_personal",
+      "breakpoints": true
     }
   ]
 }

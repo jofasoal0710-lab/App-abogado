@@ -118,6 +118,8 @@ export const users = pgTable(
     active: boolean().notNull().default(true),
     /** Recibe por correo los recordatorios de plazos y eventos que tiene asignados. */
     emailReminders: boolean("email_reminders").notNull().default(true),
+    /** Panel de inicio personalizado: widgets elegidos, en orden y con su tamaño. Null = el predeterminado. */
+    dashboardLayout: jsonb("dashboard_layout").$type<{ id: string; size: "s" | "m" | "l" }[]>(),
     /**
      * Debe elegir una contraseña nueva antes de usar la aplicación: al crearle la cuenta y cuando un
      * administrador se la restablece. Así el administrador nunca conoce la contraseña definitiva.
