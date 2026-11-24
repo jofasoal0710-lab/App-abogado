@@ -43,6 +43,7 @@ export async function applyTemplateAction(matterId: number, _prev: ActionState, 
       // Los plazos vencen al final de la jornada; las tareas se colocan a primera hora.
       startsAt: new Date(`${date}T${step.type === "plazo" ? "16:00" : "08:00"}`),
       assignedId: assignedId ?? user.id,
+      createdById: user.id,
       notes: `Plantilla «${t.name}» (fecha base ${base.split("-").reverse().join("/")}).${note ? " " + note : ""} Verifica el cómputo con la notificación real.`,
     });
   }

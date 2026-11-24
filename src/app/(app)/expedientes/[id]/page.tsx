@@ -455,6 +455,9 @@ async function AgendaTab({ matterId, base }: { matterId: number; base: string })
       <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
         <h2 className="font-serif text-lg font-semibold">Plazos y eventos</h2>
         <div className="flex gap-2">
+          <Link href={`/tareas?expediente=${matterId}`} className="btn-secondary btn-sm">
+            Tablero de tareas
+          </Link>
           <Link href={`${base}/plantilla`} className="btn-secondary btn-sm">
             Aplicar plantilla de proceso
           </Link>

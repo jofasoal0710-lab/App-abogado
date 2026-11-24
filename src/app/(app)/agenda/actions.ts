@@ -12,6 +12,10 @@ import { ACCESS_DENIED } from "@/lib/access-rules";
 import { requireUser } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-redirect";
 import { overlaps, safeMeetingUrl } from "@/lib/hearings";
+import { isTaskPriority, statusPatch } from "@/lib/tasks";
+import { notifyTaskAssigned } from "@/lib/task-mail";
+
+const taskPriorityFrom = (f: FormData) => { const v = String(f.get("priority") ?? ""); return isTaskPriority(v) ? v : "normal"; };
 import { asSessionActor, asActor } from "@/lib/data-audit";
 
 const eventSchema = z
@@ -108,7 +112,8 @@ export async function createEventAction(_prev: ActionState, formData: FormData):
   const clash = await hearingClash(parsed.data, formData);
   if (clash) return { error: clash };
 
-  await db.insert(events).values(parsed.data);
+  const [created] = await db.insert(events).values({ ...parsed.data, createdById: user.id, priority: taskPriorityFrom(formData) }).returning({ id: events.id });
+  if (parsed.data.assignedId && parsed.data.assignedId !== user.id) await notifyTaskAssigned(created.id, user);
   revalidateAgenda(parsed.data.matterId);
   redirect(safeNext(str(formData, "returnTo"), "/agenda"));
 }
@@ -127,7 +132,9 @@ export async function updateEventAction(
   const clash = await hearingClash(parsed.data, formData, id);
   if (clash) return { error: clash };
 
-  await asSessionActor((tx) => tx.update(events).set(parsed.data).where(eq(events.id, id)));
+  const [before] = await db.select({ assignedId: events.assignedId }).from(events).where(eq(events.id, id));
+  await asSessionActor((tx) => tx.update(events).set({ ...parsed.data, priority: taskPriorityFrom(formData) }).where(eq(events.id, id)));
+  if (parsed.data.assignedId && parsed.data.assignedId !== before?.assignedId && parsed.data.assignedId !== user.id) await notifyTaskAssigned(id, user);
   revalidateAgenda(parsed.data.matterId);
   redirect(safeNext(str(formData, "returnTo"), "/agenda"));
 }
@@ -137,7 +144,7 @@ export async function toggleEventAction(id: number) {
   if (!(await canAccessEvent(user, id))) return;
   const [ev] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!ev) return;
-  await asSessionActor((tx) => tx.update(events).set({ completed: !ev.completed }).where(eq(events.id, id)));
+  await asSessionActor((tx) => tx.update(events).set(statusPatch(ev.completed ? "pendiente" : "hecha", new Date())).where(eq(events.id, id)));
   revalidateAgenda(ev.matterId);
 }
 

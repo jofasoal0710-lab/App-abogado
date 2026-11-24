@@ -173,6 +173,12 @@ const paths = {
       <path d="M9 21v-6h6v6M4 21h16" />
     </>
   ),
+  tareas: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="m8 10 2 2 4-4M8 16h8" />
+    </>
+  ),
   llave: (
     <>
       <circle cx="8" cy="15" r="4" />

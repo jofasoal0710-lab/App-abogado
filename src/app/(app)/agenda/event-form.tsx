@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/actions";
 import { toDateTimeLocalValue } from "@/lib/dates";
 import { entries, eventKindLabels } from "@/lib/labels";
 import { HEARING_MODES, HEARING_TYPES } from "@/lib/hearings";
+import { TASK_PRIORITIES } from "@/lib/tasks";
 
 export function EventForm({
   action,
@@ -50,6 +51,15 @@ export function EventForm({
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Prioridad" hint="Ordena el tablero de tareas.">
+          <select className="input" name="priority" defaultValue={event?.priority ?? "normal"}>
+            {Object.entries(TASK_PRIORITIES).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>

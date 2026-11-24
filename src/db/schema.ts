@@ -42,6 +42,9 @@ export const feeModeEnum = pgEnum("fee_mode", ["fijo", "horas", "porcentaje", "a
 /** Gastos del expediente que no son honorarios (no llevan IVA): se cobran aparte. */
 export const expenseKindEnum = pgEnum("expense_kind", ["timbre", "registro", "gasto", "viaticos"]);
 export const eventKindEnum = pgEnum("event_kind", ["audiencia", "plazo", "reunion", "tarea"]);
+/** Estado de trabajo (tablero de tareas). «hecha» va siempre a la par que `completed`. */
+export const taskStatusEnum = pgEnum("task_status", ["pendiente", "en_curso", "hecha"]);
+export const taskPriorityEnum = pgEnum("task_priority", ["baja", "normal", "alta", "urgente"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "borrador",
   "emitida",
@@ -313,6 +316,10 @@ export const events = pgTable(
     meetingUrl: text("meeting_url"),
     assignedId: integer("assigned_id").references(() => users.id, { onDelete: "set null" }),
     completed: boolean().notNull().default(false),
+    status: taskStatusEnum().notNull().default("pendiente"),
+    priority: taskPriorityEnum().notNull().default("normal"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

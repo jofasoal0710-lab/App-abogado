@@ -2,6 +2,9 @@ import { AssistantChat } from "@/components/assistant-chat";
 import { CommandPalette } from "@/components/command-palette";
 import { Sidebar, type NavGroup, type NavItem } from "@/components/sidebar";
 import { TimerBar } from "@/components/timer/timer-bar";
+import { and, eq, ne, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { events } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { can } from "@/lib/permissions";
@@ -10,6 +13,11 @@ import { currentTheme } from "@/lib/theme-server";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const theme = await currentTheme();
+  // Tareas abiertas asignadas a mí (y si alguna está vencida) para el contador del menú.
+  const [myTasks] = await db
+    .select({ open: sql<number>`count(*)::int`, overdue: sql<number>`count(*) filter (where ${events.startsAt} < now())::int` })
+    .from(events)
+    .where(and(eq(events.kind, "tarea"), eq(events.assignedId, user.id), ne(events.status, "hecha")));
 
   const groups: NavGroup[] = [
     { title: null, items: [{ href: "/", label: "Panel", icon: "panel" }] },
@@ -19,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         { href: "/expedientes", label: "Expedientes", icon: "expedientes" },
         { href: "/clientes", label: "Mis clientes", icon: "clientes" },
         { href: "/agenda", label: "Control de plazos", icon: "agenda" },
+        { href: "/tareas", label: "Tareas", icon: "tareas", badge: myTasks?.open || undefined, alert: (myTasks?.overdue ?? 0) > 0 },
         { href: "/horas", label: "Horas", icon: "horas" },
       ],
     },
