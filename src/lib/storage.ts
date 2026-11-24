@@ -55,6 +55,16 @@ export async function saveFile(data: Buffer, originalName: string): Promise<stri
   return key;
 }
 
+/** Guarda un fichero generado en el servidor (p. ej. un Word rellenado), con cualquier driver. */
+export async function saveServerFile(data: Buffer, originalName: string, contentType: string): Promise<string> {
+  if (storageDriver() === "s3") {
+    const key = newStorageKey(originalName);
+    await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: data, ContentType: contentType }));
+    return key;
+  }
+  return saveFile(data, originalName);
+}
+
 export function openFile(key: string) {
   return createReadStream(localPath(key));
 }

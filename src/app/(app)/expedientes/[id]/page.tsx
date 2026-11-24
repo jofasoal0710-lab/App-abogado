@@ -68,7 +68,7 @@ export default async function MatterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; error?: string; nuevo?: string; plantilla?: string }>;
+  searchParams: Promise<{ tab?: string; error?: string; nuevo?: string; plantilla?: string; generado?: string }>;
 }) {
   const user = await requireUser();
   const id = Number((await params).id);
@@ -156,6 +156,14 @@ export default async function MatterPage({
         }
       />
 
+      {sp.generado && tab === "documentos" && (
+        <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Documento generado y guardado en este expediente.{" "}
+          <Link className="link" href={`/api/documentos/${Number(sp.generado)}`}>
+            Descargarlo
+          </Link>
+        </p>
+      )}
       {sp.plantilla && Number(sp.plantilla) > 0 && (
         <p role="status" className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Se crearon {Number(sp.plantilla)} pasos de la plantilla en el control de plazos.
@@ -379,6 +387,11 @@ async function DocumentsTab({ matterId, user, portalShared, canShare, clientId }
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Link href={`/expedientes/${matterId}/plantilla-word`} className="btn-secondary btn-sm">
+          Generar desde plantilla Word
+        </Link>
+      </div>
       <UploadForm matterId={matterId} />
       <div className="card">
         <DocumentsTable rows={rows} user={user} showMatter={false} />

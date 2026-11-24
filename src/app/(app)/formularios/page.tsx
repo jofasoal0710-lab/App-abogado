@@ -18,7 +18,15 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
   ];
   return (
     <>
-      <PageHeader title="Formularios" subtitle="Modelos base de Costa Rica: revísalos y adáptalos a cada caso antes de presentarlos." />
+      <PageHeader
+        title="Formularios"
+        subtitle="Modelos base de Costa Rica: revísalos y adáptalos a cada caso antes de presentarlos."
+        actions={
+          <Link href="/formularios/plantillas" className="btn-secondary">
+            Plantillas Word propias
+          </Link>
+        }
+      />
       {groups.map((g) => (
         <section key={g.kind} id={g.kind === "escritura" ? "escrituras" : "escritos"} className="mb-8">
           <div className="mb-3 flex items-center gap-2">

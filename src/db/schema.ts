@@ -1093,3 +1093,21 @@ export const portalLinks = pgTable(
   (t) => [index("portal_links_client_idx").on(t.clientId)],
 ).enableRLS();
 export type PortalLink = typeof portalLinks.$inferSelect;
+
+/**
+ * Plantillas Word (.docx) propias del despacho, con campos entre llaves ({cliente}, {expediente}…). El
+ * fichero se guarda en el almacenamiento como cualquier documento; aquí, sus datos y los campos detectados.
+ */
+export const docTemplates = pgTable("doc_templates", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull(),
+  description: text(),
+  fileName: text("file_name").notNull(),
+  storageKey: text("storage_key").notNull().unique(),
+  sizeBytes: integer("size_bytes").notNull(),
+  /** Campos encontrados en el documento, en orden de aparición. */
+  fields: jsonb().$type<string[]>().notNull().default([]),
+  createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+export type DocTemplate = typeof docTemplates.$inferSelect;

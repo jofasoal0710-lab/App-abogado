@@ -1,7 +1,7 @@
 import "server-only";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { documents } from "@/db/schema";
+import { docTemplates, documents } from "@/db/schema";
 import { deleteFile, isAppKey, listStoredObjects, storageDriver } from "./storage";
 
 /**
@@ -11,7 +11,8 @@ import { deleteFile, isAppKey, listStoredObjects, storageDriver } from "./storag
  * al bucket y después la app lo registra. Si el registro no llega (pestaña cerrada, red caída o alguien
  * que pide URLs sin registrarlas), el objeto queda en el bucket sin documento. Aquí se borran los que
  * lleven más de ORPHAN_UPLOAD_MINUTES (60 por defecto: la URL de subida caduca a los 10 min y el token
- * de registro a los 15). Solo se tocan claves creadas por la app; lo demás del bucket, nunca.
+ * de registro a los 15). Solo se tocan claves creadas por la app; lo demás del bucket, nunca. Cuentan como
+ * registradas las claves de `documents` y de `doc_templates` (plantillas Word).
  */
 export type OrphanCleanup = { checked: number; candidates: number; deleted: number; aborted?: string };
 
@@ -35,6 +36,8 @@ export async function cleanupOrphanUploads(olderThanMinutes = orphanMinutes()): 
   for (let i = 0; i < old.length; i += 500) {
     const chunk = old.slice(i, i + 500);
     for (const r of await db.select({ k: documents.storageKey }).from(documents).where(inArray(documents.storageKey, chunk))) registered.add(r.k);
+    // Las plantillas Word también viven en el bucket con claves de la app: nunca son «huérfanas».
+    for (const r of await db.select({ k: docTemplates.storageKey }).from(docTemplates).where(inArray(docTemplates.storageKey, chunk))) registered.add(r.k);
   }
   const orphans = old.filter((k) => !registered.has(k));
 

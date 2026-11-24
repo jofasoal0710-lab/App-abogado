@@ -204,6 +204,13 @@
       "when": 1795541747299,
       "tag": "0028_tareas",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795542676018,
+      "tag": "0029_plantillas_word",
+      "breakpoints": true
     }
   ]
 }

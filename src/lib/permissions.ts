@@ -31,6 +31,11 @@ export const PERMISSIONS = {
     hint: "No solo de los que dio de alta. Incluye «Gestionar clientes».",
   },
   "documentos.borrar": { group: "Documentos y horas", label: "Eliminar documentos" },
+  "plantillas.gestionar": {
+    group: "Documentos y horas",
+    label: "Gestionar las plantillas Word del despacho",
+    hint: "Subir, sustituir y eliminar plantillas. Usarlas para generar documentos puede cualquiera.",
+  },
   "horas.borrar_todas": { group: "Documentos y horas", label: "Corregir y borrar horas de otras personas", hint: "Solo horas sin facturar. Cada persona puede corregir y borrar siempre las suyas." },
   "facturacion.ver": { group: "Facturación", label: "Ver facturas y cobros", hint: "Sección Facturas, importes pendientes y cobros del panel." },
   "facturacion.cobros": { group: "Facturación", label: "Registrar cobros", hint: "Incluye «Ver facturas y cobros»." },
@@ -92,7 +97,7 @@ export const SYSTEM_ROLES = {
   abogado: {
     name: "Abogado/a",
     description: "Lleva expedientes y factura.",
-    permissions: normalizePermissions(["clientes.gestionar", "documentos.borrar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar", "notaria.usar"]),
+    permissions: normalizePermissions(["clientes.gestionar", "documentos.borrar", "plantillas.gestionar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar", "notaria.usar"]),
   },
   asistente: {
     name: "Asistente",
