@@ -30,18 +30,34 @@ import { formatDuration, formatMoney } from "./money";
 import { can, type Permission } from "./permissions";
 import { logRead } from "./read-audit";
 import { likePattern } from "./search";
+import { parseCommand } from "./assistant-commands";
+import { commandAnswer, type ChatContext, type Proposal } from "./assistant-exec";
+import { spanishWordCheck } from "./spellcheck";
 
 export type AssistantItem = { label: string; detail?: string; href?: string };
-export type AssistantAnswer = { text: string; items?: AssistantItem[]; suggestions?: string[] };
+export type AssistantAnswer = { text: string; items?: AssistantItem[]; suggestions?: string[]; proposal?: Proposal; context?: ChatContext };
 
 const ACTIVE = ["abierto", "en_curso", "en_espera"] as const;
 const HELP_SUGGESTIONS = ["Resumen", "Plazos de esta semana", "Facturas pendientes", "Expedientes activos"];
 const NO_BILLING = "No tienes permiso para ver la facturación.";
 
 /** Responde a una pregunta con los datos que la persona puede ver (mismas reglas que el resto de la app). */
-export async function answer(user: CurrentUser, question: string): Promise<AssistantAnswer> {
+export async function answer(user: CurrentUser, question: string, ctx: ChatContext = {}): Promise<AssistantAnswer> {
+  // 1) ¿Es una orden que se puede ejecutar desde el chat? (crear tarea, registrar horas, cronómetro…)
+  const command = parseCommand(question, todayISO(), { isWord: await spanishWordCheck() });
+  if (command) return commandAnswer(user, command, ctx);
+  // «¿y sus plazos?», «estado de ese expediente»: lo que se refiere al expediente de la conversación.
+  if (ctx.matterNumber && /\b(ese|este|dicho|el mismo) (expediente|caso|asunto)\b|^(?:y )?(?:sus|su) /i.test(normalize(question)) && !/\bexp/.test(normalize(question).replace(/\b(ese|este|dicho|el mismo) expediente\b/, ""))) {
+    question = `${question} ${ctx.matterNumber}`;
+  }
   const intent = parseIntent(question);
   const res = await route(user, question, intent);
+  // Recuerda el expediente del que se habla, para las órdenes siguientes («crea una tarea en ese expediente»).
+  if (!res.context) {
+    const href = res.items?.find((i) => /^\/expedientes\/\d+/.test(i.href ?? ""))?.href;
+    const ref = intent.kind === "expediente" ? intent.ref : intent.kind === "escritos" || intent.kind === "generar" || intent.kind === "normativa" ? intent.ref : null;
+    if (href && ref) res.context = { matterId: Number(href.split("/")[2]), matterNumber: /^EXP-/.test(ref) ? ref : undefined };
+  }
   // Si se interpretó como un nombre de cliente que no existe («¿cuánto cobramos por la consulta?»),
   // quizá era una pregunta para la base de conocimiento. (Nunca con expedientes: un «no encuentro»
   // ahí es la respuesta correcta, también cuando es confidencial.)
@@ -97,8 +113,8 @@ async function route(user: CurrentUser, question: string, intent: ReturnType<typ
 function help(): AssistantAnswer {
   return {
     text:
-      "Puedo ayudarte con:\n- El despacho (con tus permisos): «estado del EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «escritos del EXP-2026-0001», «próxima escritura».\n- Dudas jurídicas, con la base de conocimiento y las leyes cargadas: «¿cuánto tengo para apelar una sentencia?», «¿cuándo prescribe un reclamo laboral?», «artículo 29 del código de trabajo».\n- Cálculos: «me notificaron el 20/11, ¿cuándo vence la apelación?», «liquidación de 3 años y 7 meses con salario de 600 000».\n- Redactar: «genera una demanda laboral para EXP-2026-0001».\nLo que el despacho añada en Conocimiento, lo uso para responder.",
-    suggestions: [...HELP_SUGGESTIONS, "¿Cuánto tengo para apelar una sentencia?", "Formularios"],
+      "Puedo ayudarte con:\n- El despacho (con tus permisos): «estado del EXP-2026-0001», «cliente Gerson», «¿cuánto debe Gerson?», «plazos de esta semana», «escritos del EXP-2026-0001», «próxima escritura».\n- Dudas jurídicas, con la base de conocimiento y las leyes cargadas: «¿cuánto tengo para apelar una sentencia?», «¿cuándo prescribe un reclamo laboral?», «artículo 29 del código de trabajo».\n- Cálculos: «me notificaron el 20/11, ¿cuándo vence la apelación?», «liquidación de 3 años y 7 meses con salario de 600 000».\n- Redactar: «genera una demanda laboral para EXP-2026-0001».\n- Hacer cosas (con confirmación): «crea una tarea urgente para mañana a las 3 pm asignada a Lucía: revisar contrato», «agenda una audiencia preliminar el 5/12 a las 9 en el EXP-2026-0001», «registra 1h30 en ese expediente: redacción de demanda», «inicia el cronómetro en EXP-2026-0001», «añade una nota al EXP-2026-0001: llamó el cliente», «marca como hecha la tarea revisar contrato», «pasa el EXP-2026-0001 a en espera».\n- Lo tuyo: «mis tareas de hoy», «¿cuántas horas llevo esta semana?».\nLo que el despacho añada en Conocimiento, lo uso para responder.",
+    suggestions: [...HELP_SUGGESTIONS, "Mis tareas", "¿Cuánto tengo para apelar una sentencia?"],
   };
 }
 

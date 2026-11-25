@@ -30,6 +30,12 @@ function getSpeller(): Promise<Speller> {
 
 const MAX_ISSUES = 150;
 
+/** ¿Es una palabra del español? (Para que el asistente no «corrija» palabras correctas.) */
+export async function spanishWordCheck(): Promise<(w: string) => boolean> {
+  const s = await getSpeller();
+  return (w) => s.correct(w);
+}
+
 export async function checkText(text: string): Promise<TextIssue[]> {
   const issues = styleIssues(text);
   const s = await getSpeller();

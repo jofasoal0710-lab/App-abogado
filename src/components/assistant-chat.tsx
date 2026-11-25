@@ -2,16 +2,76 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { askAssistantAction } from "@/app/(app)/asistente/actions";
+import { askAssistantAction, executeAssistantAction } from "@/app/(app)/asistente/actions";
 import type { AssistantAnswer } from "@/lib/assistant";
+import type { ChatContext, Proposal } from "@/lib/assistant-exec";
 
-type Message = { from: "yo" } & { text: string } | ({ from: "asistente" } & AssistantAnswer);
+type Message = ({ from: "yo" } & { text: string }) | ({ from: "asistente"; done?: boolean } & AssistantAnswer);
 
 const START: Message = {
   from: "asistente",
-  text: "Hola. Pregúntame por expedientes, clientes, cobros y plazos, o una duda jurídica: respondo con la base de conocimiento del despacho y las leyes cargadas, y hago cálculos de plazos y liquidaciones.",
-  suggestions: ["Resumen", "Plazos de esta semana", "¿Cuánto tengo para apelar una sentencia?", "Liquidación de 3 años con salario de 600 000"],
+  text: "Hola. Pregúntame por expedientes, clientes, cobros y plazos, o una duda jurídica. También puedo HACER cosas por ti: crear tareas y plazos, agendar audiencias, registrar horas, manejar el cronómetro, añadir notas o cambiar el estado de un expediente (siempre te pido confirmación).",
+  suggestions: ["Resumen", "Mis tareas", "Crea una tarea para mañana: revisar contrato", "Plazos de esta semana", "¿Cuánto tengo para apelar una sentencia?"],
 };
+
+/** Tarjeta para confirmar una acción: muestra lo entendido y deja corregir cada dato antes de ejecutar. */
+function ProposalCard({ proposal, disabled, onConfirm, onCancel }: { proposal: Proposal; disabled: boolean; onConfirm: (cmd: Record<string, string>) => void; onCancel: () => void }) {
+  const [cmd, setCmd] = useState<Record<string, string>>(proposal.cmd);
+  const set = (k: string, v: string) => setCmd((c) => ({ ...c, [k]: v }));
+  const missing = proposal.fields.filter((f) => f.required && !(cmd[f.name] ?? "").trim());
+  return (
+    <form
+      className="mt-2 space-y-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!missing.length) onConfirm(cmd);
+      }}
+      aria-label={proposal.summary}
+    >
+      <p className="text-xs text-ink-600">
+        <span className="font-semibold text-ink-800">Entendí:</span> {proposal.understood.join(" · ")}
+      </p>
+      {proposal.fields.map((f) => (
+        <label key={f.name} className={f.kind === "checkbox" ? "flex items-center gap-2 text-xs font-medium text-ink-700" : "block"}>
+          {f.kind !== "checkbox" && <span className="mb-0.5 block text-xs font-medium text-ink-700">{f.label}</span>}
+          {f.kind === "select" ? (
+            <select className="input py-1.5 text-sm" name={f.name} value={cmd[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)}>
+              {(f.options ?? []).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : f.kind === "textarea" ? (
+            <textarea className="input min-h-16 py-1.5 text-sm" name={f.name} value={cmd[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)} />
+          ) : f.kind === "checkbox" ? (
+            <>
+              <input type="checkbox" name={f.name} checked={cmd[f.name] === "on"} onChange={(e) => set(f.name, e.target.checked ? "on" : "")} />
+              {f.label}
+            </>
+          ) : (
+            <input
+              className="input py-1.5 text-sm"
+              name={f.name}
+              type={f.kind === "date" ? "date" : f.kind === "time" ? "time" : "text"}
+              placeholder={f.kind === "duration" ? "1:30" : undefined}
+              value={cmd[f.name] ?? ""}
+              onChange={(e) => set(f.name, e.target.value)}
+            />
+          )}
+        </label>
+      ))}
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button type="submit" className="btn-primary btn-sm" disabled={disabled || missing.length > 0} title={missing.length ? `Falta: ${missing.map((f) => f.label).join(", ")}` : undefined}>
+          {proposal.confirmLabel}
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={onCancel} disabled={disabled}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
 
 /** Burbuja de chat del asistente: abajo a la derecha en todas las pantallas. */
 export function AssistantChat() {
@@ -19,6 +79,8 @@ export function AssistantChat() {
   const [messages, setMessages] = useState<Message[]>([START]);
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
+  // El expediente del que se está hablando («crea una tarea en ese expediente»).
+  const [context, setContext] = useState<ChatContext>({});
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,9 +122,21 @@ export function AssistantChat() {
     setMessages((m) => [...m, { from: "yo", text: q }]);
     setInput("");
     startTransition(async () => {
-      const res = await askAssistantAction(q);
+      const res = await askAssistantAction(q, context);
+      if (res.context) setContext(res.context);
       setMessages((m) => [...m, { from: "asistente", ...res }]);
     });
+  }
+
+  function confirm(index: number, cmd: Record<string, string>) {
+    startTransition(async () => {
+      const res = await executeAssistantAction(cmd);
+      if (res.context) setContext(res.context);
+      setMessages((m) => [...m.map((x, i) => (i === index ? { ...x, done: true } : x)), { from: "asistente", ...res }]);
+    });
+  }
+  function cancel(index: number) {
+    setMessages((m) => [...m.map((x, i) => (i === index ? { ...x, done: true } : x)), { from: "asistente", text: "Cancelado: no he cambiado nada." }]);
   }
 
   return (
@@ -74,12 +148,12 @@ export function AssistantChat() {
         <section
           role="dialog"
           aria-label="Asistente del despacho"
-          className="flex h-[min(34rem,calc(100dvh-7rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-2xl shadow-brand-900/20"
+          className="flex h-[min(38rem,calc(100dvh-7rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-2xl shadow-brand-900/20"
         >
           <header className="flex items-center justify-between bg-brand-700 px-4 py-3 text-white">
             <div>
               <p className="font-serif text-base font-semibold">Asistente</p>
-              <p className="text-xs text-white/80">Despacho, conocimiento, leyes y cálculos</p>
+              <p className="text-xs text-white/80">{context.matterNumber ? `Hablando de ${context.matterNumber}` : "Consultas, cálculos y acciones"}</p>
             </div>
             <button onClick={() => setOpen(false)} className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Cerrar el asistente">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -98,6 +172,8 @@ export function AssistantChat() {
                 <div key={i} className="max-w-[92%] space-y-2">
                   <div className="rounded-2xl rounded-bl-sm border border-ink-200 bg-surface px-3.5 py-2.5 text-sm text-ink-800">
                     <p className="whitespace-pre-line">{m.text}</p>
+                    {m.proposal && !m.done && <ProposalCard proposal={m.proposal} disabled={pending} onConfirm={(cmd) => confirm(i, cmd)} onCancel={() => cancel(i)} />}
+                    {m.proposal && m.done && <p className="mt-1 text-xs text-ink-500">({m.proposal.summary})</p>}
                     {m.items && m.items.length > 0 && (
                       <ul className="mt-2 divide-y divide-ink-100">
                         {m.items.map((it, j) => (
@@ -141,7 +217,7 @@ export function AssistantChat() {
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              maxLength={300}
+              maxLength={500}
               className="input"
               placeholder="Escribe tu pregunta…"
               aria-label="Pregunta para el asistente"
