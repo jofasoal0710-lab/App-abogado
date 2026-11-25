@@ -95,13 +95,13 @@ describe("CSP (OWASP-A02-001)", () => {
     expect(script).not.toContain("unsafe-eval");
     for (const d of ["object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"]) expect(csp).toContain(d);
   });
-  it("permite subir directamente al bucket S3 configurado (y a nada más)", async () => {
+  it("permite subir directamente al bucket S3 configurado (y a Hacienda para la consulta de cédulas; a nada más)", async () => {
     const { buildCsp, s3Origins } = await import("../src/lib/csp");
     expect(s3Origins({ STORAGE_DRIVER: "local", S3_ENDPOINT: "https://x.example" })).toEqual([]);
     expect(s3Origins({ STORAGE_DRIVER: "s3", S3_BUCKET: "documentos", S3_ENDPOINT: "https://abcd.storage.supabase.co/storage/v1/s3", S3_FORCE_PATH_STYLE: "true" })).toEqual(["https://abcd.storage.supabase.co"]);
     expect(s3Origins({ STORAGE_DRIVER: "s3", S3_BUCKET: "docs", S3_ENDPOINT: "https://cuenta.r2.cloudflarestorage.com" })).toEqual(["https://cuenta.r2.cloudflarestorage.com", "https://docs.cuenta.r2.cloudflarestorage.com"]);
     expect(s3Origins({ STORAGE_DRIVER: "s3", S3_BUCKET: "docs", S3_REGION: "eu-west-1" })).toEqual(["https://docs.s3.eu-west-1.amazonaws.com", "https://docs.s3.amazonaws.com"]);
     const connect = buildCsp("n", { STORAGE_DRIVER: "s3", S3_BUCKET: "documentos", S3_ENDPOINT: "https://abcd.storage.supabase.co/storage/v1/s3", S3_FORCE_PATH_STYLE: "true" }).split("; ").find((d) => d.startsWith("connect-src"));
-    expect(connect).toBe("connect-src 'self' https://abcd.storage.supabase.co");
+    expect(connect).toBe("connect-src 'self' https://api.hacienda.go.cr https://abcd.storage.supabase.co");
   });
 });

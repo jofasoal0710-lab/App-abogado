@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { onlyDigits } from "@/lib/cr-id";
+import { HACIENDA_PUBLIC_URL, parseHacienda } from "@/lib/hacienda-lookup";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,10 @@ export const dynamic = "force-dynamic";
  * Solo para usuarios con sesión, con un límite por persona, y sin guardar nada: el formulario rellena el
  * nombre y la persona decide si lo guarda.
  */
-const HACIENDA_URL = () => process.env.HACIENDA_API_URL || "https://api.hacienda.go.cr/fe/ae";
+const HACIENDA_URL = () => process.env.HACIENDA_API_URL || HACIENDA_PUBLIC_URL;
 const TIMEOUT_MS = 8000;
 const MAX_PER_MINUTE = 20;
 const recent = new Map<number, number[]>();
-
-const TYPE_BY_CODE: Record<string, string> = { "01": "cedula_fisica", "02": "cedula_juridica", "03": "dimex", "04": "nite" };
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -37,17 +36,17 @@ export async function GET(req: Request) {
     return Response.json({ error: "Hacienda no responde ahora mismo. Inténtalo más tarde o escribe los datos a mano." }, { status: 502 });
   }
   if (res.status === 404) return Response.json({ error: "Hacienda no tiene registrado ese número como contribuyente. Escribe el nombre a mano." }, { status: 404 });
+  // 403: Hacienda bloquea al servidor (por su ubicación). El navegador lo intentará directamente.
+  if (res.status === 403 || res.status === 401) return Response.json({ error: "Hacienda no acepta consultas desde el servidor.", blocked: true }, { status: 502 });
   if (!res.ok) return Response.json({ error: `Hacienda respondió con un error (${res.status}). Escribe los datos a mano.` }, { status: 502 });
 
-  let data: { nombre?: unknown; tipoIdentificacion?: unknown; situacion?: { estado?: unknown } };
+  let data: unknown;
   try {
     data = await res.json();
   } catch {
     return Response.json({ error: "Respuesta de Hacienda no válida." }, { status: 502 });
   }
-  const name = typeof data.nombre === "string" ? data.nombre.replace(/\s+/g, " ").trim().slice(0, 200) : "";
-  if (!name) return Response.json({ error: "Hacienda no devolvió un nombre para ese número." }, { status: 404 });
-  const code = typeof data.tipoIdentificacion === "string" ? data.tipoIdentificacion : "";
-  const status = typeof data.situacion?.estado === "string" ? data.situacion.estado.slice(0, 60) : null;
-  return Response.json({ name, idType: TYPE_BY_CODE[code] ?? null, status });
+  const found = parseHacienda(data);
+  if (!found) return Response.json({ error: "Hacienda no devolvió un nombre para ese número." }, { status: 404 });
+  return Response.json(found);
 }

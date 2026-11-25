@@ -41,7 +41,8 @@ export function buildCsp(nonce: string, env: Env = process.env): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src ${["'self'", ...s3Origins(env), ...(dev ? ["ws:"] : [])].join(" ")}`,
+    // Hacienda: consulta pública de contribuyentes desde el navegador si rechaza al servidor (ver lib/hacienda-lookup.ts).
+    `connect-src ${["'self'", "https://api.hacienda.go.cr", ...s3Origins(env), ...(dev ? ["ws:"] : [])].join(" ")}`,
     // Solo el service worker propio (public/sw.js), que no guarda datos privados.
     "worker-src 'self'",
     "manifest-src 'self'",

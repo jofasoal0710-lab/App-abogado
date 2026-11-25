@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ageOn, guessIdType, ID_TYPES, MARITAL_STATUS, type IdType } from "@/lib/cr-id";
+import { ageOn, guessIdType, ID_TYPES, MARITAL_STATUS, onlyDigits, type IdType } from "@/lib/cr-id";
+import { HACIENDA_PUBLIC_URL, parseHacienda } from "@/lib/hacienda-lookup";
 import { clientTypeLabels } from "@/lib/labels";
 import { nameLooksLikeId } from "@/lib/client-rules";
 
@@ -33,8 +34,18 @@ export function IdentityFields({ initial, today }: { initial: Initial; today: st
     setLookup({ state: "loading" });
     try {
       const res = await fetch(`/api/hacienda?id=${encodeURIComponent(taxId)}`, { cache: "no-store" });
-      const data = (await res.json()) as { name?: string; idType?: IdType | null; status?: string | null; error?: string };
-      if (!res.ok || !data.name) return setLookup({ state: "error", message: data.error ?? "No se pudo consultar." });
+      let data = (await res.json()) as { name?: string; idType?: IdType | null; status?: string | null; error?: string; blocked?: boolean };
+      // Hacienda rechaza al servidor (está fuera de la región): la consulta la hace este navegador.
+      if (data.blocked) {
+        const direct = await fetch(`${HACIENDA_PUBLIC_URL}?identificacion=${onlyDigits(taxId)}`, { cache: "no-store", headers: { accept: "application/json" } }).catch(() => null);
+        if (!direct) return setLookup({ state: "error", message: "Hacienda no responde ahora mismo. Escribe los datos a mano." });
+        if (direct.status === 404) return setLookup({ state: "error", message: "Hacienda no tiene registrado ese número como contribuyente. Escribe el nombre a mano." });
+        const parsed = direct.ok ? parseHacienda(await direct.json().catch(() => null)) : null;
+        if (!parsed) return setLookup({ state: "error", message: `Hacienda respondió con un error (${direct.status}). Escribe los datos a mano.` });
+        data = { ...parsed, idType: parsed.idType as IdType | null };
+      }
+      if (!res.ok && !data.name) return setLookup({ state: "error", message: data.error ?? "No se pudo consultar." });
+      if (!data.name) return setLookup({ state: "error", message: data.error ?? "No se pudo consultar." });
       setName(data.name);
       if (data.idType) {
         setIdType(data.idType);
