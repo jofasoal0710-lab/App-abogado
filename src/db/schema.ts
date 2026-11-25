@@ -1179,3 +1179,31 @@ export const intakeFiles = pgTable(
   },
   (t) => [index("intake_files_request_idx").on(t.requestId)],
 ).enableRLS();
+
+/**
+ * Demandas recibidas analizadas para preparar la contestación: el texto extraído del documento, lo que la
+ * app reconoció (hechos, pretensiones, prueba, plazo…) y las respuestas del abogado, hecho por hecho.
+ */
+export const demandAnalyses = pgTable(
+  "demand_analyses",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    matterId: integer("matter_id")
+      .notNull()
+      .references(() => matters.id, { onDelete: "cascade" }),
+    /** Documento del expediente del que salió el texto (si se pegó a mano, null). */
+    documentId: integer("document_id").references(() => documents.id, { onDelete: "set null" }),
+    sourceName: text("source_name").notNull(),
+    text: text().notNull(),
+    analysis: jsonb().notNull(),
+    answers: jsonb().notNull().default({}),
+    /** Escrito de contestación generado (formularios) y plazo añadido al control de plazos. */
+    writingId: integer("writing_id").references(() => writings.id, { onDelete: "set null" }),
+    eventId: integer("event_id").references(() => events.id, { onDelete: "set null" }),
+    createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("demand_analyses_matter_idx").on(t.matterId)],
+).enableRLS();
+export type DemandAnalysisRow = typeof demandAnalyses.$inferSelect;

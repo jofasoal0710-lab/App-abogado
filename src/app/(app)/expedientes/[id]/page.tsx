@@ -388,6 +388,9 @@ async function DocumentsTab({ matterId, user, portalShared, canShare, clientId }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-end gap-2">
+        <Link href={`/expedientes/${matterId}/contestar`} className="btn-secondary btn-sm">
+          Analizar una demanda recibida
+        </Link>
         <Link href={`/expedientes/${matterId}/plantilla-word`} className="btn-secondary btn-sm">
           Generar desde plantilla Word
         </Link>
@@ -682,9 +685,14 @@ async function WritingsTab({ matterId, justCreated }: { matterId: number; justCr
       <section className="card">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 className="font-serif text-lg font-semibold">Escritos del expediente</h2>
-          <Link href={`/formularios?expediente=${matterId}`} className="btn-primary btn-sm">
-            Generar escrito
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/expedientes/${matterId}/contestar`} className="btn-secondary btn-sm">
+              Contestar una demanda
+            </Link>
+            <Link href={`/formularios?expediente=${matterId}`} className="btn-primary btn-sm">
+              Generar escrito
+            </Link>
+          </div>
         </div>
         {rows.length === 0 ? (
           <EmptyState title="Aún no hay escritos">Genera uno desde los formularios: demanda, contestación, recursos…</EmptyState>
