@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { str, type ActionState } from "@/lib/actions";
 import { isClientIpTrusted } from "@/lib/client-ip";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { PROVISIONAL_PASSWORD_DAYS, provisionalExpired } from "@/lib/passwords";
 import { MAX_PER_EMAIL, MAX_PER_IP, MAX_PER_IP_EMAIL, clearFailures, emailKey, ipAnyKey, ipEmailKey, isRateLimited, registerFailure } from "@/lib/rate-limit";
 import { checkSecondFactor, clearPendingLogin, readPendingLogin, setPendingLogin } from "@/lib/mfa";
@@ -31,6 +32,16 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
 
   // Solo se confía en la cabecera de IP que se configure (CLIENT_IP_HEADER); ver lib/client-ip.ts.
   const { ip, userAgent } = await requestMeta();
+  // Verificación anti-robots (Cloudflare Turnstile), antes de mirar la contraseña. Si Cloudflare no responde,
+  // se deja entrar (los límites de intentos siguen activos) para no dejar al despacho sin acceso, y se anota.
+  const human = await verifyTurnstile(formData, "login", ip);
+  if (!human.ok) {
+    if (!human.unavailable) {
+      if (!(await loggedRecently("antirobots_rechazado", { ip }, 15))) await logSecurityEvent("antirobots_rechazado", { email, ip, detail: `login: ${human.reason}` });
+      return { error: "No se pudo completar la verificación anti-robots. Espera a que termine (la casilla de Cloudflare) y vuelve a intentarlo." };
+    }
+    if (!(await loggedRecently("antirobots_no_disponible", { ip }, 60))) await logSecurityEvent("antirobots_no_disponible", { email, ip, detail: human.reason });
+  }
   const byIp = ipEmailKey(ip, email);
   const byEmail = emailKey(email);
   // Límite por IP entre TODAS las cuentas (una contraseña probada contra muchos correos): solo si la IP es fiable.

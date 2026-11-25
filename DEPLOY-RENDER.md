@@ -164,6 +164,23 @@ Cada comprobante guarda el XML firmado y la respuesta de Hacienda (descargables 
 - **IP del cliente (`CLIENT_IP_HEADER`):** sin ella, la IP que se anota puede estar falseada y el límite por IP entre cuentas está desactivado (a propósito: si todo pareciera venir de la misma IP, bloquearía a todo el despacho). Para configurarla: entra como administrador en **Seguridad → Detección de la IP de origen**; ahí ves qué cabeceras llegan y con qué IP. Busca tu IP pública (p. ej. «cuál es mi IP» en un buscador), elige la cabecera que la contiene **sola** y añádela en *Environment* como `CLIENT_IP_HEADER`.
 - **Política de seguridad de contenido (CSP):** cada página solo ejecuta los scripts de la propia app (con un *nonce* por respuesta); un HTML inyectado no puede ejecutar código. Si añades algo externo (analítica, chat…), habría que permitirlo en `src/lib/csp.ts`.
 
+## 7b. Cloudflare Turnstile (verificación anti-robots)
+
+Protege el **inicio de sesión** y el **formulario público de solicitudes** frente a robots (relleno de credenciales, spam). Es gratuito y funciona con la dirección de Render, sin dominio propio.
+
+1. Crea una cuenta en Cloudflare (gratis) → **Turnstile** → **Add widget**.
+2. Nombre: «Bufete». **Hostname:** `app-abogado-do0k.onrender.com` (y tu dominio, si algún día lo usas). **Widget mode:** *Managed*.
+3. Copia la **Site Key** y la **Secret Key**.
+4. En Render → *Environment*, añade `TURNSTILE_SITE_KEY` y `TURNSTILE_SECRET_KEY` y guarda (se vuelve a desplegar solo).
+
+Comportamiento:
+- Sin las dos claves no se pide verificación (todo funciona como antes).
+- **Login:** si Cloudflare no responde, se deja entrar (siguen los límites de intentos) y se anota «Cloudflare Turnstile no respondió» en Seguridad, para no dejar al despacho sin acceso.
+- **Formulario público:** si Cloudflare no responde, no se aceptan envíos en ese momento.
+- Un token sirve una sola vez y solo para su formulario (el del login no vale para el público).
+
+Para poner **toda** la app detrás de Cloudflare (cortafuegos WAF, límite de peticiones, protección DDoS) hace falta un **dominio propio** en Cloudflare apuntando a Render con el proxy activado; con `*.onrender.com` no es posible.
+
 ## 8. Qué está verificado y qué no
 
 **Verificado en local**, simulando Render con la mayor fidelidad posible: una **copia limpia del repositorio** (como un clon nuevo), `npm ci --include=dev` con `NODE_ENV=production`, el `buildCommand` y el `startCommand` exactos de `render.yaml`, `PORT=10000`, las variables de entorno de producción y un emulador S3:

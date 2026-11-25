@@ -31,9 +31,12 @@ export function s3Origins(env: Env): string[] {
 
 export function buildCsp(nonce: string, env: Env = process.env): string {
   const dev = env.NODE_ENV === "development";
+  // Cloudflare Turnstile (anti-robots), solo si está configurado: su script y su marco.
+  const turnstile = env.TURNSTILE_SITE_KEY?.trim() && env.TURNSTILE_SECRET_KEY?.trim() ? " https://challenges.cloudflare.com" : "";
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${turnstile}${dev ? " 'unsafe-eval'" : ""}`,
+    `frame-src 'self'${turnstile}`,
     // Estilos en línea (atributos style de React): no ejecutan código.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",

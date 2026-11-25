@@ -36,6 +36,12 @@ services:
       - key: DATABASE_POOL_MAX
         value: "5"
 
+      # --- Cloudflare Turnstile (anti-robots en login y formulario público). Ver DEPLOY-RENDER.md, 7b ---
+      - key: TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+
       # --- Documentos: S3 obligatorio, el disco del plan gratuito es efímero ---
       - key: STORAGE_DRIVER
         value: s3

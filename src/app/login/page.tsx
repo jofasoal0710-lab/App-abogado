@@ -7,6 +7,9 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { safeNext } from "@/lib/safe-redirect";
+import { headers } from "next/headers";
+import { Turnstile } from "@/components/turnstile";
+import { turnstileSiteKey } from "@/lib/turnstile-core";
 import { loginAction } from "./actions";
 
 export const metadata: Metadata = { title: "Iniciar sesión" };
@@ -21,6 +24,8 @@ export default async function LoginPage({
   const user = await getSessionUser();
   if (user?.mustChangePassword) redirect("/cambiar-contrasena");
   if (user) redirect(safeNext(next));
+  const siteKey = turnstileSiteKey();
+  const nonce = siteKey ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
   return (
     <main className="flex min-h-screen items-center justify-center bg-brand-700 px-4 py-10">
       <div className="w-full max-w-sm">
@@ -40,6 +45,7 @@ export default async function LoginPage({
             <Field label="Contraseña">
               <PasswordInput name="password" autoComplete="current-password" required />
             </Field>
+            {siteKey && <Turnstile siteKey={siteKey} action="login" nonce={nonce} />}
             <SubmitButton className="btn-primary w-full" pendingText="Entrando…">
               Entrar
             </SubmitButton>

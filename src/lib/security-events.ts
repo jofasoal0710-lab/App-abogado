@@ -28,6 +28,8 @@ export const SECURITY_EVENT_LABELS = {
   portal_enlace_revocado: "Enlace del portal del cliente revocado",
   portal_entrada: "Un cliente entró en su portal",
   portal_descarga: "Un cliente descargó un documento o factura desde su portal",
+  antirobots_rechazado: "Verificación anti-robots (Turnstile) no superada",
+  antirobots_no_disponible: "Cloudflare Turnstile no respondió: se dejó entrar sin verificación",
 } as const;
 
 export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
@@ -35,6 +37,7 @@ export type SecurityEventKind = keyof typeof SECURITY_EVENT_LABELS;
 /** Eventos que conviene que un administrador revise con atención. */
 export const NOTABLE_EVENTS: ReadonlySet<SecurityEventKind> = new Set([
   "login_bloqueado",
+  "antirobots_no_disponible",
   "contrasena_actual_incorrecta",
   "contrasena_restablecida",
   "rol_cambiado",

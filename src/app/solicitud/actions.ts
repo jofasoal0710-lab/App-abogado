@@ -1,13 +1,15 @@
 "use server";
 
+import { gt, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { intakeFiles, intakeRequests } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
-import { INTAKE_GLOBAL_PER_HOUR, INTAKE_MAX_FILES, INTAKE_PER_IP_PER_HOUR, checkIntakeFile, magicMatches, parseIntake } from "@/lib/intake";
+import { INTAKE_DAILY_FILE_BYTES, INTAKE_GLOBAL_PER_HOUR, INTAKE_MAX_FILES, INTAKE_PER_IP_PER_HOUR, checkIntakeFile, magicMatches, parseIntake } from "@/lib/intake";
 import { getIntakeSettings, notifyNewIntake } from "@/lib/intake-db";
 import { consumeQuota } from "@/lib/rate-limit";
-import { requestMeta } from "@/lib/security-log";
+import { loggedRecently, logSecurityEvent, requestMeta } from "@/lib/security-log";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { deleteFile, saveServerFile } from "@/lib/storage";
 
 export type IntakeState = { errors?: string[] } | undefined;
@@ -51,11 +53,30 @@ export async function submitIntakeAction(_prev: IntakeState, formData: FormData)
   if (errors.length || !parsed.ok) return { errors };
 
   const { ip } = await requestMeta();
+  // Verificación anti-robots (Cloudflare Turnstile). Aquí, si Cloudflare no responde, no se acepta el envío.
+  const human = await verifyTurnstile(formData, "solicitud", ip);
+  if (!human.ok) {
+    if (!human.unavailable && !(await loggedRecently("antirobots_rechazado", { ip }, 15))) await logSecurityEvent("antirobots_rechazado", { ip, detail: `solicitud: ${human.reason}` });
+    return {
+      errors: [human.unavailable ? "No se pudo completar la verificación anti-robots en este momento. Inténtalo de nuevo en unos minutos o llama al despacho." : "No se pudo completar la verificación anti-robots. Espera a que termine (la casilla de Cloudflare, al final del formulario) y vuelve a enviar."],
+    };
+  }
   if (ip !== "local" && (await consumeQuota(`intake|ip|${ip}`, INTAKE_PER_IP_PER_HOUR, 60))) {
     return { errors: ["Has enviado varias solicitudes en poco tiempo. Espera un rato o contacta al despacho por teléfono."] };
   }
   if (await consumeQuota("intake|global", INTAKE_GLOBAL_PER_HOUR, 60)) {
     return { errors: ["El formulario está recibiendo muchas solicitudes ahora mismo. Inténtalo de nuevo en una hora o contacta al despacho por teléfono."] };
+  }
+
+  if (checked.length) {
+    const [{ bytes }] = await db
+      .select({ bytes: sql<number>`coalesce(sum(${intakeFiles.sizeBytes}), 0)::bigint` })
+      .from(intakeFiles)
+      .where(gt(intakeFiles.createdAt, sql`now() - interval '24 hours'`));
+    const adding = checked.reduce((n, f) => n + f.data.length, 0);
+    if (Number(bytes) + adding > INTAKE_DAILY_FILE_BYTES) {
+      return { errors: ["Hoy ya se recibieron muchos documentos por este formulario. Envía tu solicitud sin adjuntos: el despacho te los pedirá al contactarte."] };
+    }
   }
 
   const saved: string[] = [];

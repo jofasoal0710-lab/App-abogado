@@ -28,6 +28,8 @@ export const INTAKE_FILE_TYPES: Record<string, string> = {
 /** Cupos del formulario: por IP y en total (si alguien lo inunda, el despacho no recibe miles de solicitudes). */
 export const INTAKE_PER_IP_PER_HOUR = 5;
 export const INTAKE_GLOBAL_PER_HOUR = 40;
+/** Tope de adjuntos de solicitudes en 24 horas (protege el almacenamiento frente a envíos masivos). */
+export const INTAKE_DAILY_FILE_BYTES = 200 * 1024 * 1024;
 /** Las descartadas se borran solas pasado este tiempo (minimización de datos, Ley 8968). */
 export const INTAKE_DISCARDED_RETENTION_DAYS = 180;
 

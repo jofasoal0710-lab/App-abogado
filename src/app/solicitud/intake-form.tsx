@@ -4,6 +4,7 @@ import { startTransition, useActionState, useState } from "react";
 import { ID_TYPES, MARITAL_STATUS } from "@/lib/cr-id";
 import { CONTACT_OPTIONS, INTAKE_AREAS, INTAKE_MAX_FILES, INTAKE_MAX_FILE_BYTES } from "@/lib/intake";
 import { areaLabels } from "@/lib/labels";
+import { Turnstile } from "@/components/turnstile";
 import { submitIntakeAction } from "./actions";
 
 const AREA_HELP: Record<string, string> = {
@@ -19,7 +20,7 @@ const AREA_HELP: Record<string, string> = {
 };
 
 /** Formulario público de solicitud: datos de contacto, el caso, documentos y aviso de privacidad. */
-export function IntakeForm({ firmName, today }: { firmName: string; today: string }) {
+export function IntakeForm({ firmName, today, siteKey, nonce }: { firmName: string; today: string; siteKey?: string | null; nonce?: string }) {
   const [state, formAction, pending] = useActionState(submitIntakeAction, undefined);
   const [type, setType] = useState<"persona" | "empresa">("persona");
   const [fileNote, setFileNote] = useState<string | null>(null);
@@ -205,6 +206,7 @@ export function IntakeForm({ firmName, today }: { firmName: string; today: strin
         </label>
       </section>
 
+      {siteKey && <Turnstile siteKey={siteKey} action="solicitud" nonce={nonce} />}
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="btn-primary px-6 py-3 text-base" disabled={pending}>
           {pending ? "Enviando…" : "Enviar solicitud"}

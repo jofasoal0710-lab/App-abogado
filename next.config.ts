@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Los documentos se suben mediante Server Actions: límite algo por encima de los 25 MB permitidos.
+  // Los documentos se suben mediante Server Actions: límite justo por encima de los 25 MB permitidos (el
+  // cuerpo se lee antes de comprobar la sesión, así que no conviene dejar margen de más; SEC-014).
   experimental: {
-    serverActions: { bodySizeLimit: "30mb" },
+    serverActions: { bodySizeLimit: "26mb" },
   },
   serverExternalPackages: ["pg", "@dojocoding/hacienda-sdk", "nspell", "dictionary-es", "mammoth"],
   // No anunciar el framework en cada respuesta (X-Powered-By: Next.js).

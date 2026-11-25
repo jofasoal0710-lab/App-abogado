@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { config } from "@/lib/config";
 import { todayISO } from "@/lib/dates";
+import { headers } from "next/headers";
 import { getIntakeSettings } from "@/lib/intake-db";
+import { turnstileSiteKey } from "@/lib/turnstile-core";
 import { IntakeForm } from "./intake-form";
 
 export const metadata: Metadata = { title: "Solicitar una consulta" };
@@ -10,6 +12,8 @@ export const dynamic = "force-dynamic";
 /** Formulario público para posibles clientes (sin sesión). Solo funciona si el despacho lo ha activado. */
 export default async function IntakePage() {
   const settings = await getIntakeSettings();
+  const siteKey = turnstileSiteKey();
+  const nonce = siteKey ? ((await headers()).get("x-nonce") ?? undefined) : undefined;
   return (
     <div className="min-h-screen bg-ink-50">
       <header className="border-b border-ink-200 bg-white">
@@ -26,7 +30,7 @@ export default async function IntakePage() {
               {settings.intro?.trim() || "Rellena este formulario y un abogado o abogada del despacho revisará tu consulta y te contactará. Solo te llevará unos minutos."}
             </p>
             <div className="mt-6">
-              <IntakeForm firmName={config.firmName} today={todayISO()} />
+              <IntakeForm firmName={config.firmName} today={todayISO()} siteKey={siteKey} nonce={nonce} />
             </div>
           </>
         ) : (
