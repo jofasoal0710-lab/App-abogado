@@ -1113,3 +1113,69 @@ export const docTemplates = pgTable("doc_templates", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 export type DocTemplate = typeof docTemplates.$inferSelect;
+
+/** Ajustes del formulario público de solicitudes (una sola fila, id = 1). Desactivado hasta que se active. */
+export const intakeSettings = pgTable("intake_settings", {
+  id: integer().primaryKey(),
+  enabled: boolean().notNull().default(false),
+  /** Texto de bienvenida que ve la persona antes de rellenar el formulario. */
+  intro: text(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/**
+ * Solicitudes de posibles clientes enviadas desde el formulario público (/solicitud). No dan acceso a nada:
+ * se revisan (con la búsqueda de conflictos de interés) y, si se aceptan, se convierten en cliente y expediente.
+ */
+export const intakeRequests = pgTable(
+  "intake_requests",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** pendiente | aceptada | descartada */
+    status: text().notNull().default("pendiente"),
+    clientType: clientTypeEnum("client_type").notNull().default("persona"),
+    name: text().notNull(),
+    idType: text("id_type"),
+    taxId: text("tax_id"),
+    birthDate: date("birth_date"),
+    maritalStatus: text("marital_status"),
+    email: text().notNull(),
+    phone: text().notNull(),
+    address: text(),
+    area: matterAreaEnum().notNull().default("otros"),
+    summary: text().notNull(),
+    opposingParty: text("opposing_party"),
+    /** Fecha límite que indica la persona (una audiencia, un plazo que le notificaron…). */
+    deadline: date(),
+    preferredContact: text("preferred_contact"),
+    /** Momento en que aceptó el aviso de protección de datos (Ley 8968). */
+    consentAt: timestamp("consent_at", { withTimezone: true }).notNull(),
+    reviewedById: integer("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+    /** Constancia de la revisión de conflictos hecha al decidir (qué se buscó y qué salió). */
+    conflictSummary: text("conflict_summary"),
+    clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+    matterId: integer("matter_id").references(() => matters.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("intake_requests_status_idx").on(t.status, t.createdAt)],
+).enableRLS();
+export type IntakeRequest = typeof intakeRequests.$inferSelect;
+
+/** Documentos que adjunta la persona. Al aceptar la solicitud pasan a ser documentos del expediente. */
+export const intakeFiles = pgTable(
+  "intake_files",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    requestId: integer("request_id")
+      .notNull()
+      .references(() => intakeRequests.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("intake_files_request_idx").on(t.requestId)],
+).enableRLS();

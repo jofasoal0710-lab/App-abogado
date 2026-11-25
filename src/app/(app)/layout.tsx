@@ -8,6 +8,7 @@ import { events } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { can } from "@/lib/permissions";
+import { pendingIntakeCount } from "@/lib/intake-db";
 import { currentTheme } from "@/lib/theme-server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .select({ open: sql<number>`count(*)::int`, overdue: sql<number>`count(*) filter (where ${events.startsAt} < now())::int` })
     .from(events)
     .where(and(eq(events.kind, "tarea"), eq(events.assignedId, user.id), ne(events.status, "hecha")));
+  const intakePending = can(user, "solicitudes.gestionar") ? await pendingIntakeCount() : 0;
 
   const groups: NavGroup[] = [
     { title: null, items: [{ href: "/", label: "Panel", icon: "panel" }] },
@@ -26,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       items: [
         { href: "/expedientes", label: "Expedientes", icon: "expedientes" },
         { href: "/clientes", label: "Mis clientes", icon: "clientes" },
+        ...(can(user, "solicitudes.gestionar") ? [{ href: "/solicitudes", label: "Solicitudes", icon: "bandeja", badge: intakePending || undefined, badgeLabel: "pendientes" } satisfies NavItem] : []),
         { href: "/agenda", label: "Control de plazos", icon: "agenda" },
         { href: "/tareas", label: "Tareas", icon: "tareas", badge: myTasks?.open || undefined, alert: (myTasks?.overdue ?? 0) > 0 },
         { href: "/horas", label: "Horas", icon: "horas" },

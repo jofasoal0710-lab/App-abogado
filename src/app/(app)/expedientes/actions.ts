@@ -15,7 +15,7 @@ import { ACCESS_DENIED, CLIENT_ACCESS_DENIED, activeHolderIds, canManageMatterAc
 import { requirePermission, requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
-import { formatNumber, nextSequence } from "@/lib/numbering";
+import { nextMatterNumber } from "@/lib/matter-number";
 import { deleteFile } from "@/lib/storage";
 import { can } from "@/lib/permissions";
 import { stampSessionActor, asSessionActor, asActor } from "@/lib/data-audit";
@@ -102,19 +102,9 @@ export async function createMatterAction(_prev: ActionState, formData: FormData)
     if (!resp?.active) return { error: "El responsable de un expediente confidencial debe ser una persona activa." };
   }
 
-  const year = new Date().getFullYear();
-  const prefix = "EXP";
   const row = await db.transaction(async (tx) => {
     await stampSessionActor(tx);
-    // Bloqueo por transacción: dos altas simultáneas no pueden obtener el mismo número.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('matter_number'))`);
-    const [last] = await tx
-      .select({ number: matters.number })
-      .from(matters)
-      .where(like(matters.number, `${prefix}-${year}-%`))
-      .orderBy(desc(matters.number))
-      .limit(1);
-    const number = formatNumber(prefix, year, nextSequence(last?.number, prefix, year));
+    const number = await nextMatterNumber(tx);
     const [created] = await tx
       .insert(matters)
       .values({ ...result.data, visibility, number })

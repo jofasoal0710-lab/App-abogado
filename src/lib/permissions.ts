@@ -30,6 +30,11 @@ export const PERMISSIONS = {
     label: "Cambiar la confidencialidad de cualquier cliente",
     hint: "No solo de los que dio de alta. Incluye «Gestionar clientes».",
   },
+  "solicitudes.gestionar": {
+    group: "Clientes",
+    label: "Revisar las solicitudes de nuevos clientes",
+    hint: "Ver las consultas que llegan por el formulario público, revisar conflictos, aceptarlas (cliente y expediente) o descartarlas, y activar o desactivar el formulario.",
+  },
   "documentos.borrar": { group: "Documentos y horas", label: "Eliminar documentos" },
   "plantillas.gestionar": {
     group: "Documentos y horas",
@@ -97,7 +102,7 @@ export const SYSTEM_ROLES = {
   abogado: {
     name: "Abogado/a",
     description: "Lleva expedientes y factura.",
-    permissions: normalizePermissions(["clientes.gestionar", "documentos.borrar", "plantillas.gestionar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar", "notaria.usar"]),
+    permissions: normalizePermissions(["clientes.gestionar", "solicitudes.gestionar", "documentos.borrar", "plantillas.gestionar", "facturacion.cobros", "facturacion.emitir", "facturacion.exportar", "notaria.usar"]),
   },
   asistente: {
     name: "Asistente",

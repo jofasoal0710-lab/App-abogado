@@ -39,3 +39,18 @@ export async function registerFailure(key: string): Promise<void> {
 export async function clearFailures(key: string): Promise<void> {
   await db.delete(loginAttempts).where(eq(loginAttempts.key, key));
 }
+
+/**
+ * Cupo de uso (no de fallos): suma uno y dice si se pasó de `max` en la ventana de `minutes`. Atómico.
+ * Lo usa el formulario público de solicitudes para frenar envíos masivos.
+ */
+export async function consumeQuota(key: string, max: number, minutes: number): Promise<boolean> {
+  const r = await db.execute<{ count: number }>(sql`
+    insert into "login_attempts" ("key", "count", "reset_at")
+    values (${key}, 1, now() + make_interval(mins => ${minutes}))
+    on conflict ("key") do update set
+      "count" = case when "login_attempts"."reset_at" <= now() then 1 else "login_attempts"."count" + 1 end,
+      "reset_at" = case when "login_attempts"."reset_at" <= now() then now() + make_interval(mins => ${minutes}) else "login_attempts"."reset_at" end
+    returning "count"`);
+  return Number(r.rows[0]?.count ?? 0) > max;
+}

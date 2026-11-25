@@ -8,7 +8,7 @@ import { toggleDarkAction } from "@/app/(app)/cuenta/theme-actions";
 import { openCommandPalette, SearchButton } from "./command-palette";
 import { Icon, type IconName } from "./icons";
 
-export type NavItem = { href: string; label: string; icon: IconName; /** Otras rutas que cuentan como esta sección. */ also?: string[]; /** Contador (p. ej. tareas abiertas); rojo si `alert`. */ badge?: number; alert?: boolean };
+export type NavItem = { href: string; label: string; icon: IconName; /** Otras rutas que cuentan como esta sección. */ also?: string[]; /** Contador (p. ej. tareas abiertas); rojo si `alert`. */ badge?: number; alert?: boolean; /** Qué cuenta el contador, para lectores de pantalla («abiertas», «pendientes»). */ badgeLabel?: string };
 export type NavGroup = { title: string | null; items: NavItem[] };
 
 const STORAGE_KEY = "menu-plegado";
@@ -120,7 +120,7 @@ export function Sidebar({
                           <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-side-active-fg" : "text-side-muted"}`} />
                           {item.label}
                           {item.badge ? (
-                            <span className={`ml-auto min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums ${item.alert ? "bg-red-500 text-white" : "bg-white/20 text-current"}`} aria-label={`${item.badge} abiertas${item.alert ? ", alguna vencida" : ""}`}>
+                            <span className={`ml-auto min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums ${item.alert ? "bg-red-500 text-white" : "bg-white/20 text-current"}`} aria-label={`${item.badge} ${item.badgeLabel ?? "abiertas"}${item.alert ? ", alguna vencida" : ""}`}>
                               {item.badge}
                             </span>
                           ) : null}

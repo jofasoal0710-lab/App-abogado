@@ -218,6 +218,13 @@
       "when": 1795556187621,
       "tag": "0030_panel_personal",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795571560023,
+      "tag": "0031_solicitudes",
+      "breakpoints": true
     }
   ]
 }

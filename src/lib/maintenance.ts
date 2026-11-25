@@ -1,7 +1,8 @@
 import "server-only";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { docTemplates, documents } from "@/db/schema";
+import { docTemplates, documents, intakeFiles, intakeRequests } from "@/db/schema";
+import { INTAKE_DISCARDED_RETENTION_DAYS } from "./intake";
 import { deleteFile, isAppKey, listStoredObjects, storageDriver } from "./storage";
 
 /**
@@ -38,6 +39,8 @@ export async function cleanupOrphanUploads(olderThanMinutes = orphanMinutes()): 
     for (const r of await db.select({ k: documents.storageKey }).from(documents).where(inArray(documents.storageKey, chunk))) registered.add(r.k);
     // Las plantillas Word también viven en el bucket con claves de la app: nunca son «huérfanas».
     for (const r of await db.select({ k: docTemplates.storageKey }).from(docTemplates).where(inArray(docTemplates.storageKey, chunk))) registered.add(r.k);
+    // Y los adjuntos de las solicitudes de nuevos clientes.
+    for (const r of await db.select({ k: intakeFiles.storageKey }).from(intakeFiles).where(inArray(intakeFiles.storageKey, chunk))) registered.add(r.k);
   }
   const orphans = old.filter((k) => !registered.has(k));
 
@@ -65,6 +68,7 @@ export async function runMaintenance(): Promise<{ orphanUploads: OrphanCleanup; 
   // Conservación (Ley 8968: lo justo): registro de cambios un año, historial de copias 90 días.
   await db.execute(sql`delete from data_audit where at < now() - interval '365 days'`);
   await db.execute(sql`delete from backup_runs where at < now() - interval '90 days'`);
+  await purgeDiscardedIntake();
   // Copia de seguridad diaria (SEC-001). Un fallo queda en backup_runs y se ve en /seguridad/respaldos.
   let backup: string | null = null;
   try {
@@ -78,4 +82,19 @@ export async function runMaintenance(): Promise<{ orphanUploads: OrphanCleanup; 
     console.error("[respaldo] error:", err);
   }
   return { orphanUploads, backup };
+}
+
+/** Solicitudes descartadas hace más de INTAKE_DISCARDED_RETENTION_DAYS: se borran con sus adjuntos. */
+export async function purgeDiscardedIntake(): Promise<number> {
+  const old = await db
+    .select({ id: intakeRequests.id })
+    .from(intakeRequests)
+    .where(sql`${intakeRequests.status} = 'descartada' and coalesce(${intakeRequests.reviewedAt}, ${intakeRequests.createdAt}) < now() - make_interval(days => ${INTAKE_DISCARDED_RETENTION_DAYS})`)
+    .limit(200);
+  if (!old.length) return 0;
+  const ids = old.map((o) => o.id);
+  const files = await db.select({ k: intakeFiles.storageKey }).from(intakeFiles).where(inArray(intakeFiles.requestId, ids));
+  await db.delete(intakeRequests).where(inArray(intakeRequests.id, ids));
+  for (const f of files) await deleteFile(f.k).catch(() => undefined);
+  return ids.length;
 }
