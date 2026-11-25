@@ -22,6 +22,28 @@ export function AssistantChat() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // En el móvil el botón se aparta mientras se baja por la página (no tapa lo que se está leyendo) y
+  // vuelve al subir o al dejar de desplazarse un momento.
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      if (window.innerWidth >= 640) return setHidden(false);
+      const y = window.scrollY;
+      if (y > last + 4 && y > 80) setHidden(true);
+      else if (y < last - 4) setHidden(false);
+      last = y;
+      clearTimeout(timer);
+      timer = setTimeout(() => setHidden(false), 1200);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(timer);
+    };
+  }, []);
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, pending]);
@@ -44,7 +66,10 @@ export function AssistantChat() {
   }
 
   return (
-    <div className="no-print fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    <div
+      className={`no-print fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] right-3 z-40 flex flex-col items-end gap-3 transition-transform duration-200 sm:bottom-6 sm:right-6 ${hidden && !open ? "translate-y-24" : ""}`}
+      data-assistant-launcher
+    >
       {open && (
         <section
           role="dialog"
@@ -131,7 +156,7 @@ export function AssistantChat() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={open ? "Cerrar el asistente" : "Abrir el asistente"}
-        className="flex h-14 items-center gap-2 rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-lg shadow-brand-900/30 transition-[background-color,transform] duration-150 hover:bg-brand-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+        className="flex h-12 w-12 items-center justify-center gap-2 rounded-full bg-brand-600 text-sm font-semibold sm:h-14 sm:w-auto sm:px-5 text-white shadow-lg shadow-brand-900/30 transition-[background-color,transform] duration-150 hover:bg-brand-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.5A8 8 0 1 1 21 12Z" />

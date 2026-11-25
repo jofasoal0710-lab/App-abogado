@@ -78,7 +78,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar groups={groups} firmName={config.firmName} user={{ name: user.name, roleName: user.roleName, initials }} darkMode={theme.mode === "dark"} />
       <div className="min-w-0 flex-1">
         <TimerBar user={user} />
-        <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 outline-none sm:px-8 sm:py-8">{children}</main>
+        <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-24 pt-6 outline-none sm:px-8 sm:py-8">{children}</main>
         <AssistantChat />
         <CommandPalette />
       </div>
