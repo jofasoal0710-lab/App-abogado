@@ -57,7 +57,7 @@ export function DashboardGrid({ widgets, catalog }: { widgets: GridWidget[]; cat
             Restaurar el panel original
           </button>
         )}
-        <button type="button" className={editing ? "btn-primary btn-sm" : "btn-secondary btn-sm"} onClick={() => setEditing((e) => !e)} aria-pressed={editing}>
+        <button type="button" className={editing ? "btn-primary btn-sm" : "btn-secondary btn-sm"} onClick={() => setEditing((e) => !e)} aria-pressed={editing} data-tour="personalizar">
           {editing ? "Listo" : "Personalizar panel"}
         </button>
       </div>
@@ -78,7 +78,7 @@ export function DashboardGrid({ widgets, catalog }: { widgets: GridWidget[]; cat
         </div>
       )}
 
-      <div className="grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-tour="widgets">
         {items.map((w, i) => (
           <div
             key={w.id}

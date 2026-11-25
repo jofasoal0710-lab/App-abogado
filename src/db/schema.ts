@@ -120,6 +120,8 @@ export const users = pgTable(
     emailReminders: boolean("email_reminders").notNull().default(true),
     /** Panel de inicio personalizado: widgets elegidos, en orden y con su tamaño. Null = el predeterminado. */
     dashboardLayout: jsonb("dashboard_layout").$type<{ id: string; size: "s" | "m" | "l" }[]>(),
+    /** Recorridos guiados que ya vio (para no repetir el de bienvenida). */
+    toursSeen: text("tours_seen").array().notNull().default(sql`'{}'::text[]`),
     /**
      * Debe elegir una contraseña nueva antes de usar la aplicación: al crearle la cuenta y cuando un
      * administrador se la restablece. Así el administrador nunca conoce la contraseña definitiva.

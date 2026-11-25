@@ -2,6 +2,9 @@ import { AssistantChat } from "@/components/assistant-chat";
 import { CommandPalette } from "@/components/command-palette";
 import { Sidebar, type NavGroup, type NavItem } from "@/components/sidebar";
 import { TimerBar } from "@/components/timer/timer-bar";
+import { TourRunner } from "@/components/help/tour-runner";
+import { Suspense } from "react";
+import { users } from "@/db/schema";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { events } from "@/db/schema";
@@ -20,6 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .from(events)
     .where(and(eq(events.kind, "tarea"), eq(events.assignedId, user.id), ne(events.status, "hecha")));
   const intakePending = can(user, "solicitudes.gestionar") ? await pendingIntakeCount() : 0;
+  // El recorrido de bienvenida se ofrece solo una vez (la primera visita al panel).
+  const [seen] = await db.select({ tours: users.toursSeen }).from(users).where(eq(users.id, user.id));
+  const autoTour = seen && !seen.tours.includes("bienvenida") ? "bienvenida" : null;
 
   const groups: NavGroup[] = [
     { title: null, items: [{ href: "/", label: "Panel", icon: "panel" }] },
@@ -59,6 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ...(can(user, "equipo.gestionar") ? [{ href: "/equipo", label: "Equipo", icon: "equipo" } satisfies NavItem] : []),
         ...(can(user, "seguridad.ver") ? [{ href: "/seguridad", label: "Seguridad", icon: "seguridad" } satisfies NavItem] : []),
         { href: "/cuenta", label: "Mi cuenta", icon: "cuenta" },
+        { href: "/ayuda", label: "Ayuda", icon: "ayuda" },
       ],
     },
   ];
@@ -83,6 +90,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <TimerBar user={user} />
         <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-24 pt-6 outline-none sm:px-8 sm:py-8">{children}</main>
         <AssistantChat />
+        <Suspense fallback={null}>
+          <TourRunner autoStart={autoTour} />
+        </Suspense>
         <CommandPalette />
       </div>
     </div>

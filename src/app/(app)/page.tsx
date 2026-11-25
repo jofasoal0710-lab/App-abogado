@@ -13,6 +13,7 @@ import { appLocale } from "@/lib/locale";
 import { pendingIndexes } from "@/lib/notary";
 import { can } from "@/lib/permissions";
 import { DashboardGrid } from "./panel/dashboard-grid";
+import { HelpButton } from "@/components/help/help-button";
 import { renderWidget } from "./panel/widgets";
 
 export const metadata: Metadata = { title: "Panel" };
@@ -54,12 +55,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <section className="relative mb-5 overflow-hidden rounded-2xl bg-brand-800 px-6 py-6 text-white sm:px-8">
+      <section className="relative mb-5 overflow-hidden rounded-2xl bg-brand-800 px-6 py-6 text-white sm:px-8" data-tour="saludo">
         <Icon name="balanza" className="pointer-events-none absolute -right-6 -top-8 h-48 w-48 text-white/[0.06]" />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm text-white/70 first-letter:uppercase">{new Date().toLocaleDateString(appLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-            <h1 className="mt-1 font-serif text-3xl font-semibold">Hola, {user.name.split(" ")[0]}</h1>
+            <div className="mt-1 flex items-center gap-3">
+              <h1 className="font-serif text-3xl font-semibold">Hola, {user.name.split(" ")[0]}</h1>
+              <HelpButton className="border-white/30 bg-white/10 text-white hover:bg-white/20" />
+            </div>
             <p className="mt-1.5 max-w-xl text-white/80">
               {summary}
               {overdue.n > 0 && (

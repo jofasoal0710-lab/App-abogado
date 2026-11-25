@@ -58,7 +58,7 @@ export function MatterTabs({ tabs, active, base }: { tabs: MatterTab[]; active: 
     }`;
 
   return (
-    <nav className="no-print mb-6" aria-label="Secciones del expediente">
+    <nav className="no-print mb-6" aria-label="Secciones del expediente" data-tour="pestanas">
       {/* Móvil: selector con la sección actual. */}
       <label className="block md:hidden">
         <span className="sr-only">Sección del expediente</span>

@@ -232,6 +232,7 @@ export function AssistantChat() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={open ? "Cerrar el asistente" : "Abrir el asistente"}
+        data-tour="asistente"
         className="flex h-12 w-12 items-center justify-center gap-2 rounded-full bg-brand-600 text-sm font-semibold sm:h-14 sm:w-auto sm:px-5 text-white shadow-lg shadow-brand-900/30 transition-[background-color,transform] duration-150 hover:bg-brand-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

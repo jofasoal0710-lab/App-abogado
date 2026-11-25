@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HelpButton } from "@/components/help/help-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -48,7 +49,10 @@ export default async function IntakeDetailPage({ params }: { params: Promise<{ i
       <Breadcrumbs items={[{ label: "Solicitudes", href: "/solicitudes" }, { label: req.name }]} />
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">{req.name}</h1>
+          <div className="flex items-center gap-2" data-tour="titulo">
+            <h1 className="font-serif text-2xl font-semibold">{req.name}</h1>
+            <HelpButton />
+          </div>
           <p className="mt-1 text-sm text-ink-500">
             {areaLabels[req.area]} · recibida el {formatDateTime(req.createdAt)} ·{" "}
             <span className={status === "pendiente" ? "badge-amber" : status === "aceptada" ? "badge-green" : "badge-gray"}>{INTAKE_STATUSES[status]}</span>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HelpButton } from "@/components/help/help-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -30,7 +31,10 @@ export default async function AnswerDemandStartPage({ params }: { params: Promis
   return (
     <>
       <Breadcrumbs items={[{ label: "Expedientes", href: "/expedientes" }, { label: matter.number, href: `/expedientes/${matterId}?tab=escritos` }, { label: "Contestar una demanda" }]} />
-      <h1 className="font-serif text-2xl font-semibold">Contestar una demanda</h1>
+      <div className="flex items-center gap-2" data-tour="titulo">
+            <h1 className="font-serif text-2xl font-semibold">Contestar una demanda</h1>
+            <HelpButton />
+          </div>
       <p className="mt-1 max-w-3xl text-sm text-ink-600">
         La app lee la demanda que presentó la otra parte, separa sus hechos, pretensiones y pruebas, calcula el plazo y te guía para responder cada hecho como exige la ley. Con tus respuestas redacta la contestación. Todo se hace dentro de la app: el documento no se envía a ningún servicio externo.
       </p>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon, type IconName } from "./icons";
+import { HelpButton } from "./help/help-button";
 
 export function PageHeader({
   title,
@@ -12,11 +13,18 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="font-serif text-2xl font-semibold text-ink-900">{title}</h1>
+      <div data-tour="titulo">
+        <div className="flex items-center gap-2">
+          <h1 className="font-serif text-2xl font-semibold text-ink-900">{title}</h1>
+          <HelpButton />
+        </div>
         {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
       </div>
-      {actions && <div className="no-print flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="no-print flex flex-wrap items-center gap-2" data-tour="acciones">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

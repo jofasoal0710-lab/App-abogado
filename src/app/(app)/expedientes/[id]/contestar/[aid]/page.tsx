@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HelpButton } from "@/components/help/help-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -52,7 +53,10 @@ export default async function AnswerDemandPage({ params }: { params: Promise<{ i
       <Breadcrumbs items={[{ label: "Expedientes", href: "/expedientes" }, { label: matter.number, href: `/expedientes/${matterId}?tab=escritos` }, { label: "Contestar", href: `/expedientes/${matterId}/contestar` }, { label: row.sourceName }]} />
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">Contestar la demanda</h1>
+          <div className="flex items-center gap-2" data-tour="titulo">
+            <h1 className="font-serif text-2xl font-semibold">Contestar la demanda</h1>
+            <HelpButton />
+          </div>
           <p className="mt-1 text-sm text-ink-500">
             {row.sourceName} · {analysis.words.toLocaleString("es-CR")} palabras · tu cliente: <strong>{client?.name}</strong> (parte demandada)
           </p>

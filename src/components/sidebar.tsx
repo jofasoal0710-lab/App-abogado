@@ -78,11 +78,12 @@ export function Sidebar({
         </span>
         <span className="font-serif text-base font-semibold leading-tight">{firmName}</span>
       </Link>
-      <div className="mx-3 mb-3">
+      <div className="mx-3 mb-3" data-tour="buscar">
         <SearchButton className="flex w-full items-center gap-2 rounded-lg bg-side-hover px-3 py-2 text-sm text-side-muted ring-1 ring-inset ring-current/15 hover:text-side-fg" />
       </div>
       <nav
         aria-label="Principal"
+        data-tour="menu"
         className="flex-1 space-y-1 overflow-y-auto px-3 pb-3"
         onClick={(e) => (e.target as HTMLElement).closest("a") && setOpen(false)}
       >
@@ -134,7 +135,7 @@ export function Sidebar({
           );
         })}
       </nav>
-      <div className="mx-3 flex items-center gap-2 rounded-lg bg-side-2 px-3 py-3">
+      <div className="mx-3 flex items-center gap-2 rounded-lg bg-side-2 px-3 py-3" data-tour="cuenta">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white" aria-hidden="true">
           {user.initials}
         </span>
@@ -173,7 +174,7 @@ export function Sidebar({
         <Link href="/" className="min-w-0 flex-1 truncate font-serif text-base font-semibold text-ink-900">
           {firmName}
         </Link>
-        <button type="button" onClick={openCommandPalette} className="btn-ghost" aria-label="Buscar">
+        <button type="button" onClick={openCommandPalette} className="btn-ghost" aria-label="Buscar" data-tour="buscar">
           <Icon name="buscar" className="h-5 w-5" />
         </button>
         <form action={toggleDarkAction}>
