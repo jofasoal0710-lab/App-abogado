@@ -175,3 +175,18 @@ export async function deleteDemandAnalysisAction(id: number) {
   revalidatePath(`/expedientes/${ctx.matter.id}/contestar`);
   redirect(`/expedientes/${ctx.matter.id}/contestar`);
 }
+
+/**
+ * Vuelve a leer la demanda con el analizador actual (por ejemplo, tras una mejora de la lectura). Las respuestas
+ * se conservan: van por número de hecho y de pretensión.
+ */
+export async function reanalyzeDemandAction(id: number): Promise<void> {
+  const ctx = await loadAnalysis(id);
+  if (!ctx) redirect("/expedientes");
+  const analysis = analyzeDemand(ctx.row.text);
+  await db.transaction(async (tx) => {
+    await stampSessionActor(tx);
+    await tx.update(demandAnalyses).set({ analysis, updatedAt: new Date() }).where(eq(demandAnalyses.id, id));
+  });
+  revalidatePath(`/expedientes/${ctx.row.matterId}/contestar/${id}`);
+}

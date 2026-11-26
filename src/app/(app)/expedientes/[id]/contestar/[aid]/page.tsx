@@ -12,7 +12,8 @@ import { requireUser } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { EVIDENCE_LABELS, PROCESSES, observations, sanitizeAnswers, type DemandAnalysis } from "@/lib/demand-analysis";
 import { checkCitations } from "@/lib/demand-db";
-import { addAnswerDeadlineAction, deleteDemandAnalysisAction, fillMatterFromDemandAction, generateAnswerWritingAction, saveDemandAnswersAction } from "../../../contestar-actions";
+import { pointByPoint } from "@/lib/demand-points";
+import { addAnswerDeadlineAction, deleteDemandAnalysisAction, fillMatterFromDemandAction, generateAnswerWritingAction, reanalyzeDemandAction, saveDemandAnswersAction } from "../../../contestar-actions";
 import { Workbench } from "./workbench";
 
 export const metadata: Metadata = { title: "Contestar la demanda" };
@@ -35,6 +36,7 @@ export default async function AnswerDemandPage({ params }: { params: Promise<{ i
   const [[client], citations] = await Promise.all([db.select({ name: clients.name }).from(clients).where(eq(clients.id, matter.clientId)), checkCitations(analysis.citations)]);
   const today = todayISO();
   const obs = observations({ ...analysis, process: answers.process ?? analysis.process }, { clientName: client?.name, today, missingArticles: citations.filter((c) => c.loaded && c.missing.length).map((c) => ({ law: c.law, articles: c.missing })) });
+  const points = pointByPoint(analysis, { text: row.text, clientName: client?.name, today });
   const canFill = (!matter.court && analysis.court) || (!matter.courtCaseNumber && analysis.caseNumber) || (!matter.opposingParty && analysis.plaintiffs.length);
   const evidenceCount = Object.entries(
     analysis.evidence.reduce<Record<string, number>>((acc, e) => ((acc[EVIDENCE_LABELS[e.kind]] = (acc[EVIDENCE_LABELS[e.kind]] ?? 0) + 1), acc), {}),
@@ -67,6 +69,11 @@ export default async function AnswerDemandPage({ params }: { params: Promise<{ i
               Ver la contestación redactada
             </Link>
           )}
+          <form action={reanalyzeDemandAction.bind(null, aid)}>
+            <button className="btn-ghost" title="Vuelve a leer el documento con la última versión del analizador. Tus respuestas se conservan.">
+              Volver a leer la demanda
+            </button>
+          </form>
           <form action={deleteDemandAnalysisAction.bind(null, aid)}>
             <ConfirmButton message="¿Borrar este análisis y tus respuestas? (El escrito ya redactado y el documento no se borran.)" className="btn-ghost">
               Borrar análisis
@@ -120,6 +127,7 @@ export default async function AnswerDemandPage({ params }: { params: Promise<{ i
       <Workbench
         id={aid}
         analysis={analysis}
+        points={points}
         initial={answers}
         save={saveDemandAnswersAction}
         generate={generateAnswerWritingAction}

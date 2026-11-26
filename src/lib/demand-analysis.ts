@@ -93,6 +93,10 @@ export type DemandAnalysis = {
   /** Secciones reconocidas (para mostrar qué se entendió y qué no). */
   sections: string[];
   words: number;
+  /** Fecha de la demanda (la del lugar y fecha junto a la firma), si se reconoce. */
+  filedOn?: string | null;
+  /** Normas procesales que invoca la propia demanda (p. ej. «Ley 7130»), para avisar del régimen aplicable. */
+  procedureLaw?: string | null;
 };
 
 /* ---------------- Utilidades ---------------- */
@@ -183,9 +187,12 @@ export function splitItems(section: string): string[] {
   const lines = section.split("\n");
   const items: string[] = [];
   let cur: string[] | null = null;
+  let marked = 0;
+  let preamble = false;
   for (const line of lines) {
     const f = fold(line);
     const m = MARKER.exec(f);
+    if (m) marked++;
     if (m && line.trim().length > m[0].length) {
       if (cur) items.push(cur.join(" "));
       cur = [line.slice(m[0].length).trim()];
@@ -196,9 +203,12 @@ export function splitItems(section: string): string[] {
       cur.push(line);
     } else if (line.trim()) {
       cur = [line];
+      // Texto sin numerar antes del primer punto («En mérito de lo expuesto… solicito:»): es una introducción.
+      preamble = /:\s*$/.test(line.trim()) || /^(?:en\s+merito|por\s+tanto|con\s+fundamento|por\s+lo\s+expuesto|de\s+conformidad|solicito|pido|ofrezco)\b/.test(f.trim());
     }
   }
   if (cur) items.push(cur.join(" "));
+  if (preamble && marked >= 2) items.shift();
   const clean = items.map((s) => s.replace(/\s+/g, " ").trim()).filter((s) => s.length > 2);
   if (clean.length >= 2) return clean;
   // Sin marcas: un punto por párrafo.
@@ -228,7 +238,7 @@ export function detectProcess(text: string): { kind: ProcessKind; why: string } 
 
 /* ---------------- Partes, juzgado, expediente ---------------- */
 
-const NAME_STOP = /,|\s+(?:mayor|menor|casad[oa]|solter[oa]|divorciad[oa]|viud[oa]|vecin[oa]|portador|cedula|con\s+cedula|persona|sociedad\s+an[oó]nima\s+con|en\s+su\s+condici[oó]n|representad[oa]|domiciliad[oa]|quien|por\s+los\s+siguientes|a\s+fin)\b/i;
+const NAME_STOP = /,|\n|\s+(?:mayor|menor|casad[oa]|solter[oa]|divorciad[oa]|viud[oa]|vecin[oa]|portador|cedula|con\s+cedula|persona|sociedad\s+an[oó]nima\s+con|en\s+su\s+condici[oó]n|representad[oa]|domiciliad[oa]|quien|por\s+los\s+siguientes|a\s+fin)\b/i;
 const cutName = (s: string) => {
   let n = s.split(NAME_STOP)[0].replace(/^[\s:,"«]+|[\s:,"»]+$/g, "").replace(/\s+/g, " ").trim();
   // «S.A.», «S.R.L.»: el punto final es parte de la abreviatura; si no, se quita.
@@ -239,23 +249,28 @@ const cutName = (s: string) => {
 const isName = (s: string) => s.length >= 4 && s.length <= 120 && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}/.test(s) && !/^(el|la|los|las|mi|su)\s/i.test(s);
 
 export function detectParties(text: string): { plaintiffs: string[]; defendants: string[] } {
-  const head = text.slice(0, 5000).replace(/\s+/g, " ");
-  const plaintiffs = new Set<string>();
-  const defendants = new Set<string>();
-  const add = (set: Set<string>, raw: string | undefined) => {
+  // Se conservan los saltos de línea: «ACTOR: …» y «DEMANDADA: …» suelen ir en líneas seguidas.
+  const head = text.slice(0, 5000).replace(/[ \t]+/g, " ");
+  const plaintiffs: string[] = [];
+  const defendants: string[] = [];
+  const add = (set: string[], raw: string | undefined) => {
     if (!raw) return;
     for (const part of raw.split(/\s+y\s+(?=[A-ZÁÉÍÓÚÑ])/)) {
-      const n = cutName(part);
-      if (isName(n)) set.add(n);
+      const n = cutName(part.replace(/\s+/g, " "));
+      if (!isName(n)) continue;
+      // La misma persona en mayúsculas y en minúsculas: se queda la forma con minúsculas (más legible).
+      const i = set.findIndex((x) => fold(x) === fold(n));
+      if (i < 0) set.push(n);
+      else if (set[i] === set[i].toUpperCase() && n !== n.toUpperCase()) set[i] = n;
     }
   };
   // «Quien suscribe, NOMBRE, mayor…» / «Yo, NOMBRE, …»
-  add(plaintiffs, /(?:quien(?:es)?\s+suscrib\w+|los?\s+suscrit[oa]s?|yo)\s*,?\s*([A-ZÁÉÍÓÚÑ][^,]{3,120})/i.exec(head)?.[1]);
+  add(plaintiffs, /(?:quien(?:es)?\s+suscrib\w+|(?:el|la|los|las)\s+suscrit[oa]s?|yo)\s*,?\s*([A-ZÁÉÍÓÚÑ][^,]{3,120})/i.exec(head)?.[1]);
   for (const m of head.matchAll(/(?:parte\s+)?(?:actor|actora|demandante|accionante)\s*[:]\s*([A-ZÁÉÍÓÚÑ][^,;\n]{3,120})/gi)) add(plaintiffs, m[1]);
   // «… en contra de NOMBRE, …» / «contra NOMBRE»
   add(defendants, /\b(?:en\s+)?contra\s+(?:de\s+)?(?:la\s+(?:empresa|sociedad)\s+|el\s+señor\s+|la\s+señora\s+)?([A-ZÁÉÍÓÚÑ][^,;]{2,120})/.exec(head)?.[1]);
   for (const m of head.matchAll(/(?:parte\s+)?(?:demandad[oa]|accionad[oa])\s*[:]\s*([A-ZÁÉÍÓÚÑ][^,;\n]{3,120})/gi)) add(defendants, m[1]);
-  return { plaintiffs: [...plaintiffs].slice(0, 6), defendants: [...defendants].slice(0, 6) };
+  return { plaintiffs: plaintiffs.slice(0, 6), defendants: defendants.slice(0, 6) };
 }
 
 export function detectCourt(text: string): string | null {
@@ -266,7 +281,23 @@ export function detectCourt(text: string): string | null {
   return null;
 }
 
-export const detectCaseNumber = (text: string) => /\b\d{2}-\d{6}-\d{4}-[A-Z]{2}\b/.exec(text)?.[0] ?? null;
+const CASE_RX = /\b\d{2}-\d{6}-\d{4}-[A-Z]{2}\b/;
+/**
+ * Número del expediente de ESTA demanda: el del encabezado («EXP.: 24-000123-0123-FA»). Si el encabezado dice
+ * «por asignar», no hay número todavía (los que aparecen en los hechos son de otros procesos). Sin encabezado,
+ * se toma el primero que aparezca al principio del escrito.
+ */
+export function detectCaseNumber(text: string): string | null {
+  const headLines = text.split("\n").slice(0, 20);
+  for (const line of headLines) {
+    const m = /^\s*(?:exp(?:ediente)?|n[º°.o]*\s*de\s+expediente)\b[^:]{0,20}:?\s*(.*)$/i.exec(line);
+    if (!m) continue;
+    const num = CASE_RX.exec(m[1]);
+    if (num) return num[0];
+    if (/por\s+asignar|pendiente|sin\s+asignar|nuevo/i.test(m[1])) return null;
+  }
+  return CASE_RX.exec(text.slice(0, 1500))?.[0] ?? null;
+}
 
 /* ---------------- Montos y fechas ---------------- */
 
@@ -336,9 +367,11 @@ const LAWS: [RegExp, string, string][] = [
 export function findCitations(text: string): Citation[] {
   const f = fold(text).replace(/\s+/g, " ").replace(/\bn\s*[.]?\s*[º°o]?\s*[.]?\s*(?=\d)/g, "n ");
   const out = new Map<string, Citation>();
-  const rx = /\b(?:art(?:iculos?|s?\.)|numeral(?:es)?|ordinal(?:es)?)\s*((?:\d+(?:\s*(?:bis|ter))?(?:\.\d+)?|[ivx]+)(?:\s*(?:,|y|e|al|a|-)\s*(?:\d+(?:\s*(?:bis|ter))?(?:\.\d+)?))*)\s*(?:,\s*)?(?:del?\s+(?:la\s+|el\s+)?)?((?:codigo|constitucion|ley|cpc|cpf|cpca|cpp|lgap|c\.?\s?t\.?\b)(?:(?!\s(?:y|e)\s|,\s*(?:art|num)|\sart)[^.;:()]){0,80})?/g;
+  // Cada número puede llevar «inciso 8) “segundo”» o «párrafo primero», que no son artículos.
+  const NUM = String.raw`\d+(?:\s*(?:bis|ter))?(?:\.\d+)?(?:\s+inciso\s+\w+\)?(?:\s*[“"«][^”"»]{1,15}[”"»])?|\s+parrafo\s+\w+)?`;
+  const rx = new RegExp(String.raw`\b(?:art(?:iculos?|s?\.)|numeral(?:es)?|ordinal(?:es)?)\s*((?:${NUM}|[ivx]+)(?:\s*(?:,|y|e|al|a|-)\s*(?:${NUM}))*)(?:\s+y\s+siguientes)?\s*(?:,\s*)?(?:del?\s+(?:la\s+|el\s+)?)?((?:codigo|constitucion|ley|cpc|cpf|cpca|cpp|lgap|c\.?\s?t\.?\b)(?:(?!\s(?:y|e)\s|,\s*(?:art|num)|\sart)[^.;:()]){0,80})?`, "g");
   for (const m of f.matchAll(rx)) {
-    const spec = m[1].replace(/\.\d+/g, "");
+    const spec = m[1].replace(/\s+inciso\s+\w+\)?(?:\s*[“"«][^”"»]{1,15}[”"»])?|\s+parrafo\s+\w+/g, "").replace(/\.\d+/g, "");
     const lawText = m[2] ?? "";
     let normKey: string | null = null;
     let law = "";
@@ -348,6 +381,12 @@ export function findCitations(text: string): Citation[] {
         law = name;
         break;
       }
+    }
+    // «Código Procesal Civil, Ley 7130»: el número de ley manda (es el código anterior, no el vigente).
+    const explicit = /\bley\s+(?:n\s*)?(\d{1,5})\b/.exec(lawText)?.[1];
+    if (normKey && explicit && normKey !== `ley-${explicit}` && /^ley-/.test(normKey)) {
+      normKey = `ley-${explicit}`;
+      law = `${law} (Ley N.º ${explicit})`;
     }
     if (!normKey) {
       const num = /\bley\s+(?:n[.ºo°]*\s*)?(\d{1,5})\b/.exec(lawText);
@@ -397,7 +436,7 @@ export function analyzeDemand(rawText: string): DemandAnalysis {
   const { plaintiffs, defendants } = detectParties(text);
   const facts = splitItems(sections.get("hechos") ?? "").slice(0, 150).map((t, i) => ({ n: i + 1, text: t.slice(0, 6000) }));
   const claims = splitItems(sections.get("pretensiones") ?? "").slice(0, 80).map((t, i) => ({ n: i + 1, text: t.slice(0, 4000) }));
-  const evidence = splitItems(sections.get("prueba") ?? "").slice(0, 120).map((t, i) => ({ n: i + 1, text: t.slice(0, 3000), kind: evidenceKind(t) }));
+  const evidence = splitEvidence(sections.get("prueba") ?? "").slice(0, 120).map((e, i) => ({ n: i + 1, text: e.text.slice(0, 3000), kind: e.kind }));
   const estimateText = sections.get("estimacion") ?? /estim[oa]\w*[^.]{0,160}/i.exec(text)?.[0] ?? "";
   const estimate = findAmounts(estimateText)[0] ?? null;
   return {
@@ -417,7 +456,63 @@ export function analyzeDemand(rawText: string): DemandAnalysis {
     citations: findCitations(text),
     sections: [...sections.keys()],
     words: text.split(/\s+/).filter(Boolean).length,
+    filedOn: detectFiledOn(text),
+    procedureLaw: detectProcedureLaw(text),
   };
+}
+
+/** «Cañas, 09 de setiembre de 2024.» al final del escrito. */
+export function detectFiledOn(text: string): string | null {
+  const tail = text.slice(-2500);
+  const lines = tail.split("\n").filter((l) => /\b\d{1,2}\s+de\s+[a-záéíóú]+\s+(?:de|del)\s+\d{4}/i.test(l) && l.length < 160);
+  const last = lines.at(-1);
+  return last ? (findDates(last).at(-1) ?? null) : null;
+}
+
+/** La demanda se funda en el Código Procesal Civil anterior (Ley 7130) o en un «proceso abreviado». */
+export function detectProcedureLaw(text: string): string | null {
+  const f = fold(text);
+  if (/\bley\s*(?:n\s*[.º°o]*\s*)?7130\b/.test(f)) return "Código Procesal Civil anterior (Ley N.º 7130)";
+  if (/\bproceso\s*:?\s*abreviado\b|\babreviado\s+de\s+divorcio\b/.test(f)) return "proceso abreviado (normas anteriores al Código Procesal de Familia)";
+  return null;
+}
+
+const EVIDENCE_HEADINGS: [RegExp, EvidenceKind][] = [
+  [/^(?:prueba\s+)?testimonial(?:es)?\b|^testigos?\b/, "testimonial"],
+  [/^(?:prueba\s+)?documental(?:es)?\b|^documentos?\b/, "documental"],
+  [/^(?:prueba\s+de\s+)?declaracion\s+de\s+parte\b|^confesional\b/, "declaracion_parte"],
+  [/^(?:prueba\s+)?pericial\b|^peritaje\b/, "pericial"],
+  [/^reconocimiento\s+judicial\b|^inspeccion\b/, "reconocimiento"],
+  [/^(?:prueba\s+de\s+)?informes?\b/, "informes"],
+];
+
+/**
+ * Prueba con subapartados («TESTIMONIAL:», «DOCUMENTAL:», «DECLARACIÓN DE PARTE:»): el apartado da el tipo
+ * de cada punto, y las frases de introducción («Ofrezco los siguientes documentos:») no son pruebas.
+ */
+export function splitEvidence(section: string): { text: string; kind: EvidenceKind }[] {
+  const groups: { kind: EvidenceKind | null; lines: string[] }[] = [{ kind: null, lines: [] }];
+  for (const line of section.split("\n")) {
+    const f = fold(line.trim()).replace(/^(?:[a-h]|\d+|[ivx]+)\s*[.)\-–]+\s*/, "");
+    const hit = line.trim().length <= 40 ? EVIDENCE_HEADINGS.find(([rx]) => rx.test(f) && /:?\s*$/.test(f) && f.split(/\s+/).length <= 4) : undefined;
+    if (hit) {
+      groups.push({ kind: hit[1], lines: [] });
+      const rest = line.replace(/^[^:]*:\s*/, "");
+      if (rest !== line && rest.trim()) groups.at(-1)!.lines.push(rest);
+    } else groups.at(-1)!.lines.push(line);
+  }
+  const out: { text: string; kind: EvidenceKind }[] = [];
+  for (const g of groups) {
+    const body = g.lines.join("\n").trim();
+    if (!body) continue;
+    const items = splitItems(body).filter((t) => !/:\s*$/.test(t) || t.length > 160);
+    // Sin subapartado, un único punto puede ser la frase de introducción entera: se conserva.
+    for (const t of items.length ? items : [body.replace(/\s+/g, " ")]) {
+      if (/:\s*$/.test(t) && t.length <= 160) continue;
+      out.push({ text: t, kind: g.kind ?? evidenceKind(t) });
+    }
+  }
+  return out;
 }
 
 /* ---------------- Observaciones para preparar la contestación ---------------- */
@@ -449,6 +544,9 @@ export function observations(a: DemandAnalysis, ctx: { clientName?: string | nul
   const out: Observation[] = [];
   const p = PROCESSES[a.process];
   out.push({ level: "info", text: `${p.label}: plazo de ${p.days} días hábiles para contestar.`, ref: p.ref });
+  if (a.procedureLaw && a.process === "familia") {
+    out.push({ level: "aviso", text: `La demanda se plantea conforme al ${a.procedureLaw}${a.filedOn ? ` y está fechada el ${a.filedOn.split("-").reverse().join("/")}` : ""}. Comprueba en la resolución que da traslado qué normas aplica el juzgado y el plazo que concede: puede no ser el de ocho días del Código Procesal de Familia.` });
+  }
   if (!a.facts.length) out.push({ level: "alerta", text: "No encontré la sección de HECHOS numerados. Revisa que el documento tenga texto (si es un escaneo, pega el texto) o añade los hechos a mano." });
   else {
     const compound = a.facts.filter((f) => isCompound(f.text)).map((f) => f.n);
@@ -465,7 +563,7 @@ export function observations(a: DemandAnalysis, ctx: { clientName?: string | nul
     out.push({ level: "aviso", text: `No encontré a tu cliente (${ctx.clientName}) entre los demandados detectados (${a.defendants.join("; ")}). Comprueba la legitimación pasiva: si no es la persona correcta, valora la excepción de falta de legitimación.` });
   }
 
-  if (a.dates.length) {
+  if (a.dates.length && a.process !== "familia") {
     const oldest = a.dates[0];
     const years = (Date.parse(ctx.today) - Date.parse(oldest)) / (365.25 * 86_400_000);
     if (years >= 1) out.push({ level: "aviso", text: `El hecho más antiguo es del ${oldest.split("-").reverse().join("/")} (hace ${Math.floor(years)} año${Math.floor(years) === 1 ? "" : "s"}). Revisa si algún extremo está prescrito (calculadora de prescripción en Herramientas).` });
@@ -488,6 +586,7 @@ export function observations(a: DemandAnalysis, ctx: { clientName?: string | nul
   const ftext = fold(a.facts.map((f) => f.text).join(" "));
   for (const [rx, hint] of TOPIC_HINTS) if (rx.test(ftext)) out.push({ level: "info", text: hint });
   const witnesses = a.evidence.filter((e) => e.kind === "testimonial").length;
+  if (a.evidence.some((e) => e.kind === "declaracion_parte")) out.push({ level: "info", text: "La parte actora pide la declaración de parte de tu cliente: prepárala con tiempo, hecho por hecho." });
   if (witnesses) out.push({ level: "info", text: `Ofrece ${witnesses} prueba${witnesses === 1 ? "" : "s"} testimonial${witnesses === 1 ? "" : "es"}: puedes pronunciarte sobre su pertinencia y ofrecer tus propios testigos.` });
   return out;
 }
@@ -503,12 +602,13 @@ export function sameParty(a: string, b: string): boolean {
 
 /* ---------------- Respuestas y excepciones ---------------- */
 
-export type FactAnswer = "admito" | "variantes" | "rechazo" | "desconozco";
+export type FactAnswer = "admito" | "variantes" | "rechazo" | "desconozco" | "no_hecho";
 export const FACT_ANSWERS: Record<FactAnswer, string> = {
   admito: "Lo admito como cierto",
   variantes: "Lo admito con variantes o rectificaciones",
   rechazo: "Lo rechazo por inexacto",
   desconozco: "Lo desconozco",
+  no_hecho: "No es un hecho, sino una apreciación jurídica",
 };
 
 export type Defense = { key: string; label: string; kind: "procesal" | "material"; ref: string; hint: string };
@@ -549,7 +649,7 @@ export function defensesFor(kind: ProcessKind): Defense[] {
 
 export type Answers = {
   facts: Record<string, { a?: FactAnswer; why?: string }>;
-  claims: Record<string, { allanamiento?: boolean; why?: string }>;
+  claims: Record<string, { allanamiento?: boolean; parcial?: boolean; why?: string }>;
   evidence: Record<string, { objection?: string }>;
   defenses: Record<string, { on?: boolean; why?: string }>;
   ownEvidence: string;
@@ -574,7 +674,7 @@ export function sanitizeAnswers(raw: unknown, a: DemandAnalysis): Answers {
   }
   for (const c of a.claims) {
     const v = obj(obj(r.claims)[String(c.n)]);
-    if (v.allanamiento || v.why) out.claims[String(c.n)] = { allanamiento: v.allanamiento === true, why: txt(v.why) };
+    if (v.allanamiento || v.parcial || v.why) out.claims[String(c.n)] = { allanamiento: v.allanamiento === true, parcial: v.allanamiento !== true && v.parcial === true, why: txt(v.why) };
   }
   for (const e of a.evidence) {
     const v = obj(obj(r.evidence)[String(e.n)]);
@@ -621,8 +721,10 @@ export function answerValues(a: DemandAnalysis, ans: Answers): Record<string, st
     .map((d) => `${d.kind === "procesal" ? "Excepción procesal" : "Excepción"} de ${d.label.toLowerCase()}${d.ref ? ` (${d.ref})` : ""}: ${sentence(ans.defenses[d.key]?.why || "[PENDIENTE: razonar la excepción]")}`);
   const claims = a.claims.map((c) => {
     const r = ans.claims[String(c.n)];
+    // Si la razón ya está redactada como postura («Me allano a que…»), se usa tal cual.
+    if (r?.why?.trim() && /^(?:me\s+(?:allano|opongo)|acepto|no\s+me\s+opongo|solicito)\b/i.test(r.why.trim())) return `En cuanto a la pretensión ${c.n}: ${sentence(r.why)}`;
     if (r?.allanamiento) return `Me allano a la pretensión ${c.n}. ${sentence(r.why ?? "")}`.trim();
-    return `Me opongo a la pretensión ${c.n}${r?.why?.trim() ? `: ${sentence(r.why)}` : "."}`;
+    return `Me opongo${r?.parcial ? " parcialmente" : ""} a la pretensión ${c.n}${r?.why?.trim() ? `: ${sentence(r.why)}` : "."}`;
   });
   if (ans.estimatePosition.trim()) claims.push(`Sobre la estimación: ${sentence(ans.estimatePosition)}`);
   const evidence = a.evidence.filter((e) => ans.evidence[String(e.n)]?.objection?.trim()).map((e) => `Sobre la prueba ${e.n} de la parte actora (${e.text.slice(0, 80)}${e.text.length > 80 ? "…" : ""}): ${sentence(ans.evidence[String(e.n)]!.objection!)}`);
