@@ -114,11 +114,11 @@ export function Sidebar({
                         <Link
                           href={item.href}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-side-fg ${
+                          className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-side-fg ${
                             active ? "bg-side-active text-side-active-fg shadow-sm" : "text-side-muted hover:bg-side-hover hover:text-side-fg"
                           }`}
                         >
-                          <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-side-active-fg" : "text-side-muted"}`} />
+                          <Icon name={item.icon} className={`h-5 w-5 transition-transform duration-200 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none ${active ? "text-side-active-fg" : "text-side-muted"}`} />
                           {item.label}
                           {item.badge ? (
                             <span className={`ml-auto min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums ${item.alert ? "bg-red-500 text-white" : "bg-white/20 text-current"}`} aria-label={`${item.badge} ${item.badgeLabel ?? "abiertas"}${item.alert ? ", alguna vencida" : ""}`}>
@@ -185,8 +185,8 @@ export function Sidebar({
       </div>
       {open && (
         <div className="no-print fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menú">
-          <button type="button" className="absolute inset-0 bg-ink-900/50" aria-label="Cerrar el menú" onClick={() => setOpen(false)} />
-          <aside className="relative flex h-full w-[min(18rem,85vw)] flex-col bg-side pb-4 pt-4 shadow-2xl">
+          <button type="button" className="fade-enter absolute inset-0 bg-ink-900/50" aria-label="Cerrar el menú" onClick={() => setOpen(false)} />
+          <aside className="drawer-left-enter relative flex h-full w-[min(18rem,85vw)] flex-col bg-side pb-4 pt-4 shadow-2xl">
             <button type="button" onClick={() => setOpen(false)} className={`absolute right-2 top-2 ${iconBtn}`} aria-label="Cerrar el menú">
               <Icon name="cerrar" className="h-5 w-5" />
             </button>

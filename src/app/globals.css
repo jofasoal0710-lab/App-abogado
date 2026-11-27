@@ -195,6 +195,43 @@ body { @apply bg-ink-50 text-ink-800 antialiased; }
   .btn-sm { min-height: 40px; }
 }
 
+/*
+ * Movimiento: entradas suaves al cambiar de pantalla, tarjetas que aparecen escalonadas y se elevan al pasar
+ * el ratón, paneles que se deslizan. Solo transform y opacity (no recalculan el diseño), con una curva
+ * «ease-out» rápida al principio y suave al final, para que se sienta natural. Al terminar, el transform
+ * queda en «none» (así no altera los elementos fijos que haya dentro).
+ */
+:root { --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes drawer-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes drawer-left-in { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }
+
+.page-enter { animation: page-in 340ms var(--ease-out-soft) both; }
+.stagger > * { animation: rise-in 520ms var(--ease-out-soft) both; }
+.stagger > :nth-child(2) { animation-delay: 50ms; }
+.stagger > :nth-child(3) { animation-delay: 100ms; }
+.stagger > :nth-child(4) { animation-delay: 150ms; }
+.stagger > :nth-child(5) { animation-delay: 200ms; }
+.stagger > :nth-child(6) { animation-delay: 250ms; }
+.stagger > :nth-child(7) { animation-delay: 300ms; }
+.stagger > :nth-child(n + 8) { animation-delay: 340ms; }
+.drawer-enter { animation: drawer-in 300ms var(--ease-out-soft) both; }
+.drawer-left-enter { animation: drawer-left-in 300ms var(--ease-out-soft) both; }
+.pop-enter { animation: pop-in 240ms var(--ease-out-soft) both; transform-origin: bottom right; }
+.fade-enter { animation: fade-in 200ms ease-out both; }
+.grow-x { transform-origin: left center; animation: grow-x 800ms var(--ease-out-soft) 200ms both; }
+
+/* Tarjetas que se elevan al pasar el ratón (solo con ratón: en táctil no hay «hover»). */
+.lift { transition: transform 240ms var(--ease-out-soft), box-shadow 240ms var(--ease-out-soft), border-color 240ms; }
+@media (hover: hover) {
+  .lift:hover, a.card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -14px rgb(16 24 40 / 0.28); }
+  a.card { transition: transform 240ms var(--ease-out-soft), box-shadow 240ms var(--ease-out-soft); }
+}
+
 /* Quien pide menos movimiento no ve transiciones. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }

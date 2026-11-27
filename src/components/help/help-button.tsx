@@ -42,8 +42,8 @@ export function HelpButton({ className = "" }: { className?: string }) {
       </button>
       {open && (
         <div className="no-print fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="help-title">
-          <button type="button" className="absolute inset-0 bg-ink-900/40" aria-label="Cerrar la ayuda" onClick={() => setOpen(false)} />
-          <div ref={panelRef} tabIndex={-1} className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-surface shadow-2xl outline-none">
+          <button type="button" className="fade-enter absolute inset-0 bg-ink-900/40" aria-label="Cerrar la ayuda" onClick={() => setOpen(false)} />
+          <div ref={panelRef} tabIndex={-1} className="drawer-enter absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-surface shadow-2xl outline-none">
             <header className="flex items-start justify-between gap-3 border-b border-ink-200 px-5 py-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-brand-700">Ayuda</p>

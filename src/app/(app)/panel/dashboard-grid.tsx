@@ -78,7 +78,7 @@ export function DashboardGrid({ widgets, catalog }: { widgets: GridWidget[]; cat
         </div>
       )}
 
-      <div className="grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-tour="widgets">
+      <div className={`grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 ${editing ? "" : "stagger"}`} data-tour="widgets">
         {items.map((w, i) => (
           <div
             key={w.id}

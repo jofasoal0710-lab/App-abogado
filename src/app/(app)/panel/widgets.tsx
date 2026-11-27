@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
 import { and, asc, count, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { BarList, Columns, Donut } from "@/components/charts";
 import { Icon, type IconName } from "@/components/icons";
@@ -13,7 +14,7 @@ import { countdown, URGENCY, urgencyOf } from "@/lib/deadlines";
 import { loadAdjustments } from "@/lib/invoice-queries";
 import { summarizeInvoice } from "@/lib/invoices";
 import { areaLabels, eventKindLabels, matterStatusLabels } from "@/lib/labels";
-import { appLocale } from "@/lib/locale";
+import { appCurrency, appLocale } from "@/lib/locale";
 import { formatDuration, formatMoney } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { qs } from "@/lib/search";
@@ -30,7 +31,7 @@ const mine = (user: CurrentUser, extra?: ReturnType<typeof and>) =>
 
 function Card({ title, icon, href, linkText, children, pad = false }: { title: string; icon?: IconName; href?: string; linkText?: string; children: React.ReactNode; pad?: boolean }) {
   return (
-    <section className="card flex h-full flex-col">
+    <section className="card lift flex h-full flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-5 py-3">
         <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-ink-900">
           {icon && <Icon name={icon} className="h-5 w-5 text-brand-600" />}
@@ -153,22 +154,23 @@ async function Cifras({ user }: { user: CurrentUser }) {
   const sums = emitted.map((inv) => summarizeInvoice(inv, today, adj.get(inv.id)));
   const outstanding = sums.reduce((s, x) => s + x.outstandingCents, 0);
   const late = sums.filter((x) => x.overdue);
+  const money = { currency: appCurrency(), locale: appLocale() };
   return (
     <div className="grid h-full gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Stat label="Expedientes activos" value={active.n} href="/expedientes" icon="expedientes" />
+      <Stat label="Expedientes activos" value={<CountUp value={active.n} />} href="/expedientes" icon="expedientes" />
       <Stat
         label="Mis plazos esta semana"
-        value={week.n}
+        value={<CountUp value={week.n} />}
         href="/agenda?mios=1"
         icon={overdue.n > 0 ? "alerta" : "agenda"}
         tone={overdue.n > 0 ? "danger" : "default"}
         hint={overdue.n > 0 ? `${overdue.n} ${overdue.n === 1 ? "vencido" : "vencidos"} sin completar` : "Todo al día"}
       />
-      <Stat label="Horas sin facturar" value={formatMoney(unbilled.cents)} href="/horas?todos=1" icon="horas" hint={formatDuration(unbilled.minutes)} />
+      <Stat label="Horas sin facturar" value={<CountUp value={unbilled.cents} format="money" money={money} />} href="/horas?todos=1" icon="horas" hint={formatDuration(unbilled.minutes)} />
       {seesBilling ? (
         <Stat
           label="Pendiente de cobro"
-          value={formatMoney(outstanding)}
+          value={<CountUp value={outstanding} format="money" money={money} />}
           href="/facturas?estado=emitida"
           icon="cobro"
           tone={late.length ? "warn" : "default"}
@@ -363,17 +365,17 @@ async function MisHoras({ user }: { user: CurrentUser }) {
         ].map(([l, v]) => (
           <div key={l as string} className="rounded-xl bg-ink-50 px-2 py-3">
             <dt className="text-xs text-ink-500">{l}</dt>
-            <dd className="whitespace-nowrap font-serif text-xl font-semibold tabular-nums text-ink-900">{hm(v as number)}</dd>
+            <dd className="whitespace-nowrap font-serif text-xl font-semibold tabular-nums text-ink-900"><CountUp value={v as number} format="hm" /></dd>
           </div>
         ))}
       </dl>
       <div className="px-5 pb-4 text-xs text-ink-600">
         <div className="mb-1 flex justify-between">
           <span>Facturables este mes</span>
-          <span className="tabular-nums">{pct} %</span>
+          <CountUp value={pct} format="pct" />
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-          <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
+          <div className="grow-x h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-3">{timer.length ? `⏱ Cronómetro en marcha en ${timer[0].matter}.` : "Consejo: «Iniciar cronómetro» en un expediente mide el tiempo por ti."}</p>
       </div>

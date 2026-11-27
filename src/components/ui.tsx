@@ -82,7 +82,7 @@ export function Stat({
   const color = tone === "danger" ? "text-red-700" : tone === "warn" ? "text-amber-700" : "text-ink-900";
   const chip = tone === "danger" ? "bg-red-50 text-red-600" : tone === "warn" ? "bg-amber-50 text-amber-700" : "bg-brand-50 text-brand-600";
   const body = (
-    <div className={`card card-pad h-full transition-colors ${href ? "hover:border-brand-300" : ""}`}>
+    <div className={`card card-pad h-full ${href ? "lift hover:border-brand-300" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-ink-600">{label}</p>
         {icon && (

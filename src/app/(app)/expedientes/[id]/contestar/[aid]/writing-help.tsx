@@ -61,7 +61,7 @@ export function WritingHelp({ open, onClose, fields, target, female, onInsert, o
   };
 
   return (
-    <aside role="dialog" aria-label="Ayuda para escribir" className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-200 bg-white shadow-2xl" data-testid="ayuda-escribir">
+    <aside role="dialog" aria-label="Ayuda para escribir" className="drawer-enter fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-ink-200 bg-white shadow-2xl" data-testid="ayuda-escribir">
       <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
         <h2 className="font-semibold">Ayuda para escribir</h2>
         <button type="button" className="btn-ghost btn-sm" onClick={onClose} aria-label="Cerrar la ayuda para escribir">

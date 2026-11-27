@@ -148,7 +148,7 @@ export function AssistantChat() {
         <section
           role="dialog"
           aria-label="Asistente del despacho"
-          className="flex h-[min(38rem,calc(100dvh-7rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-2xl shadow-brand-900/20"
+          className="pop-enter flex h-[min(38rem,calc(100dvh-7rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-surface shadow-2xl shadow-brand-900/20"
         >
           <header className="flex items-center justify-between bg-brand-700 px-4 py-3 text-white">
             <div>
