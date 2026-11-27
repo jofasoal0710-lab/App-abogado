@@ -1,4 +1,4 @@
-import { ordinal, type Block } from "@/lib/forms/engine";
+import { ordinalLabel, type Block } from "@/lib/forms/engine";
 
 /** Documento redactado, con formato de escrito (letra con serifa, justificado, interlineado amplio). */
 export function LegalDocument({ blocks }: { blocks: Block[] }) {
@@ -35,7 +35,7 @@ export function LegalDocument({ blocks }: { blocks: Block[] }) {
               <ol key={i} className="mt-3 space-y-3">
                 {b.items.map((it, j) => (
                   <li key={j} className="text-justify">
-                    <span className="font-semibold">{ordinal(j)}:</span> {it}
+                    <span className="font-semibold">{ordinalLabel(j, b.prefix)}:</span> {it}
                   </li>
                 ))}
               </ol>

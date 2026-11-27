@@ -1,8 +1,9 @@
+import { isReadableDemand } from "@/lib/doc-text";
 import type { Metadata } from "next";
 import { HelpButton } from "@/components/help/help-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { ActionForm, SubmitButton } from "@/components/form";
 import { Breadcrumbs, EmptyState } from "@/components/ui";
 import { db } from "@/db";
@@ -15,7 +16,6 @@ import { startDemandAnalysisAction } from "../../contestar-actions";
 
 export const metadata: Metadata = { title: "Contestar una demanda" };
 
-const READABLE = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
 
 /** Paso 1: elegir la demanda recibida (documento del expediente o texto pegado) para analizarla. */
 export default async function AnswerDemandStartPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +24,7 @@ export default async function AnswerDemandStartPage({ params }: { params: Promis
   if (!Number.isInteger(matterId)) notFound();
   const matter = await requireMatterPage(user, matterId);
   const [docs, analyses] = await Promise.all([
-    db.select({ id: documents.id, name: documents.name, createdAt: documents.createdAt }).from(documents).where(and(eq(documents.matterId, matterId), inArray(documents.mimeType, READABLE))).orderBy(desc(documents.createdAt)),
+    db.select({ id: documents.id, name: documents.name, mimeType: documents.mimeType, createdAt: documents.createdAt }).from(documents).where(eq(documents.matterId, matterId)).orderBy(desc(documents.createdAt)).then((rows) => rows.filter((d) => isReadableDemand(d.name, d.mimeType))),
     db.select({ id: demandAnalyses.id, sourceName: demandAnalyses.sourceName, analysis: demandAnalyses.analysis, answers: demandAnalyses.answers, updatedAt: demandAnalyses.updatedAt, writingId: demandAnalyses.writingId }).from(demandAnalyses).where(eq(demandAnalyses.matterId, matterId)).orderBy(desc(demandAnalyses.updatedAt)),
   ]);
 

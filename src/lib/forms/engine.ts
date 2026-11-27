@@ -41,7 +41,8 @@ export type Block =
   | { t: "encabezado"; text: string }
   | { t: "p"; text: string }
   | { t: "seccion"; text: string }
-  | { t: "ordinales"; items: string[] }
+  /** Puntos numerados «PRIMERO:», «SEGUNDO:»… Con `prefix`, «AL HECHO PRIMERO:». */
+  | { t: "ordinales"; items: string[]; prefix?: string }
   | { t: "firma"; lines: string[] };
 
 export type Values = Record<string, string>;
@@ -78,6 +79,11 @@ export function ordinal(i: number): string {
   return ORDINALS[i] ?? `${i + 1}.º`;
 }
 
+/** «PRIMERO» o, con prefijo, «AL HECHO PRIMERO». */
+export function ordinalLabel(i: number, prefix?: string): string {
+  return prefix ? `${prefix} ${ordinal(i)}` : ordinal(i);
+}
+
 /** Fecha «AAAA-MM-DD» en letras de calendario: «19 de noviembre de 2026». */
 export function longDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
@@ -90,7 +96,7 @@ export function longDate(iso: string): string {
 export function toPlainText(blocks: Block[]): string {
   return blocks
     .map((b) => {
-      if (b.t === "ordinales") return b.items.map((it, i) => `${ordinal(i)}: ${it}`).join("\n");
+      if (b.t === "ordinales") return b.items.map((it, i) => `${ordinalLabel(i, b.prefix)}: ${it}`).join("\n");
       if (b.t === "firma") return b.lines.join("\n");
       return b.text;
     })

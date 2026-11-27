@@ -12,6 +12,10 @@ const LEGAL_WORDS = [
   "ad", "hoc", "ut", "et", "al", "bis", "ter", "quater", "inc", "lic", "licda", "licdo", "cpc", "cpca", "cpp", "lgap", "srl", "ltda", "notarial", "notariales", "protocolizar",
   "protocolización", "apostilla", "apostillado", "cesantía", "preaviso", "acójase", "acójanse", "téngase", "tómese", "notifíquese", "resuélvase", "comuníquese", "cúmplase",
   "remátese", "embárguese", "deniégase", "rechácese", "admítase", "confírmase", "revócase", "anúlase", "díctese", "otórguese", "señálese", "subsidio", "sinpe",
+  // Vocabulario forense que el diccionario general no trae.
+  "actora", "actoras", "codemandado", "codemandada", "codemandados", "codemandadas", "monto", "montos", "ganancialidad", "catastrado", "catastrada", "registral", "registrales",
+  "notifíquese", "contrademanda", "contrademandas", "indemnizatorio", "indemnizatoria", "resarcitorio", "resarcitoria", "contravencional", "contravencionales", "supletoriamente",
+  "especialísimo", "especialísima", "generalísimo", "generalísima", "interrelación", "allanamiento", "allanamientos", "apersonamiento", "personería",
 ];
 
 type Speller = { correct(w: string): boolean; suggest(w: string): string[] };

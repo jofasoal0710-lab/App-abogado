@@ -4,6 +4,9 @@ import { db } from "@/db";
 import { lawArticles, lawTexts } from "@/db/schema";
 import type { Citation } from "./demand-analysis";
 import { readStoredFile } from "./storage";
+import { rtfToText, sniffDocument } from "./doc-text";
+
+export { isReadableDemand } from "./doc-text";
 
 /** Tamaño máximo de una demanda para analizarla (texto sacado del PDF o Word). */
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -21,19 +24,28 @@ export async function extractStoredText(storageKey: string, mimeType: string): P
   try {
     let text = "";
     let pages: number | undefined;
-    if (mimeType === "application/pdf") {
+    // El formato se reconoce por el contenido (un .doc puede venir como «application/octet-stream»).
+    const kind = sniffDocument(data, mimeType);
+    if (kind === "pdf") {
       const { extractText, getDocumentProxy } = await import("unpdf");
       const pdf = await getDocumentProxy(new Uint8Array(data));
       const r = await extractText(pdf, { mergePages: false });
       pages = r.totalPages;
       text = (r.text as string[]).join("\n\n");
-    } else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    } else if (kind === "docx") {
       const mammoth = await import("mammoth");
       text = (await mammoth.extractRawText({ buffer: data })).value;
-    } else if (mimeType === "text/plain") {
+    } else if (kind === "doc") {
+      // Word 97-2003 (.doc): se lee en el servidor, sin programas externos.
+      const WordExtractor = (await import("word-extractor")).default;
+      const doc = await new WordExtractor().extract(data);
+      text = [doc.getHeaders?.({ includeFooters: false }) ?? "", doc.getBody(), doc.getFootnotes?.() ?? ""].filter(Boolean).join("\n\n");
+    } else if (kind === "rtf") {
+      text = rtfToText(data.toString("latin1"));
+    } else if (kind === "txt") {
       text = data.toString("utf8");
     } else {
-      return { ok: false, error: "Solo se pueden analizar demandas en PDF, Word (.docx) o texto. Si es otro formato, pega el texto." };
+      return { ok: false, error: "Solo se pueden analizar demandas en PDF, Word (.doc o .docx), RTF o texto. Si es otro formato, pega el texto." };
     }
     const words = text.split(/\s+/).filter((w) => /[a-záéíóúñ]{2}/i.test(w)).length;
     if (words < 40) {

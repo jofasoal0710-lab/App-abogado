@@ -15,6 +15,7 @@ import { checkCitations } from "@/lib/demand-db";
 import { pointByPoint } from "@/lib/demand-points";
 import { addAnswerDeadlineAction, deleteDemandAnalysisAction, fillMatterFromDemandAction, generateAnswerWritingAction, reanalyzeDemandAction, saveDemandAnswersAction } from "../../../contestar-actions";
 import { Workbench } from "./workbench";
+import { checkSpellingAction } from "../../../../formularios/tools-actions";
 
 export const metadata: Metadata = { title: "Contestar la demanda" };
 
@@ -133,6 +134,8 @@ export default async function AnswerDemandPage({ params }: { params: Promise<{ i
         generate={generateAnswerWritingAction}
         addDeadline={addAnswerDeadlineAction.bind(null, aid)}
         hasEvent={!!row.eventId}
+        writingId={row.writingId}
+        check={checkSpellingAction}
         today={today}
       />
 

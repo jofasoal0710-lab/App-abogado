@@ -39,6 +39,7 @@
     "sanitize-html": "2.18.1",
     "server-only": "^0.0.1",
     "unpdf": "2.0.1",
+    "word-extractor": "1.0.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {

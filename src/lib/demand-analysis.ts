@@ -212,10 +212,15 @@ export function splitItems(section: string): string[] {
   const clean = items.map((s) => s.replace(/\s+/g, " ").trim()).filter((s) => s.length > 2);
   if (clean.length >= 2) return clean;
   // Sin marcas: un punto por párrafo.
-  return section
+  const paragraphs = section
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\s+/g, " ").trim())
     .filter((p) => p.length > 15);
+  // Word (.doc/.docx) da un párrafo por línea, sin líneas en blanco entre ellos. Si casi todas las líneas
+  // terminan como una frase (y no son cortes de línea de un PDF), cada línea es un párrafo.
+  const lineParas = section.split("\n").map((l) => l.trim()).filter((l) => l.length > 15);
+  if (paragraphs.length < 2 && lineParas.length >= 2 && lineParas.filter((l) => /[.:;]$/.test(l)).length >= lineParas.length * 0.8) return lineParas;
+  return paragraphs;
 }
 
 /* ---------------- Tipo de proceso ---------------- */
@@ -729,6 +734,7 @@ export function answerValues(a: DemandAnalysis, ans: Answers): Record<string, st
   if (ans.estimatePosition.trim()) claims.push(`Sobre la estimación: ${sentence(ans.estimatePosition)}`);
   const evidence = a.evidence.filter((e) => ans.evidence[String(e.n)]?.objection?.trim()).map((e) => `Sobre la prueba ${e.n} de la parte actora (${e.text.slice(0, 80)}${e.text.length > 80 ? "…" : ""}): ${sentence(ans.evidence[String(e.n)]!.objection!)}`);
   return {
+    petitoria: petitoria(a, ans, defenses.length > 0).join("\n"),
     hechos: facts.join("\n"),
     excepciones: defenses.join("\n"),
     pretensiones: claims.join("\n"),
@@ -737,4 +743,32 @@ export function answerValues(a: DemandAnalysis, ans: Answers): Record<string, st
     derecho: ans.legalGrounds,
     tipoProceso: PROCESSES[kind].label.replace(/^Proceso\s+/i, "").replace(/^./, (c) => c.toUpperCase()),
   };
+}
+
+const listNums = (ns: number[]) => (ns.length === 1 ? `${ns[0]}` : `${ns.slice(0, -1).join(", ")} y ${ns.at(-1)}`);
+
+/**
+ * Lo que se pide al juzgado, coherente con las respuestas: si hubo allanamientos no se puede pedir «sin lugar
+ * la demanda en todos sus extremos» ni la condena en costas de la parte actora.
+ */
+export function petitoria(a: DemandAnalysis, ans: Answers, hasDefenses: boolean): string[] {
+  const allanadas: number[] = [];
+  const parciales: number[] = [];
+  const opuestas: number[] = [];
+  for (const c of a.claims) {
+    const r = ans.claims[String(c.n)];
+    (r?.allanamiento ? allanadas : r?.parcial ? parciales : opuestas).push(c.n);
+  }
+  const out = ["Que se tenga por contestada en tiempo y forma la demanda, en los términos expuestos."];
+  if (hasDefenses) out.push("Que se acojan las excepciones opuestas.");
+  if (!allanadas.length && !parciales.length) {
+    out.push("Que se declare sin lugar la demanda en todos sus extremos.");
+    out.push("Que se condene a la parte actora al pago de ambas costas del proceso.");
+    return out;
+  }
+  if (allanadas.length) out.push(`Que se tenga por hecho el allanamiento a ${allanadas.length === 1 ? "la pretensión" : "las pretensiones"} ${listNums(allanadas)}, en los términos indicados.`);
+  if (parciales.length) out.push(`Que ${parciales.length === 1 ? "la pretensión" : "las pretensiones"} ${listNums(parciales)} se ${parciales.length === 1 ? "resuelva" : "resuelvan"} conforme a la posición expuesta, rechazándose en lo que fue objetado.`);
+  if (opuestas.length) out.push(`Que se ${opuestas.length === 1 ? "rechace la pretensión" : "rechacen las pretensiones"} ${listNums(opuestas)}.`);
+  out.push("Que se resuelva sin especial condena en costas.");
+  return out;
 }

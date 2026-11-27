@@ -1,14 +1,14 @@
 import { getCurrentUser } from "@/lib/auth";
+import { writingDocx } from "@/lib/docx-export";
 import { getTemplate } from "@/lib/forms/templates";
-import { wordDocument } from "@/lib/writing-export";
 import { logRead } from "@/lib/read-audit";
 import { getAccessibleWriting } from "@/lib/writings";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Descarga para Word: un documento HTML que Word abre y permite editar y guardar como .docx. Mismo
- * acceso que la ficha del escrito (404 si no se ve).
+ * Descarga en Word (.docx de verdad): carta, Times New Roman 12, márgenes de 2,5 cm, numeración de páginas
+ * y los [PENDIENTE] resaltados. Mismo acceso que la ficha del escrito (404 si no se ve).
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -19,12 +19,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!w || !tpl) return new Response("No encontrado", { status: 404 });
   if (w.matterId) await logRead(user, { matterId: w.matterId, kind: "documento", detail: `Descargó el escrito: ${w.title}` });
 
-  const html = wordDocument(w.title, tpl.render(w.values));
+  const bytes = writingDocx(w.title, tpl.render(w.values), { author: user.name });
   const name = w.title.replace(/[^\p{L}\p{N} ._-]+/gu, "").trim().slice(0, 80) || "escrito";
-  return new Response("﻿" + html, {
+  // Nombre de respaldo sin tildes, para navegadores que no leen «filename*».
+  const ascii = name.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/["\\]/g, "").trim() || "escrito";
+  return new Response(Buffer.from(bytes), {
     headers: {
-      "content-type": "application/msword; charset=utf-8",
-      "content-disposition": `attachment; filename="escrito.doc"; filename*=UTF-8''${encodeURIComponent(name)}.doc`,
+      "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "content-disposition": `attachment; filename="${ascii}.docx"; filename*=UTF-8''${encodeURIComponent(name)}.docx`,
       "cache-control": "no-store",
     },
   });

@@ -13,9 +13,17 @@ import { procedureDeadline } from "@/lib/calculators";
 import { stampSessionActor } from "@/lib/data-audit";
 import { PROCESSES, analyzeDemand, answerValues, sanitizeAnswers, type DemandAnalysis } from "@/lib/demand-analysis";
 import { extractStoredText } from "@/lib/demand-db";
-import { cleanValues, initialValues } from "@/lib/forms/engine";
+import { BLANK, cleanValues, initialValues } from "@/lib/forms/engine";
 import { getTemplate } from "@/lib/forms/templates";
 import { autoValues } from "@/lib/writings";
+
+/** «PROCESO: ABREVIADO DE DIVORCIO» del encabezado → «Abreviado de divorcio». */
+function processLine(text: string): string | null {
+  const m = /^\s*(?:tipo\s+de\s+)?proceso\s*:\s*(.{4,80})$/im.exec(text.split("\n").slice(0, 25).join("\n"));
+  if (!m) return null;
+  const t = m[1].trim().replace(/[.\s]+$/, "").toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 /** La demanda analizada, solo si se tiene acceso a su expediente. */
 async function loadAnalysis(id: number) {
@@ -93,9 +101,12 @@ export async function generateAnswerWritingAction(id: number) {
   const values = cleanValues(tpl, {
     ...base,
     juzgado: base.juzgado || analysis.court || "",
-    expediente: base.expediente || analysis.caseNumber || "",
+    // Sin número aún («por asignar»): queda la línea en blanco para completarla, y sale en la lista de pendientes.
+    expediente: base.expediente || analysis.caseNumber || BLANK,
     contraparte: analysis.plaintiffs.join(" y ") || base.contraparte || "",
     ...fromDemand,
+    // El tipo de proceso tal como lo nombra la demanda («PROCESO: ABREVIADO DE DIVORCIO»), si lo indica.
+    ...(processLine(row.text) ? { tipoProceso: processLine(row.text)! } : {}),
     derecho: fromDemand.derecho || base.derecho || "",
   });
   const title = `Contestación de demanda${analysis.plaintiffs[0] ? ` de ${analysis.plaintiffs[0]}` : ""}`.slice(0, 200);

@@ -6,6 +6,9 @@ import { ActionForm, SubmitButton } from "@/components/form";
 import { procedureDeadline } from "@/lib/calculators";
 import { EVIDENCE_LABELS, FACT_ANSWERS, PROCESSES, defensesFor, type Answers, type DemandAnalysis, type FactAnswer, type ProcessKind } from "@/lib/demand-analysis";
 import type { ActionState } from "@/lib/actions";
+import { insertAt } from "@/lib/writing-phrases";
+import type { TextIssue } from "@/lib/text-rules";
+import { WritingHelp, type HelpField } from "./writing-help";
 import { CONTROVERSY_LABELS, NATURE_LABELS, STANCE_LABELS, type ClaimChoice, type ClaimStance, type Controversy, type Nature, type PointByPoint } from "@/lib/demand-points";
 
 type Props = {
@@ -18,6 +21,9 @@ type Props = {
   addDeadline: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   hasEvent: boolean;
   today: string;
+  /** Escrito ya redactado (para descargarlo en Word). */
+  writingId: number | null;
+  check: (fields: { field: string; label: string; text: string }[]) => Promise<{ field: string; label: string; issues: TextIssue[] }[]>;
 };
 
 const ANSWER_STYLE: Record<FactAnswer, string> = {
@@ -58,7 +64,7 @@ const choiceOf = (c: { allanamiento?: boolean; parcial?: boolean }): ClaimChoice
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
 
 /** Mesa de trabajo de la contestación: hecho por hecho, pretensiones, prueba, excepciones. Se guarda sola. */
-export function Workbench({ id, analysis, points, initial, save, generate, addDeadline, hasEvent, today }: Props) {
+export function Workbench({ id, analysis, points, initial, save, generate, addDeadline, hasEvent, today, writingId, check }: Props) {
   const [ans, setAns] = useState<Answers>(initial);
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "error">("idle");
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -107,6 +113,76 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
   const evidencePoint = new Map(points.evidence.map((p) => [p.n, p]));
   /** Sustituir un texto ya escrito pide confirmación. */
   const replaceOk = (current: string | undefined, next: string) => !current?.trim() || current.trim() === next.trim() || window.confirm("Esto sustituye lo que ya escribiste. ¿Continuar?");
+  /* ---------- Ayuda para escribir: campos, cursor e inserciones ---------- */
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [target, setTarget] = useState<{ id: string; label: string } | null>(null);
+  const defenseLabel = (k: string) => defenses.find((d) => d.key === k)?.label ?? k;
+  const labelOf = (fid: string) => {
+    const [kind, key] = fid.split(":");
+    return kind === "fact" ? `Hecho ${key}` : kind === "claim" ? `Pretensión ${key}` : kind === "evidence" ? `Prueba ${key} de la actora` : kind === "defense" ? `Excepción: ${defenseLabel(key)}` : kind === "own" ? "Tu prueba" : kind === "grounds" ? "Fundamentos de derecho" : "Posición sobre la estimación";
+  };
+  const getText = (a: Answers, fid: string): string => {
+    const [kind, key] = fid.split(":");
+    if (kind === "fact") return a.facts[key]?.why ?? "";
+    if (kind === "claim") return a.claims[key]?.why ?? "";
+    if (kind === "evidence") return a.evidence[key]?.objection ?? "";
+    if (kind === "defense") return a.defenses[key]?.why ?? "";
+    if (kind === "own") return a.ownEvidence;
+    if (kind === "grounds") return a.legalGrounds;
+    return a.estimatePosition;
+  };
+  const setText = (fid: string, text: string) => {
+    const [kind, key] = fid.split(":");
+    update((a) => {
+      if (kind === "fact") a.facts[key] = { ...a.facts[key], why: text };
+      else if (kind === "claim") a.claims[key] = { ...a.claims[key], why: text };
+      else if (kind === "evidence") a.evidence[key] = { objection: text };
+      else if (kind === "defense") a.defenses[key] = { ...a.defenses[key], why: text };
+      else if (kind === "own") a.ownEvidence = text;
+      else if (kind === "grounds") a.legalGrounds = text;
+      else a.estimatePosition = text;
+      return a;
+    });
+  };
+  const fieldProps = (fid: string) => ({ "data-field": fid, onFocus: () => setTarget({ id: fid, label: labelOf(fid) }) });
+  const elOf = (fid: string) => document.querySelector<HTMLTextAreaElement>(`textarea[data-field="${fid}"]`);
+  const select = (fid: string, start: number, end: number) =>
+    requestAnimationFrame(() => {
+      const el = elOf(fid);
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(start, end);
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  const helpFields: HelpField[] = [
+    ...analysis.facts.filter((f) => ans.facts[String(f.n)]?.a).map((f) => `fact:${f.n}`),
+    ...analysis.claims.map((c) => `claim:${c.n}`),
+    "estimate",
+    ...defenses.filter((d) => ans.defenses[d.key]?.on).map((d) => `defense:${d.key}`),
+    ...analysis.evidence.map((e) => `evidence:${e.n}`),
+    "own",
+    "grounds",
+  ].map((fid) => ({ id: fid, label: labelOf(fid), text: getText(ans, fid) }));
+  const insertPhrase = (text: string) => {
+    if (!target) return;
+    const el = elOf(target.id);
+    const cur = getText(latest.current, target.id);
+    const start = el?.selectionStart ?? cur.length;
+    const end = el?.selectionEnd ?? cur.length;
+    const r = insertAt(cur, start, end, text);
+    setText(target.id, r.value);
+    // Si el texto insertado trae un [PENDIENTE], queda seleccionado para escribir encima.
+    const p = r.value.indexOf("[PENDIENTE", r.caret - text.length);
+    if (p >= 0 && p < r.caret) select(target.id, p, r.value.indexOf("]", p) + 1);
+    else select(target.id, r.caret, r.caret);
+  };
+  const replaceAt = (fid: string, index: number, from: string, to: string) => {
+    const cur = getText(latest.current, fid);
+    const at = cur.slice(index, index + from.length) === from ? index : cur.indexOf(from);
+    if (at < 0) return;
+    setText(fid, cur.slice(0, at) + to + cur.slice(at + from.length));
+  };
+
   const pendingFacts = points.facts.filter((p) => !ans.facts[String(p.n)]?.a).length;
   const pendingClaims = points.claims.filter((p) => !ans.claims[String(p.n)]?.why?.trim() && !ans.claims[String(p.n)]?.allanamiento).length;
   const applyRecommended = () =>
@@ -139,6 +215,14 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
               <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${analysis.facts.length ? (done / analysis.facts.length) * 100 : 0}%` }} />
             </div>
           </div>
+          <button type="button" className="btn-secondary" onClick={() => setHelpOpen((v) => !v)} aria-expanded={helpOpen} data-testid="abrir-ayuda-escribir">
+            ✍ Ayuda para escribir
+          </button>
+          {writingId && (
+            <a href={`/api/escritos/${writingId}/doc`} download className="btn-secondary" title="Descarga la última versión redactada. Si cambiaste respuestas, pulsa antes «Redactar la contestación».">
+              Descargar Word
+            </a>
+          )}
           <button
             type="button"
             className="btn-primary"
@@ -149,10 +233,21 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
               setGenerating(false);
             }}
           >
-            {generating ? "Redactando…" : "Redactar la contestación"}
+            {generating ? "Redactando…" : writingId ? "Actualizar la contestación" : "Redactar la contestación"}
           </button>
         </div>
       </div>
+      <WritingHelp
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        fields={helpFields}
+        target={target}
+        female={points.clientRole.female}
+        onInsert={insertPhrase}
+        onGo={(fid, index, length) => select(fid, index, index + length)}
+        onReplace={replaceAt}
+        check={check}
+      />
 
       <section className="card card-pad" aria-labelledby="plazo">
         <h2 id="plazo" className="font-semibold">Tipo de proceso y plazo para contestar</h2>
@@ -317,6 +412,7 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
                 <label className="mt-2 block">
                   <span className="sr-only">Razones del hecho {f.n}</span>
                   <textarea
+                    {...fieldProps(`fact:${f.n}`)}
                     className={`input ${(cur.why ?? "").length > 300 ? "min-h-40" : "min-h-16"}`}
                     value={cur.why ?? ""}
                     onChange={(e) => setFact(f.n, { why: e.target.value })}
@@ -393,7 +489,7 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
                   ))}
                 </div>
               </fieldset>
-              <textarea className="input mt-2 min-h-12 w-full" aria-label={`Razones sobre la pretensión ${c.n}`} value={cur.why ?? ""} onChange={(e) => setClaim(c.n, { why: e.target.value })} placeholder={choice === "allano" ? "Condiciones del allanamiento (opcional)" : choice === "parcial" ? "Qué aceptas y a qué te opones" : "Motivo de la oposición"} />
+              <textarea {...fieldProps(`claim:${c.n}`)} className="input mt-2 min-h-12 w-full" aria-label={`Razones sobre la pretensión ${c.n}`} value={cur.why ?? ""} onChange={(e) => setClaim(c.n, { why: e.target.value })} placeholder={choice === "allano" ? "Condiciones del allanamiento (opcional)" : choice === "parcial" ? "Qué aceptas y a qué te opones" : "Motivo de la oposición"} />
             </div>
           );
         })}
@@ -401,7 +497,7 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
           <span className="label">
             Posición sobre la estimación {analysis.estimate ? `(la demanda la fija en ${analysis.estimate.text})` : ""}
           </span>
-          <textarea className="input min-h-12" value={ans.estimatePosition} onChange={(e) => update((a) => ({ ...a, estimatePosition: e.target.value }))} placeholder="Por ejemplo: se rechaza por excesiva, al no corresponder a los extremos reclamados." />
+          <textarea {...fieldProps("estimate")} className="input min-h-12" value={ans.estimatePosition} onChange={(e) => update((a) => ({ ...a, estimatePosition: e.target.value }))} placeholder="Por ejemplo: se rechaza por excesiva, al no corresponder a los extremos reclamados." />
         </label>
       </section>
 
@@ -427,7 +523,7 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
                           <span className="block text-xs text-ink-500">{d.hint}</span>
                         </span>
                       </label>
-                      {cur.on && <textarea className="input mt-2 min-h-14" value={cur.why ?? ""} onChange={(e) => update((a) => ({ ...a, defenses: { ...a.defenses, [d.key]: { ...a.defenses[d.key], why: e.target.value } } }))} placeholder="Razona la excepción: hechos en que se funda y prueba." />}
+                      {cur.on && <textarea {...fieldProps(`defense:${d.key}`)} className="input mt-2 min-h-14" value={cur.why ?? ""} onChange={(e) => update((a) => ({ ...a, defenses: { ...a.defenses, [d.key]: { ...a.defenses[d.key], why: e.target.value } } }))} placeholder="Razona la excepción: hechos en que se funda y prueba." />}
                     </li>
                   );
                 })}
@@ -460,7 +556,7 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
                 </button>
               </div>
             ))}
-            <textarea className="input mt-2 min-h-12" value={ans.evidence[String(e.n)]?.objection ?? ""} onChange={(ev) => update((a) => ({ ...a, evidence: { ...a.evidence, [e.n]: { objection: ev.target.value } } }))} placeholder="Opcional: objeción (impertinente, innecesaria, copia sin certificar…)" />
+            <textarea {...fieldProps(`evidence:${e.n}`)} className="input mt-2 min-h-12" value={ans.evidence[String(e.n)]?.objection ?? ""} onChange={(ev) => update((a) => ({ ...a, evidence: { ...a.evidence, [e.n]: { objection: ev.target.value } } }))} placeholder="Opcional: objeción (impertinente, innecesaria, copia sin certificar…)" />
           </div>
         ))}
       </section>
@@ -469,11 +565,11 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
         <h2 id="mi-prueba" className="font-serif text-xl font-semibold">5. Tu prueba y el derecho</h2>
         <label className="block">
           <span className="label">Prueba que ofreces (una por línea)</span>
-          <textarea className="input min-h-28" value={ans.ownEvidence} onChange={(e) => update((a) => ({ ...a, ownEvidence: e.target.value }))} placeholder={"Documental: carta de renuncia del 14 de agosto de 2025.\nTestimonial: Pedro Rojas, administrador del local."} />
+          <textarea {...fieldProps("own")} className="input min-h-28" value={ans.ownEvidence} onChange={(e) => update((a) => ({ ...a, ownEvidence: e.target.value }))} placeholder={"Documental: carta de renuncia del 14 de agosto de 2025.\nTestimonial: Pedro Rojas, administrador del local."} />
         </label>
         <label className="block">
           <span className="label">Fundamentos de derecho</span>
-          <textarea className="input min-h-24" value={ans.legalGrounds} onChange={(e) => update((a) => ({ ...a, legalGrounds: e.target.value }))} placeholder="Si lo dejas vacío, se usan las normas citadas en el expediente (pestaña Normativa)." />
+          <textarea {...fieldProps("grounds")} className="input min-h-24" value={ans.legalGrounds} onChange={(e) => update((a) => ({ ...a, legalGrounds: e.target.value }))} placeholder="Si lo dejas vacío, se usan las normas citadas en el expediente (pestaña Normativa)." />
         </label>
       </section>
 
@@ -488,12 +584,12 @@ export function Workbench({ id, analysis, points, initial, save, generate, addDe
             setGenerating(false);
           }}
         >
-          {generating ? "Redactando…" : "Redactar la contestación"}
+          {generating ? "Redactando…" : writingId ? "Actualizar la contestación" : "Redactar la contestación"}
         </button>
         <button type="button" className="btn-secondary" onClick={() => void saveNow()}>
           Guardar
         </button>
-        <span className="text-sm text-ink-500">Lo que quede sin responder sale marcado como [PENDIENTE] en el escrito. Luego puedes corregirlo, revisar la ortografía, imprimirlo o descargarlo en Word.</span>
+        <span className="text-sm text-ink-500">Lo que quede sin responder sale marcado como [PENDIENTE] en el escrito. La contestación se guarda en la pestaña «Escritos» del expediente; desde ella la descargas en Word (.docx) lista para firmar y presentar.</span>
       </div>
       <p className="text-xs text-ink-500">
         ¿Necesitas calcular algo? <Link className="link" href="/herramientas">Herramientas</Link> (liquidación laboral, prescripción, plazos).

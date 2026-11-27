@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { ordinal, type Block } from "./forms/engine";
+import { ordinalLabel, type Block } from "./forms/engine";
 import { safeText } from "./pdf-text";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -18,7 +18,7 @@ export function blocksToHtml(blocks: Block[]): string {
         case "p":
           return `<p class="j">${esc(b.text)}</p>`;
         case "ordinales":
-          return b.items.map((it, i) => `<p class="j"><b>${ordinal(i)}:</b> ${esc(it)}</p>`).join("");
+          return b.items.map((it, i) => `<p class="j"><b>${esc(ordinalLabel(i, b.prefix))}:</b> ${esc(it)}</p>`).join("");
         case "firma":
           return `<p class="c" style="margin-top:40pt">${b.lines.map((l) => (l ? esc(l) : "______________________________")).join("<br>")}</p>`;
       }
@@ -125,7 +125,7 @@ export async function writingPdf(title: string, blocks: Block[]): Promise<Uint8A
         for (const para of b.text.split(/\n+/)) paragraph(words(para, regular), "justify");
         break;
       case "ordinales":
-        b.items.forEach((it, i) => paragraph([...words(`${ordinal(i)}:`, bold), ...words(it, regular)], "justify"));
+        b.items.forEach((it, i) => paragraph([...words(`${ordinalLabel(i, b.prefix)}:`, bold), ...words(it, regular)], "justify"));
         break;
       case "firma":
         newPageIfNeeded(LEADING * (b.lines.length + 3));
